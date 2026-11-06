@@ -133,6 +133,7 @@ static int check(const char *what, int ok)
 static void ui_power_on(void)
 {
     uint32_t i;
+    ft_on = ft_ready = 0; GLO_SELECT &= (uint8_t)~REC_MODE_FREE;
     midi_insert_init();
     memset(midi_output, 0, sizeof midi_output);
     punch_reset(); punch_panel_mask=punch_panel_lock=0;

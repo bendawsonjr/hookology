@@ -1190,7 +1190,7 @@ static void glo_poll(void)
             dirty = 1;
             t = fm1_ms;
         }
-    if (dirty && fm1_ms - t > 1500u && !song.playing && !seq_counting() && !momentary.active) {
+    if (dirty && fm1_ms - t > 1500u && !song.playing && !ft_on && !seq_counting() && !momentary.active) {   /* (a save would stop a take's clock) */
         dirty = 0;
         settings_save();
     }

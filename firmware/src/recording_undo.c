@@ -62,6 +62,7 @@ static void recording_undo_capture(track_t *t)
     u->track=(uint8_t)trk_index(t);u->bank=t->pattern;u->pattern_gen=t->pattern_gen;u->engine=t->eng_req;
     u->signature=recording_undo_signature(t);
     u->valid=u->active=1;u->redo=0;
+    ft_undo.valid=0;                                    /* (a later take: not the free take's, with its tempo) */
     recording_undo_active=bit;
     /* Motion-only takes also supersede earlier manual note transactions. */
     recording_generation++;

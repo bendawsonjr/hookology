@@ -575,6 +575,38 @@ static void tracks_edit(uint32_t slot, int32_t steps)
 }
 
 /* HOME's TRACKS (ui_tracks.c): the selected track's KNOB 1 SWING, 2 LEVEL, 3 STEPS, 4 PAN. ALGORITHM picks the track */
+/* REC MODE FREE, for the audio side (free_take.c): the setting, the buttons a take watches, whether a note would start
+ * one: armed and stopped on the internal clock, no notes in any pattern. What a take ended in, in the header */
+static int project_no_notes(void)
+{
+    for (uint32_t k = 0; k < trk_n(); k++)
+        for (uint32_t b = 0; b < trk_npat(k); b++)
+            if (!pattern_empty(k, b)) return 0;
+    return 1;
+}
+static void free_take_poll(void)
+{
+    uint32_t msg = ft_msg;
+    char b[24];
+    free_mode = (GLO_SELECT & REC_MODE_FREE) != 0u;
+    ft_rec_mask = 1u << panel.btn[B_REC];
+    ft_play_mask = 1u << panel.btn[B_PLAY];
+    ft_ready = (uint8_t)(free_mode && !ft_on && !song.playing && !seq_counting() && !chain_busy() && !song.g[G_CLOCK] &&
+                         ((song.rec >> song.sel) & 1u) && project_no_notes());
+    if (!msg) return;
+    ft_msg = FT_NONE;
+    if (msg == FT_DROPPED) ui_message("TAKE DROPPED");
+    else if (msg == FT_NO_LOOP) ui_message("NO LOOP: PLAY LONGER");
+    else if (msg == FT_FULL) ui_message("TAKE FULL");
+    else {
+        fmt_int(b, ft_bars);
+        str_cpy(b + str_len(b), ft_bars > 1u ? " BARS " : " BAR ", 8);
+        fmt_int(b + str_len(b), song.g[G_BPM]);
+        ui_say(b, " BPM");
+    }
+    ui.force = 1;
+}
+
 static void tracks_value(track_t *t, uint32_t id, uint32_t k, int32_t s)
 {
     int16_t *vp = &t->p[id];
@@ -831,7 +863,7 @@ static void autosave_poll(uint32_t active)
 #else
     uint32_t r = usb.rx_pkts;
 #endif
-    if (!settings_autosave || active || r != rx || transport_busy() || ui.menu || ui.confirm || name_on() || new_on() || ui.layer || momentary.active ||
+    if (!settings_autosave || active || ft_on || r != rx || transport_busy() || ui.menu || ui.confirm || name_on() || new_on() || ui.layer || momentary.active ||
         browse_pending() || qsave_req || designer_on()) {
         t0 = fm1_ms;
         rx = r;
@@ -2259,6 +2291,12 @@ static void ui_input(void)
     uint32_t bank_notes = notes;
     uint32_t home = btn_hold(&ui.home_t0, B_HOME, now, 1);
     uint32_t rec = btn_hold(&ui.rec_t0, B_REC, now, !ui.menu && !ui.confirm && !name_on());   /* held: MIXER */
+    if (ft_on || ft_rec_eat) {                          /* (the take's press: it closed it) */
+        if (!((fm1_in.buttons >> panel.btn[B_REC]) & 1u)) ft_rec_eat = 0;
+        rec = BT_NONE;
+    }
+    if (!((fm1_in.buttons >> panel.btn[B_PLAY]) & 1u)) ft_play_eat = 0;
+    free_take_poll();
     /* On MOTION, wait for release before navigating on a SEQ hold, so the
      * button can be held as long as needed for lane/point clear gestures. */
     uint32_t seq_long = motion_page() && ui.seq_t0 && !(ui.seq_t0 & 2u) &&
@@ -2552,6 +2590,7 @@ static void ui_input(void)
         switch (b) {
         case B_PLAY:
             if (song_picker.active) { ui_message("FINISH PRESET FIRST"); break; }
+            if (ft_on || ft_play_eat) break;            /* (the take's press: it dropped it) */
             if ((fm1_in.buttons >> panel.btn[B_REC]) & 1u) {   /* REC + PLAY: record now */
                 rec_play();
                 break;

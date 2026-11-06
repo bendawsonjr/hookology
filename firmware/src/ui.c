@@ -114,6 +114,8 @@ static void glo_select_set(uint32_t v) { GLO_SELECT = (uint8_t)((GLO_SELECT & ~0
 /* UNUSED TRACKS (the menu): HIDE in bit 5 of the same byte. SHOW (0): Stage and MIXER keep a greyed row for each
  * place not in use, saying "Add track"; HIDE: the tracks in use share the rows (one track: the wide card) */
 #define TRACKS_HIDE 32u
+/* REC MODE (the menu): FREE in bit 6 of the same byte (free_take.c), GRID 0 */
+#define REC_MODE_FREE 64u
 /* the four tracks Stage, MIXER, PATTERNS and SONG show: the selected one's (1..4, or the MIDI-only
  * 5..8); a row k of them is track trk_group() + k */
 static uint32_t trk_group(void) { return song.sel / NPART * NPART; }
@@ -877,6 +879,7 @@ static int recording_history(int redo)
     motion_unguard(f);
     if(!result)return 0;
     if(result==1){
+        ft_undo_swap();
         ui.note_pick=0;ui.note_generation=recording_generation;
         ui.hot_t=0;ui.force=1;
         ui_message(redo?"REDO RECORDING":"UNDO RECORDING");

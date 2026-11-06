@@ -373,6 +373,11 @@ static uint32_t step_samples(const track_t *t, uint32_t period, uint32_t idx)
     return swing_step_len(t, period, idx);   /* core.h: own + global, at most 100 */
 }
 
+/* REC MODE FREE (the menu; free_take.c): 1 while it is on */
+static volatile uint8_t free_mode, ft_on;
+static struct { uint8_t valid, trk; int16_t bpm, slen[NTRK], sdiv[NTRK]; } ft_undo;
+#define FT_DIV 2                                        /* N_DIV: 1/16 */
+#define REC_LAT 512u                                    /* key to ear, ~12 ms: FREE takes it back from a note it records */
 #include "recording.c"
 #include "note_history.c"
 #include "recording_undo.c"
@@ -483,13 +488,14 @@ static void rec_note(track_t *t, uint32_t note, uint32_t vel)
     if (seq_erase_active(t)) return;
     uint32_t len = t->p[P_SLEN] > 0 ? (uint32_t)t->p[P_SLEN] : 1u, k;
     uint32_t next = t->seq_pos == 0x7FFFFFFFu;      /* Start and the note in one block: step 0 fires after it */
+    uint32_t heard = free_mode ? REC_LAT : 0u;      /* (FREE: where it was heard) */
     uint32_t idx = next ? 0u : t->seq_idx % len;
     step_t *s;
     /* Every recording source rounds to the closest swung onset, including
      * the last-to-first transition. Guard the upcoming live note from
      * being retriggered when that step is entered. */
     if (!next &&
-        t->seq_pos >= step_samples(t, seq_div_samples((uint32_t)t->p[P_SDIV]), idx) / 2u) {
+        t->seq_pos >= step_samples(t, seq_div_samples((uint32_t)t->p[P_SDIV]), idx) / 2u + heard) {
         idx = (idx + 1u) % len;
         next = 1;
     }
@@ -684,7 +690,8 @@ static void rec_set(track_t *t, uint32_t on)
             if ((song.rec & (1u << k)) && &trk[k] != t) rec_disarm(&trk[k]);
         if (song.rec & bit) return;
         song.rec |= bit;
-        if (song.playing && t->seq_pos < 0x7FFFFFFFu) song.rec_wait |= bit;
+        if (song.playing && free_mode) song.rec_pass |= bit;   /* FREE: at once */
+        else if (song.playing && t->seq_pos < 0x7FFFFFFFu) song.rec_wait |= bit;
         else if (song.playing) song.rec_pass |= bit;
     } else rec_disarm(t);
 }
@@ -707,10 +714,13 @@ static void rec_begin_held(track_t *t)
 static void countin_note(track_t *t,uint32_t note,uint32_t vel);
 static int rec_note_start(track_t *t);
 static void seq_advance(uint32_t n);
+static void ft_note_on(const track_t *t, uint32_t note, uint32_t vel);
+static void ft_note_off(const track_t *t, uint32_t note);
 static void input_on(track_t *t, uint32_t note, uint32_t vel)
 {
     if (vel) chord_auto_observe(t, note);
     uint32_t started = vel && rec_note_start(t);
+    if (vel) ft_note_on(t, note, vel);
     countin_note(t,note,vel);
     last_note = (uint8_t)note;
     live_note_on(t, note, vel);
@@ -733,6 +743,7 @@ static void input_off(track_t *t, uint32_t note)
     if (midi_note_held(t, note))
         return;
     live_held[trk_index(t)][note >> 5] &= ~(1u << (note & 31u));
+    ft_note_off(t, note);
     cap_off(t, note);
     rec_release(t, note);
     arp_remove(t, note);                            /* both: the note may have started in the */
@@ -1017,8 +1028,9 @@ static void recording_quant_position(const recorded_note_t *r, uint32_t at, uint
  * all other banks without allocating memory in the audio interrupt. */
 static void recording_quantize(track_t *t)
 {
-    if (!t->p[P_RECQ]) return;
-    uint32_t owner = recording_owner(t), q = (uint32_t)t->p[P_RECQ], period = seq_div_samples((uint32_t)t->p[P_SDIV]);
+    uint32_t q = t->p[P_RECQ] ? (uint32_t)t->p[P_RECQ] : free_mode ? 3u : 0u;   /* (FREE, QNT OFF: 1/16) */
+    if (!q) return;
+    uint32_t owner = recording_owner(t), period = seq_div_samples((uint32_t)t->p[P_SDIV]);
     uint32_t len = (uint32_t)clamp(t->p[P_SLEN], 1, NSTEP), blocked = 0;
     uint32_t a = step_samples(t, period, 0), b = step_samples(t, period, 1);
     recording_sync(t, period);
@@ -1324,10 +1336,17 @@ static track_t *midi_note_track(uint32_t ch, uint32_t note)
  * A count-in explicitly started with PLAY keeps its normal pickup behavior.
  * Match local PLAY's clock ownership: a running MIDI clock stays owned by its
  * source; a selected input or a stopped master does not take over internal timing. */
+#include "free_take.c"
 static int rec_note_start(track_t *t)
 {
     if (song.playing || cin_left || !(song.rec & (1u << trk_index(t))) || chain.armed || chain.running)
         return 0;
+    if (ft_on) return 0;
+    if (ft_ready) {                                     /* FREE, a project with no notes: a take, no transport */
+        ft_ready = 0;
+        ft_start(t);
+        return 0;
+    }
     resource_release(RES_NOTE_HISTORY);
     if (midi_clock_local_start(fm1_ms)) midi_clock_transport(0xFAu, fm1_ms);
     else seq_start();
@@ -1369,6 +1388,7 @@ static void seq_advance(uint32_t n)
 static void events_block(uint32_t n)
 {
     chord_auto_tick(n);
+    ft_block();
     seq_advanced = 0;
     uint32_t i, pr;
     if(song.playing || transport_req==1u)resource_release(RES_NOTE_HISTORY);

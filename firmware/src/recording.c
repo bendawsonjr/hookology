@@ -647,12 +647,23 @@ static uint32_t recording_play_on(const track_t *t, uint32_t i, uint32_t period)
 #if MELODEE_CAPTURE_FAST
 static void recording_remove(track_t *t, uint32_t i);
 #endif
+/* FREE: a note where it was heard, REC_LAT before the press, over the step's start if need be */
+static void recording_heard(const track_t *t, uint32_t period, uint32_t *actual, uint32_t *pos, uint32_t *span)
+{
+    if (!free_mode) return;
+    if (*pos >= REC_LAT) { *pos -= REC_LAT; return; }
+    uint32_t len = (uint32_t)clamp(t->p[P_SLEN], 1, NSTEP), back = REC_LAT - *pos;
+    *actual = (*actual + len - 1u) % len;
+    *span = step_samples(t, period, *actual);
+    *pos = *span > back ? *span - back : 0u;
+}
 static int recording_note(track_t *t, uint32_t note, uint32_t vel, uint32_t step)
 {
 #if MELODEE_CAPTURE_FAST
     uint32_t owner = recording_owner(t), period = seq_div_samples((uint32_t)t->p[P_SDIV]);
     uint32_t actual = t->seq_pos >= 0x7FFFFFFFu ? 0u : t->seq_idx;
     uint32_t span = step_samples(t, period, actual), pos = t->seq_pos >= 0x7FFFFFFFu ? 0u : t->seq_pos;
+    recording_heard(t, period, &actual, &pos, &span);
     uint32_t on = (uint32_t)(((uint64_t)pos * RECORD_UNIT + span / 2u) / span), free = RECORD_MAX;
     if (on > 65535u) on = 65535u;
     /* Every event of this owner, and only those, is on its bank list. One
@@ -684,6 +695,7 @@ static int recording_note(track_t *t, uint32_t note, uint32_t vel, uint32_t step
     uint32_t owner = recording_owner(t), period = seq_div_samples((uint32_t)t->p[P_SDIV]);
     uint32_t actual = t->seq_pos >= 0x7FFFFFFFu ? 0u : t->seq_idx;
     uint32_t span = step_samples(t, period, actual), pos = t->seq_pos >= 0x7FFFFFFFu ? 0u : t->seq_pos;
+    recording_heard(t, period, &actual, &pos, &span);
     uint32_t on = (uint32_t)(((uint64_t)pos * RECORD_UNIT + span / 2u) / span), free = RECORD_MAX;
     if (on > 65535u) on = 65535u;
     for (uint32_t i = 0; i < RECORD_MAX; i++) {

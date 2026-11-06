@@ -358,6 +358,7 @@ if core && [ $TABLES = 1 ]; then
     t "AUTO chords: Western scales, melody, cadences, voice leading and frozen ownership" chord_auto_test $FW
     t "AUTO2: stable melody, harmony below, Western scales and immediate strum attack" chord_melody_test $FW
     t "KIT SAMPLE: every drum, levels, ghost and hard hits, knobs, keys, presets" drum_sample_test $FW
+    t "REC MODE FREE: tempo and length from a take, the grid, limits, overdub, latency, undo" free_take_test $FW
     t "HOME TRACKS: knobs, STEPS at the loop end, one length, stored values" home_tracks_test $FW
     t "HERA chord sets: every chord and voicing, keys, recording, saved set and stored layout" hera_chord_test $FW
     t "project record (FUN16 round trip, the song chain, names, FM6 patches; older formats refused)" project_test $FW
