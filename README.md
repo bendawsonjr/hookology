@@ -660,7 +660,7 @@ Thanks to [@aroum](https://github.com/aroum) for the detailed feedback in
   lit as they sound. The knobs and octave buttons work there as on Stage
 - **SELECT on HOME** turns what you choose in the menu (hold HOME): **HOME SELECT** BPM (default), MOD WHEEL (the
   selected track's, as MIDI CC1; also sent to MIDI out), LEVEL, SWING, TRANSPOSE, OCTAVE (the same shift as the octave
-  buttons, −3 to +3), CHORD (the choices on the CHORD page), ARP RATE, PATTERN (the selected track's next pattern) or OFF.
+  buttons, −3 to +3), CHORD (the choices on the CHORD page), HERA SET, ARP RATE, PATTERN (the selected track's next pattern) or OFF.
   The header shows the value
 - **GLO + SELECT** turns the menu's **GLO SELECT** on any page: the same choices, BPM by default
 - **Held:** GLO and SCL open their quick layers; EDIT undoes, SAVE saves the project, HOME opens the menu, SEQ the PATTERNS grid with
@@ -1170,7 +1170,15 @@ while its duplicate is held. CR78 and FM use the 808's pad positions and play th
 example, 03 is its tambourine. Normal MIDI drum notes outside MPC mode and existing recorded patterns keep their GM mapping.
 
 On the **CHORD** page, CHRD picks the chord keys (OFF, the scale's triads or
-sevenths, a fixed shape, AUTO or AUTO2) and VOIC the voicing.
+sevenths, a fixed shape, AUTO, AUTO2 or HERA) and VOIC the voicing.
+
+**HERA** plays the chord sets of [HERA](https://github.com/benbadio/hera-fm1): 100 sets of 12 chords, one per key,
+in every octave. Choose HERA with CHRD, then press SCL for the **CHORD SET** page: SET picks the set (1 to 100) and the
+map shows the chord on each key, with the last one played lit. HOME SELECT and GLO SELECT can browse sets with
+**HERA SET**. Every key plays its own chord whatever the scale and QNT say; TRN transposes the chord. VOIC, STRUM,
+STROKE and the arpeggiator work as usual: CLOSE plays the chord as the set lists it, and +OCT on a four-note chord
+leaves out its third note so that the added bass still fits. Recordings store the notes, and the set is saved with
+the project. Microtonal tracks play the input note alone.
 
 **AUTO** chooses three- or four-note chords using only pitches in the selected Western scale
 (the first 16 scales, including pentatonic, blues, whole-tone and diminished). It prefers familiar
