@@ -1965,8 +1965,10 @@ static void select_turn(uint32_t hs, int32_t s)
     case HS_LEVEL:
     case HS_TRANS:
     case HS_CHORD:
+    case HS_CHSET:
     case HS_ARATE: {
-        uint32_t id = hs == HS_LEVEL ? P_LEVEL : hs == HS_TRANS ? P_TRANS : hs == HS_CHORD ? P_CHRD : P_ARATE;
+        uint32_t id = hs == HS_LEVEL ? P_LEVEL : hs == HS_TRANS ? P_TRANS : hs == HS_CHORD ? P_CHRD :
+                      hs == HS_CHSET ? P_CHSET : P_ARATE;
         if (midi_track_audio_disabled(t->eng_req, id)) return;
         const param_desc_t *d = &TP[id];
         x = d->fmt == F_ENUM ? (s > 0 ? 1 : -1) : accel(EN_SELECT, s, desc_range(d));   /* (names: one a detent) */

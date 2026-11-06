@@ -49,7 +49,7 @@ static uint32_t pv_kind(void)
         pg->graph == GR_FMPEG)
         return PV_CURVE;
     if (pg->graph == GR_NONE || pg->graph == GR_ARP || pg->graph == GR_STEPS ||
-        pg->graph == GR_CHORD)
+        pg->graph == GR_CHORD || pg->graph == GR_HERA)
         return PV_RINGS;
     if (pg->graph == GR_TRK)
         return PV_MIXER;
@@ -596,7 +596,7 @@ static uint32_t pv_pic(int32_t *cut, int32_t *res)
         return pg->graph == GR_ARP ? 5u : 6u;
     if (pg->fam == FAM_ARP)                             /* ARP 2: the notes it plays too */
         return 5u;
-    if (pg->graph == GR_CHORD)                          /* CHORD: its name, its notes (ui_graph.c) */
+    if (pg->graph == GR_CHORD || pg->graph == GR_HERA)  /* CHORD: its name, its notes (ui_graph.c) */
         return 8u;
     if ((pg->scope == SC_ENGINE || pg->scope == SC_FM6 || pg->scope == SC_FMOP) && e == ENGI_FM6)
         return 4;

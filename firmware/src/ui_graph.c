@@ -403,8 +403,10 @@ static void graph_chord(const track_t *t, uint16_t c)
     uint32_t n, i, j, k = trk_index(t), lo, cnt, w;
     int32_t r;
     uint16_t mask;
-    char b[12];
+    char b[HERA_NAME_MAX + 4u];
     const char *cap = "LAST";
+    const aafont_t *name_font = TY_VL;
+    uint32_t hera = t->p[P_CHRD] == CH_HERA, hera_chord = 0, hera_in = 0;
     if (!t->p[P_CHRD]) {
         panel_note("CHORD KEYS OFF", "[K1] DIA3: IN-KEY CHORDS", 0);   /* (the title says what they are) */
         return;
@@ -442,10 +444,17 @@ static void graph_chord(const track_t *t, uint16_t c)
     if (trk_vmode(t) != V_POLY)
         cap = "ROOT ONLY";                              /* MONO / LEGATO / UNISON */
     if (t->p[P_CHRD] == CH_MELODY) cap = "MELODY";
-    if (t->p[P_CHRD] == CH_MELODY) chord_melody_name(b, (uint32_t)r, mask);
+    if (hera) {
+        int32_t octave;
+        uint32_t last = chord_last[k].n && chord_last[k].hera;
+        hera_chord = last ? chord_last[k].hera - 1u : hera_key(t, (uint32_t)clamp(60 + t->p[P_ROOT] + t->p[P_TRANS], 0, 127), &octave);
+        hera_in = last ? chord_last[k].set : hera_set(t);
+    }
+    if (hera && hera_name(b, hera_in, hera_chord)) { if (str_len(b) > 7u) name_font = TY_TX; }
+    else if (t->p[P_CHRD] == CH_MELODY) chord_melody_name(b, (uint32_t)r, mask);
     else if (t->p[P_CHRD] == CH_AUTO) chord_auto_name(b, (uint32_t)r, mask);
     else chord_name(b, (uint32_t)r, mask);
-    cv_text_on(14, ty_y(18, TY_VL), TY_VL, b, T_TEXT, T_SURF);
+    cv_text_on(14, ty_y(18, name_font), name_font, b, T_TEXT, T_SURF);
     cv_text_r(226, ty_y(18, TY_LB), TY_LB, cap, T_MID, T_SURF);
     lo = nn[0] - nn[0] % 12u;
     cnt = nn[n - 1u] - lo < 24u ? 24u : 36u;
@@ -460,6 +469,27 @@ static void graph_chord(const track_t *t, uint16_t c)
     }
 }
 
+
+/* CHORD SET: the set, its genre, and the chord on each of the twelve keys; the last one played lit */
+static void graph_hera(const track_t *t, uint16_t c)
+{
+    uint32_t k = trk_index(t), set = hera_set(t), i, lit = chord_last[k].n && chord_last[k].hera && chord_last[k].set == set ?
+        chord_last[k].hera : 0u;
+    char b[HERA_NAME_MAX + 4u], head[16];
+    str_cpy(head, "SET ", sizeof head);
+    fmt_int(head + 4, (int32_t)set + 1);
+    cv_text_on(12, ty_y(10, TY_LB), TY_LB, head, c, T_SURF);
+    cv_text_r(228, ty_y(10, TY_LB), TY_LB, hera_genre(set), T_MID, T_SURF);
+    for (i = 0; i < HERA_KEYS; i++) {
+        int32_t x = i < 6u ? 4 : 122, y = 22 + (int32_t)(i % 6u) * 17;
+        uint32_t on = lit == i + 1u;
+        uint16_t bg = on ? c : T_SURF;
+        if (on) cv_rrect(x, y, 114, 16, 3, c, T_SURF);
+        cv_text_on(x + 4, ty_y(y + 8, TY_LB), TY_LB, N_NOTE[i], on ? T_BG : T_MID, bg);
+        if (!hera_name(b, set, i)) { b[0] = '-'; b[1] = 0; }
+        cv_text_fit(x + 30, ty_y(y + 8, TY_LB), TY_LB, b, on ? T_BG : T_TEXT, bg, 82);
+    }
+}
 
 static uint32_t steps_hash(const track_t *t)
 {
@@ -777,8 +807,8 @@ static uint32_t graph_sig(int play)
         h ^= (uint32_t)song.g[G_SWING] * 65537u + pr_held() * 15331u;
         if (play) h ^= (uint32_t)(notes_play_x(t) + 1) * 31u;
     }
-    if (pg->graph == GR_CHORD) {                     /* the last chord played */
-        h = (h ^ (chord_last[song.sel].root + 131u * chord_last[song.sel].mask)) * 16777619u;
+    if (pg->graph == GR_CHORD || pg->graph == GR_HERA) {   /* the last chord played */
+        h = (h ^ (chord_last[song.sel].root + 131u * chord_last[song.sel].mask + 257u * t->p[P_CHSET])) * 16777619u;
         for (i = 0; i < CHORD_MAX; i++)
             h = (h ^ chord_last[song.sel].note[i]) * 16777619u;
         h ^= (uint32_t)t->engine * 389u;             /* (MONO and kits follow the sounding engine) */
@@ -1039,6 +1069,10 @@ static void draw_graph(void)
             case GR_CHORD:
                 cv_oy = 0;
                 graph_chord(t, c);
+                break;
+            case GR_HERA:
+                cv_oy = 0;
+                graph_hera(t, c);
                 break;
 #if MELODEE_SLICE
             case GR_SLICES:

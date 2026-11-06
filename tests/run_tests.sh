@@ -357,6 +357,7 @@ if core && [ $TABLES = 1 ]; then
     t "chord keys: diatonic and fixed chords, voicings, MONO root, releases, recording, ARP, MIDI IN, kits" chord_test $FW
     t "AUTO chords: Western scales, melody, cadences, voice leading and frozen ownership" chord_auto_test $FW
     t "AUTO2: stable melody, harmony below, Western scales and immediate strum attack" chord_melody_test $FW
+    t "HERA chord sets: every chord and voicing, keys, recording, saved set and stored layout" hera_chord_test $FW
     t "project record (FUN16 round trip, the song chain, names, FM6 patches; older formats refused)" project_test $FW
     t "motion, whole-step chance, an older parameter count, song restore and ARP repeat" motion_test -O1 $FW
     t "64 pattern banks: chords, ties, independent loop switching, copy and persistence" pattern_test \

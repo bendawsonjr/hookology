@@ -52,7 +52,7 @@ static const char *const N_VPOINTS[] = {"AUTO", "1", "2", "3", "4", "5", "6", "7
                                         "14", "15"};
 static const char *const N_QUANT[] = {"OFF", "SNAP", "WHITE", "ALL", "MPC"};   /* Q_OFF .. Q_MPC (seq.c kb_map, midi_map) */
 /* chord keys (chord.c): OFF, the diatonic triad / seventh of the track's ROOT and SCALE on the key, fixed shapes */
-static const char *const N_CHRD[] = {"OFF", "DIA3", "DIA7", "MAJ", "MIN", "DOM7", "MAJ7", "MIN7", "SUS4", "POW", "AUTO", "AUTO2"};
+static const char *const N_CHRD[] = {"OFF", "DIA3", "DIA7", "MAJ", "MIN", "DOM7", "MAJ7", "MIN7", "SUS4", "POW", "AUTO", "AUTO2", "HERA"};
 static const char *const N_STRUM[] = {"OFF", "1/8", "1/16", "1/32", "1/64", "1/128", "16T", "32T"};
 static const char *const N_STROKE[] = {"DOWN", "UP", "ALT"};
 static const char *const N_VOIC[] = {"CLOSE", "OPEN", "INV1", "INV2", "+OCT"};   /* VC_CLOSE .. VC_BASS */
@@ -247,7 +247,7 @@ static const param_desc_t TP[P_COUNT] = {
     [P_RESERVED45] = PD("", F_INT, 0, 127, 0),
     [P_RESERVED46] = PD("", F_INT, 0, 127, 0),
     [P_RESERVED47] = PD("", F_INT, 0, 127, 0),
-    [P_RESERVED48] = PD("", F_INT, 0, 127, 0),
+    [P_CHSET] = PD("SET", F_INT, 0, 99, 0),   /* shown 1..100 (param_format); 0, the old slot's value, is set 1 */
 #define MSLOT(k) [P_M##k##SRC] = PE("SRC" #k, N_MSRC, 0), [P_M##k##DST] = PE("DST" #k, N_MDST, 0), \
                  [P_M##k##AMT] = PD("AMT" #k, F_BIPCT, -64, 63, 0)
     MSLOT(1), MSLOT(2), MSLOT(3), MSLOT(4),
@@ -437,6 +437,10 @@ static void param_format(const param_desc_t *d, int32_t v, char *val, const char
         fmt_named = 1;
         return;
     }
+    if (d == &TP[P_CHSET]) {
+        fmt_int(val, v + 1);
+        return;
+    }
     switch (d->fmt) {
     case F_PCT:                                     /* a 0..100 range (SWG) is its value, others a share of 127 */
         fmt_int(val, d->max == 100 ? v : (v * 100 + 63) / 127);
@@ -589,7 +593,7 @@ enum { SC_TRACK, SC_GLOBAL, SC_ENGINE, SC_STEP, SC_TRK,   /* SC_TRK: the TRACKS 
        SC_FM6, SC_FMOP, SC_CZ, SC_CZ1, SC_P5, SC_P5STORE, SC_DRUM, SC_DRUMHIT };                         /* FM6: its patch, functions; operator fm6_opsel;
                                                                   * CZ1: a native CZ-1 tone (cz_edit.h) */
 enum { GR_NONE, GR_ADSR, GR_LFO, GR_STEPS, GR_ARP, GR_SCALE, GR_ROLL, GR_BROWSE, GR_SLOTS, GR_USER, GR_TRK,
-       GR_MOD, GR_PATS, GR_SONG, GR_MOTION, GR_CHORD, GR_SLICES,
+       GR_MOD, GR_PATS, GR_SONG, GR_MOTION, GR_CHORD, GR_HERA, GR_SLICES,
        GR_FMEG, GR_FMPEG, GR_FMSTORE, GR_CZTOOLS, GR_SCALE_PICKER, GR_DRUMHIT, GR_PATGRID,
        GR_FXRACK }; /* NOTES shares GR_ROLL for steps and recorded events */
 
@@ -630,6 +634,7 @@ static const page_t PAGES[] = {
     {"SCALES", FAM_SCL, SC_TRACK, GR_SCALE_PICKER, {0xFF, P_SCALE, P_ROOT, P_QUANT}},
     {"SCL", FAM_SCL, SC_TRACK, GR_SCALE, {P_ROOT, 0xFF, P_QUANT, P_TRANS}}, /* K2: scale favorite */
     {"CHORD", FAM_SCL, SC_TRACK, GR_CHORD, {P_CHRD, P_VOIC, P_STRUM, P_STROKE}},   /* SCL again: the chord keys (chord.c) */
+    {"CHORD SET", FAM_SCL, SC_TRACK, GR_HERA, {P_CHSET, P_VOIC, P_STRUM, P_STROKE}},   /* CHRD HERA only (page_visible): the map */
     {"MPC", FAM_SCL, SC_TRACK, GR_NONE, {P_MPCDEG, 0xFF, 0xFF, 0xFF}},   /* the degree of each bank's pad 02: a row of SCL's list
                                                                           * (QNT MPC only), not a page of its own */
     {"EDIT 1", FAM_EDIT, SC_ENGINE, GR_NONE, {P_E0, P_E1, P_E2, P_E3}},
@@ -928,5 +933,5 @@ static const param_desc_t *page_desc(const page_t *pg, uint32_t slot, int16_t **
 static int param_kept(uint32_t i)
 {
     return i == P_LEVEL || i == P_PAN || i == P_MUTE || (i >= P_AMODE && i <= P_SGATE) ||
-           i == P_CHRD || i == P_VOIC || i == P_STRUM || i == P_STROKE || i == P_MPCDEG || i == P_RECQ || param_fx(i) || param_fx_send(i);
+           i == P_CHRD || i == P_CHSET || i == P_VOIC || i == P_STRUM || i == P_STROKE || i == P_MPCDEG || i == P_RECQ || param_fx(i) || param_fx_send(i);
 }

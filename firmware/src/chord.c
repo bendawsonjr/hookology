@@ -6,6 +6,7 @@
  *   CHRD OFF; DIA3 / DIA7: the triad / seventh of the track's scale (ROOT, SCALE) built on the key, every tone
  *        in key (a key outside the scale takes the scale note below it, as QNT SNAP does; CHR builds on the
  *        major scale of ROOT); MAJ MIN DOM7 MAJ7 MIN7 SUS4 POW: that shape on the key, whatever the scale.
+ *        HERA: the chord set P_CHSET gives the key (melodee_hera.h, HERA's 100 sets), its notes as the set lists them.
  *   VOIC CLOSE (root position); OPEN (the second tone an octave up: 1-5-3); INV1 / INV2 (the lowest tone, then
  *        the next, an octave up); +OCT (the root an octave down added; a seventh drops its fifth). At most
  *        CHORD_MAX notes, notes outside 0..127 left out.
@@ -15,9 +16,11 @@
  * key, mchord for a MIDI note) and its release ends exactly those, so CHRD / VOIC changed while it is held
  * leave nothing hanging. A note several sources hold sounds once and ends with the last of them. */
 /* Append modes: these values are stored in songs, presets and editor files. */
-enum { CH_OFF, CH_DIA3, CH_DIA7, CH_MAJ, CH_MIN, CH_DOM7, CH_MAJ7, CH_MIN7, CH_SUS4, CH_POW, CH_AUTO, CH_MELODY };
+enum { CH_OFF, CH_DIA3, CH_DIA7, CH_MAJ, CH_MIN, CH_DOM7, CH_MAJ7, CH_MIN7, CH_SUS4, CH_POW, CH_AUTO, CH_MELODY, CH_HERA = CHRD_HERA };
 enum { VC_CLOSE, VC_OPEN, VC_INV1, VC_INV2, VC_BASS };
 #define CHORD_MAX 4u
+_Static_assert(CH_HERA == CH_MELODY + 1, "CHRD: stored values");
+#include "melodee_hera.h"                /* tools/gen_hera_chords.py */
 #define MCHORD_N 24u                     /* MIDI notes held as chords at once (more: their root alone) */
 
 static const int8_t CHORD_SHAPE[CH_POW - CH_MAJ + 1][CHORD_MAX] = {
@@ -35,7 +38,7 @@ typedef struct { uint8_t id, ch, src, n, note[CHORD_MAX]; chord_strum_t strum; }
 static mchord_t mchord[MCHORD_N];
 /* the last chord played per track (the CHORD page shows it): its root, notes, and the shape's tones above the
  * root (bit i = i semitones, 0..11) */
-static struct { uint8_t root, n, note[CHORD_MAX]; uint16_t mask; uint8_t gen; } chord_last[NTRK];
+static struct { uint8_t root, n, note[CHORD_MAX]; uint16_t mask; uint8_t gen, hera, set; } chord_last[NTRK];
 
 /* 1 = the track's keys are a kit: no chords */
 static int chord_kit(const track_t *t)
@@ -43,6 +46,36 @@ static int chord_kit(const track_t *t)
     const engine_t *e = ENGINES[eng_idx(t->eng_req)];
     return e->oneshot || (e->keys && e->keys(t, 0) >= 0);
 }
+
+/* HERA: the key (a note before TRN) -> its chord of 12 and the octaves it is above C4 */
+static uint32_t hera_key(const track_t *t, uint32_t note, int32_t *octave)
+{
+    int32_t key = (int32_t)note - t->p[P_TRANS] + 120;
+    *octave = key / 12 - 15;
+    return (uint32_t)key % HERA_KEYS;
+}
+static uint32_t hera_set(const track_t *t) { return (uint32_t)clamp(t->p[P_CHSET], 0, (int32_t)HERA_SETS - 1); }
+/* the chord of `note` -> its tones above *root, *root its lowest note, the number of tones */
+static uint32_t hera_tones(const track_t *t, uint32_t note, int32_t *root, int32_t *iv)
+{
+    int32_t octave;
+    uint32_t key = hera_key(t, note, &octave), n = 0;
+    const uint8_t *c = &HERA_NOTES[(hera_set(t) * HERA_KEYS + key) * CHORD_MAX];
+    *root = c[0] + 12 * octave + t->p[P_TRANS];
+    while (n < CHORD_MAX && c[n]) {
+        iv[n] = c[n] - c[0];
+        n++;
+    }
+    return n;
+}
+/* a chord's name for the screen (b: HERA_NAME_MAX + 1 bytes). Without the resource region, none: the caller's */
+static int hera_name(char *b, uint32_t set, uint32_t key)
+{
+    if (!RES_OK()) return 0;
+    str_cpy(b, HERA_NAMES + HERA_NAME_OFF[set * HERA_KEYS + key], HERA_NAME_MAX + 1u);
+    return 1;
+}
+static const char *hera_genre(uint32_t set) { return RES_OK() ? HERA_GENRES + HERA_GENRE_OFF[HERA_GENRE[set]] : ""; }
 
 #include "chord_auto.c"
 #include "chord_melody.c"
@@ -109,13 +142,13 @@ static uint32_t chord_make(const track_t *t, uint32_t root, uint8_t *out, int32_
     *maskp = 0;
     int automatic = mode == CH_AUTO || mode == CH_MELODY;
     if (automatic && micro_scale(t)) *maskp = 1;
-    if (!mode || mode > CH_MELODY || chord_kit(t) || (automatic && micro_scale(t))) {
+    if (!mode || mode > CH_HERA || chord_kit(t) || (automatic && micro_scale(t)) || (mode == CH_HERA && micro_active(t))) {
         out[0] = (uint8_t)root;
         return 1;
     }
     if (mode == CH_AUTO) return chord_auto_make(t, root, out, rp, maskp);
     if (mode == CH_MELODY) return chord_melody_make(t, root, out, rp, maskp);
-    n = chord_tones(t, mode, &r, iv);
+    n = mode == CH_HERA ? hera_tones(t, root, &r, iv) : chord_tones(t, mode, &r, iv);
     for (i = 0; i < n; i++)
         mask |= (uint16_t)(1u << (micro_active(t) ?
             ((micro_pitch(t, r + iv[i]) - micro_pitch(t, r) + 5000) / 10000 % 12) : iv[i] % 12));
@@ -187,6 +220,12 @@ static uint32_t chord_build(track_t *t, uint32_t root, uint8_t *out)
         for (i = 0; i < CHORD_MAX; i++)
             chord_last[k].note[i] = i < m ? out[i] : 0u;
         chord_last[k].gen++;
+        chord_last[k].hera = 0;
+        if (t->p[P_CHRD] == CH_HERA) {
+            int32_t octave;
+            chord_last[k].hera = (uint8_t)(hera_key(t, root, &octave) + 1u);
+            chord_last[k].set = (uint8_t)hera_set(t);
+        }
     }
     return m;
 }

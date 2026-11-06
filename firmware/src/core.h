@@ -243,8 +243,13 @@ static int param_master_fx(uint32_t id){return id>=G_MFXTYPE && id<=G_MFX3CHAR;}
 #define G_SAFETY G_RESERVED9
 #define G_DRREV G_RESERVED26
 
-static int param_reserved(uint32_t id)
+/* P_CHSET took a retired slot: the stored layout, and so every older project, stays as it is. Old motion events may
+ * still name the slot; they stay inert (param_retired) */
+#define P_CHSET P_RESERVED48                   /* HERA chord set - 1 (chord.c CH_HERA) */
+#define CHRD_HERA 12                           /* P_CHRD's chord.c CH_HERA: scale_map needs it before chord.c */
+static int param_retired(uint32_t id)
 { return (id>=P_RESERVED33 && id<=P_RESERVED36) || (id>=P_RESERVED45 && id<=P_RESERVED48); }
+static int param_reserved(uint32_t id) { return param_retired(id) && id != P_CHSET; }
 static int global_reserved(uint32_t id)
 { return (id>=G_RESERVED4 && id<=G_RESERVED11) || (id>=G_RESERVED24 && id<=G_RESERVED26); }
 

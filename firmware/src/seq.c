@@ -142,6 +142,8 @@ static uint32_t scale_map(const track_t *t, int32_t n, int32_t offset)
 {
     static const int8_t DEGREE[12] = {0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6};
     int32_t degree;
+    if (t->p[P_CHRD] == CHRD_HERA && !micro_active(t))  /* HERA: each key has its own chord, whatever the scale */
+        return (uint32_t)clamp(n + offset + t->p[P_TRANS], 0, 127);
     if (t->p[P_QUANT] == Q_ALL)
         return scale_degree_map(t, n - 60, offset, 1);
     if (t->p[P_QUANT] == Q_WHITE || t->p[P_QUANT] == Q_MPC) {
@@ -159,7 +161,7 @@ static uint32_t kb_map(const track_t *t, uint32_t k)
     if (e->keys && (n = e->keys(t, k)) >= 0)           /* the engine's own key map (GM kit, slices) */
         return (uint32_t)n;
     n = 53 + (int32_t)k;
-    if (t->p[P_QUANT] == Q_SNAP) {                     /* SNAP: every key, rounded down to the scale */
+    if (t->p[P_QUANT] == Q_SNAP && !(t->p[P_CHRD] == CHRD_HERA && !micro_active(t))) {   /* SNAP: every key, rounded down to the scale */
         if (micro_active(t)) {
             uint32_t note = micro_snap(t, n + t->p[P_TRANS]);
             return note == KB_SILENT ? note : micro_degree_map(t, (int32_t)note - 60, 12 * input_octave(t), 1);
