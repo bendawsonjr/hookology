@@ -18,7 +18,7 @@ static uint32_t sounding(const track_t *t)
     for (uint32_t i = 0; i < NVOICE; i++) n += t->v[i].active && t->v[i].stage != 4u;
     return n;
 }
-static void defaults(void) { memset(settings_vpoints, 0, sizeof settings_vpoints); settings_safety = 0; }
+static void defaults(void) { memset(settings_vpoints, 0, sizeof settings_vpoints); settings_safety = 1; }
 static const char *value(const char *title, uint32_t slot, int16_t **vp, const char **label)
 {
     static char v[8];
@@ -76,12 +76,12 @@ int main(void)
     for (uint32_t i = 0; i < 32u; i++) if (i < 8u || i >= 16u) ok &= p.favorites.factory[8][i] == (uint8_t)(0xA0u + i);
     bad += check("defaults store zeros in row 8 bytes 8..15 and keep its stars and FX key map", ok);
 
-    settings_safety = 1;
+    settings_safety = 0;
     settings_export(&p);
     defaults();
-    ok = w[0] == 'W' && w[1] == 1u && w[7] == 0u &&
-         settings_import(&p, sizeof p) && settings_safety == 1;
-    bad += check("explicit SAFETY ON survives export/import even with AUTO weights", ok);
+    ok = w[0] == 'W' && w[1] == 1u && w[7] == 1u &&
+         settings_import(&p, sizeof p) && settings_safety == 0;
+    bad += check("explicit SAFETY OFF survives export/import even with AUTO weights", ok);
 
     static const int16_t custom[VOICE_KINDS] = {3, 0, 1, 15, 2};
     memcpy(settings_vpoints, custom, sizeof custom); settings_safety = 0;
@@ -94,7 +94,7 @@ int main(void)
 
     persist_t q = p;
     q.favorites.factory[8][8] = 'X';                           /* an untagged older record */
-    ok = settings_import(&q, (int)sizeof q) && settings_safety == 0;
+    ok = settings_import(&q, (int)sizeof q) && settings_safety == 1;
     for (uint32_t k = 0; k < VOICE_KINDS; k++) ok &= !settings_vpoints[k];
     q = p; q.favorites.factory[8][10] = 16;                    /* out of range: AUTO */
     ok &= settings_import(&q, (int)sizeof q) && !settings_vpoints[0] && settings_vpoints[3] == 15 && !settings_safety;

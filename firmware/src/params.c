@@ -92,7 +92,7 @@ static int16_t settings_budget = VOICE_BUDGET_DEFAULT;
  * built-in rule) and SAFETY (0: overload never cuts voices, audio.c). Device settings (settings_persist.c). */
 #define VOICE_KINDS 5u
 static int16_t settings_vpoints[VOICE_KINDS];
-static int16_t settings_safety;
+static int16_t settings_safety = 1;
 /* Device recording preferences: defaults preserve existing behavior. */
 #include "recording_preferences.h"
 #include "midi_knobs.h"

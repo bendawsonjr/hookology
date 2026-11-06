@@ -35,7 +35,7 @@ static int16_t settings_glo[4];                     /* ext.glo: project.c GLO_KE
 #define AUTOSAVE_OFF_TAG 0xA1u                     /* CZ row byte 28: only this tag disables autosave */
 #define WORK_BUDGET_TAG 0x57420000u /* WB: high bits of usb_off; low two bits retain USB mode */
 /* GLO > WEIGHTS in favorites.c row 8 bytes 8..15: 'W', version 1, the five points (0 AUTO, 1..15), bit 0 of the
- * last byte SAFETY OFF. Untagged bytes default to OFF; explicit ON is tagged too. Defaults store zeros. */
+ * last byte SAFETY OFF. Untagged bytes default to ON; explicit OFF is tagged. Defaults store zeros. */
 #define VOICE_PREF_ROW 8u
 #define VOICE_PREF_BYTE 8u
 /* Retired DIGITAL row bytes 24..27 (FX RATE's FQ tag until 1.2): 'C', 'K', version 1, CLICK LEVEL 0..100 %.
@@ -139,7 +139,7 @@ static int settings_import(persist_t *p, int n)
         uint32_t tagged = w[0] == 'W' && w[1] == 1u;
         for (uint32_t k = 0; k < VOICE_KINDS; k++)
             settings_vpoints[k] = (int16_t)(tagged && w[2u + k] <= 15u ? w[2u + k] : 0u);
-        settings_safety = (int16_t)(tagged && !(w[7] & 1u));
+        settings_safety = (int16_t)(!tagged || !(w[7] & 1u));
     }
     return 1;
 }
@@ -196,7 +196,7 @@ static void settings_export(persist_t *p)
     memcpy(p->ext.glo, settings_glo, sizeof settings_glo);
     {
         uint8_t *w = p->favorites.factory[VOICE_PREF_ROW] + VOICE_PREF_BYTE;
-        uint32_t custom = settings_safety;
+        uint32_t custom = !settings_safety;
         for (uint32_t k = 0; k < VOICE_KINDS; k++)
             custom |= settings_vpoints[k] != 0;
         memset(w, 0, 8);
