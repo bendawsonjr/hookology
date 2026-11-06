@@ -186,13 +186,13 @@ static int flash_image(uint32_t obj,uint8_t *dst)
 static int full_pattern_archive(void)
 {
     int bad=0, ok=1; reset(); static uint8_t archive[ED_BK_MAX], saved[ED_BK_MAX];
-    for (uint32_t k=0; k<NPART; k++) for (uint32_t b=0; b<NPAT; b++) {
+    for (uint32_t k=0; k<NROWS; k++) for (uint32_t b=0; b<NPAT; b++) {
         track_t *t=&trk[k]; pattern_request(t,b); t->p[P_SLEN]=(int16_t)(16+b);
         t->step[3]=(step_t){{(uint8_t)(40+k*8+b),60,64,67},4,ST_NOTE,SF_ACCENT,100,0x81,0x80,(uint8_t)(20+b)};
         t->step[4]=(step_t){{0},0,ST_TIE}; motion_set_event(t,3,P_PAN,(int16_t)(k*8+b));
     }
     chain_config.count=1; chain_config.row[0]=(chain_row_t){0,2};
-    for (uint32_t k=0; k<NPART; k++) chain_patterns[0][k]=(uint8_t)(k+1);
+    for (uint32_t k=0; k<NROWS; k++) chain_patterns[0][k]=(uint8_t)(k+1);
     project_save_as(0,"CHORD BANKS");
     uint32_t len,crc; list(0,&len,&crc); uint32_t alen=runtime_bytes(archive);
     bad+=check("full bank archive contains all runtime banks with its verified CRC",alen && len==alen && crc==st_crc32(archive,alen));
@@ -208,7 +208,7 @@ static int full_pattern_archive(void)
     bad+=check("full archive restores a saved slot through the shared workspace",put_all(3,archive,alen,st_crc32(archive,alen))==0);
     pattern_init(); memset(&motion,0,sizeof motion); memset(proj_meta,0,sizeof proj_meta); memset(proj_slot,0,sizeof proj_slot);
     proj_fetch(1); project_load(1); ok=1;
-    for (uint32_t k=0; k<NPART; k++) for (uint32_t b=0; b<NPAT; b++) {
+    for (uint32_t k=0; k<NROWS; k++) for (uint32_t b=0; b<NPAT; b++) {
         track_t *t=&trk[k]; pattern_request(t,b);
         ok &= t->step[3].n==4 && t->step[3].note[0]==40+k*8+b && t->step[3].note[3]==67 &&
             t->step[4].time==ST_TIE && t->p[P_SLEN]==16+(int16_t)b && step_chance(&t->step[3])==20+b && motion_count(t)==1;
@@ -251,16 +251,16 @@ static int prophet_archive(void)
 static int expanded_recording_archive(void)
 {
     reset();
-    for(uint32_t k=0;k<NPART;k++)for(uint32_t b=0;b<NPAT;b++) {
+    for(uint32_t k=0;k<NROWS;k++)for(uint32_t b=0;b<NPAT;b++) {
         pattern_request(&trk[k],b);
         trk[k].step[3]=(step_t){{60},1,ST_NOTE,SF_RECORDED,100,0,0,0};
     }
     for(uint32_t i=0;i<RECORD_MAX;i++){
         recording[i]=(recorded_note_t){.on=(uint16_t)(i*61u), .duration=1234, .vel=100, .step=3};
-        recorded_set_note(&recording[i],60);recorded_set_owner(&recording[i],i%(NPART*NPAT));
+        recorded_set_note(&recording[i],60);recorded_set_owner(&recording[i],i%(NROWS*NPAT));
     }
     recording_reindex();
-    static recorded_note_t saved[RECORD_MAX];uint32_t at=0;for(uint32_t owner=0;owner<NPART*NPAT;owner++)for(uint32_t i=0;i<RECORD_MAX;i++)if(recorded_owner(&recording[i])==owner)saved[at++]=recording[i];
+    static recorded_note_t saved[RECORD_MAX];uint32_t at=0;for(uint32_t owner=0;owner<NROWS*NPAT;owner++)for(uint32_t i=0;i<RECORD_MAX;i++)if(recorded_owner(&recording[i])==owner)saved[at++]=recording[i];
     int ok=!project_save_as(0,"FULL TAKE");
     uint32_t len,crc;ok &= !list(0,&len,&crc);
     static uint8_t archive[ED_BK_MAX], readback[ED_BK_MAX];uint32_t alen=runtime_bytes(archive);ok &= alen && len==alen;

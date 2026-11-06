@@ -16,7 +16,9 @@
 /* ------------------------------------------------------------ sizes --- */
 #define NVOICE 16                /* voice slots per part (FM6 plays Dexed's 16) */
 #define NPOLY 8                  /* the voices of an engine without its own cap (its per-voice state: engines.c eng_state) */
+#ifndef NPART
 #define NPART 6                  /* sound tracks: tracks 1..6 */
+#endif
 #define NROWS 4                  /* tracks a screen shows, and a new project starts with: 1..4, then 5..8 */
 #ifndef VBUDGET
 #define VBUDGET (MELODEE_RAM_AUDIO ? 18u : 16u) /* shared weighted voices; RAM profile uses 18 with CPU1 online

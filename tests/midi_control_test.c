@@ -319,12 +319,12 @@ static int routing_range_test(void)
         for (uint32_t r = 0; r < 4; r++) {
             for (uint32_t ch = 0; ch < 16; ch++) {
                 midi_test_reset(); settings_drumch = 0;
-                for (uint32_t t = 0; t < NPART; t++) set_engine_of(&trk[t], HOST_SYNTH);
+                for (uint32_t t = 0; t < NROWS; t++) set_engine_of(&trk[t], HOST_SYNTH);
                 song.sel = 2; song.g[G_ROUTE] = routes[r];
                 route_input(source, 0x90u | ch, 60, 100);
                 int target = ch >= r * 4u && ch < r * 4u + 4u ? (int)(ch - r * 4u) : -1;
                 ok &= mn_get(ch, 60) == (uint32_t)(target + 1);
-                for (uint32_t t = 0; t < NPART; t++) ok &= gate_note(&trk[t], 60) == ((int)t == target);
+                for (uint32_t t = 0; t < NROWS; t++) ok &= gate_note(&trk[t], 60) == ((int)t == target);
                 if (target < 0) {
                     int32_t level = trk[2].p[P_LEVEL];
                     uint32_t mw = trk[2].mw, at = trk[2].at;
@@ -338,7 +338,7 @@ static int routing_range_test(void)
                 /* Velocity-zero note-ons are releases too. */
                 route_input(source, 0x90u | ch, 60, 0);
                 ok &= !mn_get(ch, 60);
-                for (uint32_t t = 0; t < NPART; t++) ok &= !gate_note(&trk[t], 60);
+                for (uint32_t t = 0; t < NROWS; t++) ok &= !gate_note(&trk[t], 60);
             }
         }
         bad += check(source == 1 ? "USB: every channel in all four ranges maps or is filtered, including controllers" :

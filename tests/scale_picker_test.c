@@ -28,16 +28,16 @@ static void project_scale_test(void)
     song.sel = 1;
     go_title("SCL");
     edit_param(0, 7);                               /* ordinary SCL page: G */
-    for (uint32_t k = 0; k < NPART; k++) assert(trk[k].p[P_ROOT] == 7);
+    for (uint32_t k = 0; k < NROWS; k++) assert(trk[k].p[P_ROOT] == 7);
     go_home();
     lay_combo(B_SCL, black(4));                     /* SCL + D#: project key, silent */
-    for (uint32_t k = 0; k < NPART; k++) assert(trk[k].p[P_ROOT] == 3);
+    for (uint32_t k = 0; k < NROWS; k++) assert(trk[k].p[P_ROOT] == 3);
     assert(!gates());
     key_up(black(4)); frame();
     oct_back();
-    for (uint32_t k = 0; k < NPART; k++) assert(trk[k].p[P_ROOT] == 7);
+    for (uint32_t k = 0; k < NROWS; k++) assert(trk[k].p[P_ROOT] == 7);
     turn(EN_K1, 2);                                 /* SCL layer knob: A */
-    for (uint32_t k = 0; k < NPART; k++) assert(trk[k].p[P_ROOT] == 9);
+    for (uint32_t k = 0; k < NROWS; k++) assert(trk[k].p[P_ROOT] == 9);
     btn_up(B_SCL); frame();
 
     set_engine_of(&trk[3], ENGI_DRUM);
@@ -52,7 +52,7 @@ static void project_scale_test(void)
     TSEL->p[P_ROOT] = 0; TSEL->p[P_SCALE] = 0; TSEL->p[P_QUANT] = Q_OFF;
     scale_share(TSEL);
     project_load(0);
-    for (uint32_t k = 0; k < NPART; k++) {
+    for (uint32_t k = 0; k < NROWS; k++) {
         assert(trk[k].p[P_ROOT] == 5 && trk[k].p[P_SCALE] == 2 && trk[k].p[P_QUANT] == Q_WHITE);
         if (k != 3u) assert(midi_map(&trk[k], 60) == (k ? 65u : 53u));
     }
@@ -66,15 +66,15 @@ static void project_scale_test(void)
         else assert(midi_map(&trk[3], 21) == 38u);    /* MPC drum pads retain their mapping */
     }
     /* Existing projects can disagree: the saved selected track supplies the shared key. */
-    for (uint32_t k = 0; k < NPART; k++) saved.t[k].p[P_ROOT] = (int16_t)(k + 1u);
+    for (uint32_t k = 0; k < NROWS; k++) saved.t[k].p[P_ROOT] = (int16_t)(k + 1u);
     saved.sel = 2;
     saved.sum = proj_sum(&saved);
     assert(!project_restore_runtime(&saved));
-    for (uint32_t k = 0; k < NPART; k++) assert(trk[k].p[P_ROOT] == 3);
+    for (uint32_t k = 0; k < NROWS; k++) assert(trk[k].p[P_ROOT] == 3);
     template_save();
     TSEL->p[P_ROOT] = 11; scale_share(TSEL);
     template_load();
-    for (uint32_t k = 0; k < NPART; k++) assert(trk[k].p[P_ROOT] == 3);
+    for (uint32_t k = 0; k < NROWS; k++) assert(trk[k].p[P_ROOT] == 3);
     puts("project scale: page/layer edits, cancel, save/load, legacy roots, templates and drum bypass passed");
 }
 
@@ -92,7 +92,7 @@ int main(void)
     uint32_t visited = 0;
     turn(EN_K3, 5); frame();
     assert(TSEL->p[P_ROOT] == 5 && !scale_favorite(TSEL->p[P_SCALE]));
-    for (uint32_t k = 0; k < NPART; k++) assert(trk[k].p[P_ROOT] == 5);
+    for (uint32_t k = 0; k < NROWS; k++) assert(trk[k].p[P_ROOT] == 5);
     edit_param(2, 100); assert(TSEL->p[P_ROOT] == 11);
     edit_param(2, -100); assert(TSEL->p[P_ROOT] == 0);
     for (uint32_t family = 1; family <= SCALE_FAMILIES; family++) {
@@ -102,7 +102,7 @@ int main(void)
         for (uint32_t rank = 0; rank < total; rank++) {
             scale_picker_select(scale_picker_at(rank));
             assert(scale_picker_rank() == rank && SCALE_FAMILY[TSEL->p[P_SCALE]] + 1u == family);
-            for (uint32_t k = 0; k < NPART; k++) assert(trk[k].p[P_SCALE] == TSEL->p[P_SCALE]);
+            for (uint32_t k = 0; k < NROWS; k++) assert(trk[k].p[P_SCALE] == TSEL->p[P_SCALE]);
             visited++;
         }
         int16_t last = TSEL->p[P_SCALE]; edit_param(1, 1000); assert(TSEL->p[P_SCALE] == last);
@@ -113,7 +113,7 @@ int main(void)
     TSEL->p[P_MPCDEG] = 53; scale_share(TSEL);
     mark(1); assert(scale_favorite(39));
     scale_picker_select(50); /* meantone */
-    for (uint32_t k = 0; k < NPART; k++) assert(trk[k].p[P_MPCDEG] == 12);
+    for (uint32_t k = 0; k < NROWS; k++) assert(trk[k].p[P_MPCDEG] == 12);
     mark(1); assert(scale_favorite(50));
     edit_param(0, SCALE_FAMILIES + 1u);
     assert(scale_picker_count() == 2 && scale_picker_rank() == 1);
@@ -127,7 +127,7 @@ int main(void)
     mark(1); assert(scale_picker_count() == 1 && scale_favorite(50));
     edit_param(3, -100); assert(TSEL->p[P_QUANT] == Q_OFF);
     edit_param(3, 1);
-    for (uint32_t k = 0; k < NPART; k++) assert(trk[k].p[P_QUANT] == TSEL->p[P_QUANT]);
+    for (uint32_t k = 0; k < NROWS; k++) assert(trk[k].p[P_QUANT] == TSEL->p[P_QUANT]);
     press(B_SCL); frames(400); assert(!strcmp(cur_page()->title, "SCL"));
     {
         char label[16], value[16], expected[16];

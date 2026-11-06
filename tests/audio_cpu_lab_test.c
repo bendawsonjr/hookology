@@ -25,12 +25,12 @@ static void prepare(void)
 {
     reset();seq_stop();recording_reset();song.rec=song.rec_latch=0;
     memset(&midi_clock,0,sizeof midi_clock);song.g[G_CLOCK]=0;song.g[G_BPM]=120;
-    for(uint32_t k=0;k<NPART;k++){
+    for(uint32_t k=0;k<NROWS;k++){
         trk[k].p[P_SLEN]=4;trk[k].p[P_SDIV]=2;trk[k].p[P_SSWING]=0;trk[k].p[P_RECQ]=0;
         trk[k].p[P_QUANT]=0;trk[k].p[P_AMODE]=0;
         for(uint32_t s=0;s<NSTEP;s++){memset(&trk[k].step[s],0,sizeof(step_t));trk[k].step[s].time=ST_REST;}
     }
-    settings_countin=0;audio_lab_guard=1;song.ntrk=NPART;
+    settings_countin=0;audio_lab_guard=1;song.ntrk=NROWS;
 }
 static void note(uint32_t k,uint32_t pitch,uint32_t on)
 {
@@ -106,7 +106,7 @@ int main(void)
     assert(!control(4,1) && song.rec==1);
     assert(control(3,3)==1 && song.rec==1);
     assert(!control(4,2) && song.rec==2);
-    assert(!control(5,15) && !song.rec);song.ntrk=NPART;
+    assert(!control(5,15) && !song.rec);song.ntrk=NROWS;
     assert(!control(1,0));assert(control(1,0)==3);assert(!control(2,0));events_block(0);assert(!song.playing);
     settings_countin=1;assert(!control(3,1));assert(!control(1,0));events_block(0);
     assert(seq_counting() && !song.playing);assert(!control(2,0));events_block(0);assert(!seq_counting());

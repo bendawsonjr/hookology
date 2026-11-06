@@ -86,11 +86,11 @@ static void reset(void)
     transport_req = panic_req = 0; sx_ready = sx_collect = sx_busy = 0;
     so_r = so_w = mi_r = mi_w = 0; midi_in_overflow = 0; usb.config = 1;
     for (i = 0; i < G_COUNT; i++) song.g[i] = GP[i].def;
-    for (t = 0; t < NPART; t++) {
+    for (t = 0; t < NROWS; t++) {
         track_defaults(&trk[t]); set_engine_of(&trk[t], 3); apply_preset_to(&trk[t], 0);   /* (SID: values on p[]) */
         trk[t].engine = trk[t].eng_req; track_defaults_steps(&trk[t]);
     }
-    for (t = NPART; t < NTRK; t++) {                    /* the MIDI-only tracks, as melodee_init (FBKP carries them) */
+    for (t = NROWS; t < NTRK; t++) {                    /* the MIDI-only tracks, as melodee_init (FBKP carries them) */
         for (i = 0; i < P_E0; i++) trk[t].p[i] = TP[i].def;
         for (i = 0; i < NSTEP; i++) trk[t].step[i].time = ST_REST;
     }
@@ -350,7 +350,7 @@ static int fm6_patches(void)
     a[0] = 4;
     request(ED_FM6_ERASE, a, 1);
     bad += check("retired FM6 bank ERASE returns rc 3", host_wire[6] == 3);
-    a[0] = ED_FM6_TRACK; a[1] = 4;
+    a[0] = ED_FM6_TRACK; a[1] = NPART;
     request(ED_FM6_PUT, a, sizeof a);
     i = host_wire[7];
     request(ED_FM6_PUT, a, 20);
@@ -410,7 +410,7 @@ static int bank_protocol(void)
     a[2]=NPAT-1u;
     bad += check("PATTERN selects a part's bank 16 and reports its 16 banks", request(ED_PATTERN,a,3)==12 && !host_wire[7] && trk[2].pattern==NPAT-1u && host_wire[10]==NPAT);
     uint8_t m[3] = {NPART,1,NPAT_MIDI};
-    bad += check("PATTERN rejects a MIDI-only track's bank 9 and reports its 8 banks", request(ED_PATTERN,m,3)==12 && host_wire[7] && !trk[NPART].pattern && host_wire[10]==NPAT_MIDI);
+    bad += check("PATTERN rejects a MIDI-only track's bank 9 and reports its 8 banks", request(ED_PATTERN,m,3)==12 && host_wire[7] && !trk[NROWS].pattern && host_wire[10]==NPAT_MIDI);
     a[2]=7; request(ED_PATTERN,a,3);
     uint8_t row[] = {1,1,0,2,4,7,3};
     bad += check("bank SONG independently assigns four track banks", request(ED_BANK_SONG,row,sizeof row)==18 && !host_wire[6] && chain_patterns[0][3]==7 && chain_config.row[0].repeat==3);
@@ -455,7 +455,7 @@ static int cz_native_protocol(void)
     memset(cz_patch,0,sizeof cz_patch); memset(&tmpl,0,sizeof tmpl);
     int restored=tmpl_take((const uint8_t *)&saved,sizeof saved);template_load();
     bad+=check("native tone bytes and mode survive a saved template",restored && trk[1].p[P_E7]==CZ_NATIVE && !memcmp(cz_patch_of(1)->raw,raw,CZ_BYTES));
-    const uint32_t sizes[]={sizeof(tmpl_fx_legacy_t),sizeof(tmpl_fx_single_t),sizeof(tmpl_t)-NPART*2u*(P_COUNT-116u)-20u,sizeof(tmpl_t)-NPART*2u*(P_COUNT-117u)-4u,sizeof(tmpl_t)-NPART*2u*(P_COUNT-119u)-4u,sizeof(tmpl_t)+NPART*2u*(125u-P_COUNT),sizeof(tmpl_t)-NPART*2u*(P_COUNT-122u),sizeof(tmpl_t)};
+    const uint32_t sizes[]={sizeof(tmpl_fx_legacy_t),sizeof(tmpl_fx_single_t),sizeof(tmpl_t)-NROWS*2u*(P_COUNT-116u)-20u,sizeof(tmpl_t)-NROWS*2u*(P_COUNT-117u)-4u,sizeof(tmpl_t)-NROWS*2u*(P_COUNT-119u)-4u,sizeof(tmpl_t)+NROWS*2u*(125u-P_COUNT),sizeof(tmpl_t)-NROWS*2u*(P_COUNT-122u),sizeof(tmpl_t)};
     for(uint32_t k=0;k<NELEM(sizes);k++){
         uint8_t begin[12]={0,1},abort[2]={3,1};uint32_t len=sizeof(persist_t)+sizes[k];
         for(uint32_t j=0;j<5;j++)begin[2+j]=(uint8_t)((len>>(7*j))&127u);

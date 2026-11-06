@@ -22,7 +22,7 @@ static void select_range(int32_t delta)
 static int cursor_playback(void)
 {
     int bad = 0; ui_power_on();
-    for (uint32_t k = 0; k < NPART; k++) {
+    for (uint32_t k = 0; k < NROWS; k++) {
         trk[k].p[P_SLEN] = 1;
         trk[k].step[0] = (step_t){{60}, 1, ST_NOTE, 0, 96};
         pattern_commit(&trk[k]);
@@ -215,7 +215,7 @@ static int song_looping(void)
 {
     int bad=0;ui_power_on();
     bad+=check("song loop defaults off",!chain_config.rsv[CHAIN_LOOP]);
-    for(uint32_t k=0;k<NPART;k++){trk[k].p[P_SLEN]=1;trk[k].step[0]=(step_t){{60},1,ST_NOTE,0,96};pattern_commit(&trk[k]);}
+    for(uint32_t k=0;k<NROWS;k++){trk[k].p[P_SLEN]=1;trk[k].step[0]=(step_t){{60},1,ST_NOTE,0,96};pattern_commit(&trk[k]);}
     pattern_request(&trk[0],2);trk[0].p[P_SLEN]=7;trk[0].step[0]=(step_t){{75},1,ST_NOTE,0,96};
     arrangement(2);memset(chain_patterns,0,sizeof chain_patterns);chain_config.row[1].slot=0;chain_config.row[0].repeat=2;
     song_page();press(B_OCTUP);sheet_do("Loop song");

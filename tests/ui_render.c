@@ -412,7 +412,7 @@ static void state(void)                          /* a playing song with steps on
 #endif
     song.playing = 1;
     song.g[G_BPM] = 124;
-    for (i = 0; i < NPART; i++) trk[i].seq_idx = 5;
+    for (i = 0; i < NROWS; i++) trk[i].seq_idx = 5;
     my_steps(&trk[1]);
     trk[0].step[2].flags |= SF_ACCENT;
     trk[0].step[6].flags |= SF_SLIDE;
@@ -527,7 +527,7 @@ static void mock_state(int s)
     scope_w = 0;
     song.playing = 1;
     song.g[G_BPM] = 124;
-    for (i = 0; i < NPART; i++) trk[i].seq_idx = 5;
+    for (i = 0; i < NROWS; i++) trk[i].seq_idx = 5;
     demo_pat16(&trk[0], DEMO_ACID);
     demo_pat16(&trk[1], DEMO_PAD);
     for (i = 0; i < 16u; i++) {
@@ -689,7 +689,7 @@ static void ref_scene(int s)
     set_engine_of(&trk[1], ENGI_PROPHET); apply_preset_to(&trk[1], 33);           /* Pickle Pincher */
     set_engine_of(&trk[2], ENGI_CZ); apply_preset_to(&trk[2], preset_named(ENGI_CZ, "ELEC.PIANO"));
     set_engine_of(&trk[3], ENGI_FM6); apply_preset_to(&trk[3], preset_named(ENGI_FM6, "BRASS SECT"));
-    for (k = 0; k < NPART; k++) {
+    for (k = 0; k < NROWS; k++) {
         trk[k].engine = trk[k].eng_req;
         if (PAT[k]) pattern_switch(&trk[k], PAT[k]);
         ref_steps(&trk[k], ON[k], 45u + 12u * k, k == 0u);
@@ -741,7 +741,7 @@ static void ref_scene(int s)
         for (k = 0; k < 6u; k++) {
             static const uint8_t ROW[6] = {0, 0, 1, 1, 2, 0};
             chain_config.row[k] = (chain_row_t){ROW[k], 1};
-            memset(chain_patterns[k], ROW[k], NPART);
+            memset(chain_patterns[k], ROW[k], NROWS);
         }
         chain.running = 1; chain.row = 2;
         go_page(GR_PATGRID);
@@ -749,10 +749,10 @@ static void ref_scene(int s)
     case S_REF_SONG: {                               /* the mock's: four sections, B twice; T1 1 2 2 3, T2 1 2 2 4,
                                                       * T3 - 1 2 1, T4 - - 3 2 (-: pattern 6, empty); B's second time
                                                       * playing, a quarter in; KNOB 1 on D */
-        static const uint8_t SP[4][NPART] = {{0, 0, 5, 5}, {1, 1, 0, 5}, {1, 1, 1, 2}, {2, 3, 0, 1}};
+        static const uint8_t SP[4][NROWS] = {{0, 0, 5, 5}, {1, 1, 0, 5}, {1, 1, 1, 2}, {2, 3, 0, 1}};
         uint32_t b;
         song.playing = 0;
-        for (k = 0; k < NPART; k++) {
+        for (k = 0; k < NROWS; k++) {
             for (b = 0; b < 4u; b++) { pattern_switch(&trk[k], b); ref_steps(&trk[k], ON[(k + b) % 4u], 45u + 12u * k, k == 0u); }
             pattern_switch(&trk[k], 0);
         }
@@ -760,7 +760,7 @@ static void ref_scene(int s)
         chain_config.count = 4;
         for (k = 0; k < 4u; k++) {
             chain_config.row[k] = (chain_row_t){SP[k][0], (uint8_t)(k == 1u ? 2u : 1u)};
-            memcpy(chain_patterns[k], SP[k], NPART);
+            memcpy(chain_patterns[k], SP[k], NROWS);
         }
         ui.song_row = 3; go_page(GR_SONG);
         song.playing = 1; chain.running = 1; chain.row = 1; chain.remaining = 1; trk[0].seq_idx = 4;
@@ -903,7 +903,7 @@ static void ref_scene(int s)
         break;
     case S_REF_MIXER: {                              /* (R5) the mock's levels, pans, sends; 3 muted, 1 and 4 armed */
         static const int16_t LV[4] = {91, 70, 44, 112}, PN[4] = {0, -20, 0, 13}, RV[4] = {51, 15, 0, 20};
-        for (k = 0; k < NPART; k++) { trk[k].p[P_LEVEL] = LV[k]; trk[k].p[P_PAN] = PN[k]; trk[k].p[P_RESERVED36] = RV[k]; }
+        for (k = 0; k < NROWS; k++) { trk[k].p[P_LEVEL] = LV[k]; trk[k].p[P_PAN] = PN[k]; trk[k].p[P_RESERVED36] = RV[k]; }
         trk[2].p[P_MUTE] = 1; song.rec = 1u | 8u; song.playing = 0;
         go_title("MIXER");
         break;
@@ -933,8 +933,8 @@ static void setup(int s)
     case S_PATGRID_COPY_MIDI:                        /* (Copy to from track 1 to track 6: the page shows 5..8) */
         ui_power_on(); song.ntrk=s==S_STAGE_MIDI_PARTIAL?5u:NTRK;
         song.sel=s==S_STAGE_MIDI_PARTIAL?4u:s==S_PATGRID_COPY_MIDI?0u:6u;
-        for(uint32_t k=NPART;k<trk_n();k++){
-            demo_pat16(&trk[k],DEMO_ACID); trk[k].pattern=(uint8_t)(k-NPART); trk[k].seq_idx=5;
+        for(uint32_t k=NROWS;k<trk_n();k++){
+            demo_pat16(&trk[k],DEMO_ACID); trk[k].pattern=(uint8_t)(k-NROWS); trk[k].seq_idx=5;
         }
         song.rec=(uint8_t)(1u<<song.sel); trk[7].p[P_MUTE]=1;
         go_home();
@@ -1046,7 +1046,7 @@ static void setup(int s)
         song.playing = 0; project_save(0); project_save(1);
         chain_config.count = 3;
         chain_config.row[0] = (chain_row_t){0, 2}; chain_config.row[1] = (chain_row_t){1, 4}; chain_config.row[2] = (chain_row_t){2, 1};
-        memset(chain_patterns[1], 1, NPART); memset(chain_patterns[2], 2, NPART); ui.song_row = 1; go_page(GR_SONG); chain_prepare(); events_block(32);
+        memset(chain_patterns[1], 1, NROWS); memset(chain_patterns[2], 2, NROWS); ui.song_row = 1; go_page(GR_SONG); chain_prepare(); events_block(32);
         break;
     case S_NOTES_SLIDE:
     case S_NOTES_MIXED:
@@ -1156,7 +1156,7 @@ static void setup(int s)
         uint32_t k;
         song.ntrk = 3; go_home(); ui.home_pg = 1;
         memset(&view, 0, sizeof view);
-        for (k = 0; k < NPART; k++) trk[k].engine = trk[k].eng_req;
+        for (k = 0; k < NROWS; k++) trk[k].engine = trk[k].eng_req;
         trk[0].peak = 9000; trk[1].peak = 4000; trk[2].peak = 300;
         if (s == S_VIEW_EMPTY) { TSEL->p[P_ROOT] = 9; TSEL->p[P_SCALE] = 2; break; }   /* (A minor) */
         track_select(1);
@@ -1176,7 +1176,7 @@ static void setup(int s)
             input_off(TSEL, 67); view_notes(on, of, &f);
             input_off(TSEL, 69); view_notes(on, of, &f);
             input_off(&trk[0], 45);
-            for (k = 0; k < NPART; k++) for (uint32_t i = 0; i < NVOICE; i++) trk[k].v[i].gate = 0;
+            for (k = 0; k < NROWS; k++) for (uint32_t i = 0; i < NVOICE; i++) trk[k].v[i].gate = 0;
         }
         break;
     }
@@ -1199,7 +1199,7 @@ static void setup(int s)
     case S_SONG_T2:
         song.ntrk = 2; song.playing = 0; chain_config.count = 2;
         chain_config.row[0] = (chain_row_t){0, 2}; chain_config.row[1] = (chain_row_t){1, 4};
-        memset(chain_patterns[1], 1, NPART); ui.song_row = 1; go_page(GR_SONG); break;
+        memset(chain_patterns[1], 1, NROWS); ui.song_row = 1; go_page(GR_SONG); break;
     case S_GLO_T2: song.ntrk = 2; go_home(); ui.layer = LAYER_GLO; trk[1].p[P_MUTE] = 1; break;
     case S_NEW_ROLES_T1: song.playing = 0; new_open(); nw.on = 2; break;
     case S_STAGE_DRUM:
@@ -1243,7 +1243,7 @@ static void setup(int s)
             chain_config.count = 4;
             chain_config.row[0] = (chain_row_t){0, 2}; chain_config.row[1] = (chain_row_t){1, 4};
             chain_config.row[2] = (chain_row_t){0, 1}; chain_config.row[3] = (chain_row_t){2, 16};
-            memset(chain_patterns[1], 1, NPART); chain_patterns[1][3] = 0; memset(chain_patterns[3], 2, NPART);
+            memset(chain_patterns[1], 1, NROWS); chain_patterns[1][3] = 0; memset(chain_patterns[3], 2, NROWS);
             chain.running = 1; chain.row = 1;
         } else {                                         /* no song: the jam's rows */
             jam.n = 2; jam.pat[0][0] = 0; jam.rep[0] = 4; jam.pat[1][0] = 1; jam.pat[1][1] = 4; jam.rep[1] = 2;
@@ -1687,9 +1687,9 @@ static void sweep_mpc_octaves(const char *out)
         char name[80];
         render_pixel = face; setup(S_HOME); pal(p);
         song.octave = 2; song.rec = song.rec_wait = 0; ui.msg_t = 0;
-        for (uint32_t k = 0; k < NPART; k++) { trk[k].p[P_QUANT] = Q_MPC; trk[k].mpc_octave = oct[k]; }
+        for (uint32_t k = 0; k < NROWS; k++) { trk[k].p[P_QUANT] = Q_MPC; trk[k].mpc_octave = oct[k]; }
         draw(-1);
-        for (uint32_t k = 0; k < NPART; k++) {
+        for (uint32_t k = 0; k < NROWS; k++) {
             snprintf(name, sizeof name, "%s%s/MPC bank %u octave", face ? "PIXEL " : "", UI_PALETTES[p].name, k);
             cur_name = name; song.sel = (uint8_t)k;
             nscr = npend = 0; ui_draw();
@@ -1739,7 +1739,7 @@ static void sweep_waiting_headers(const char *out)
         for (uint32_t end = 0; end < 3u; end++) {
             song.rec = song.rec_wait = 1u << song.sel;
             ui_draw();
-            if (end == 2u) song.sel = (song.sel + 1u) % NPART;
+            if (end == 2u) song.sel = (song.sel + 1u) % NROWS;
             else { song.rec_wait = 0; if (end) song.rec = 0; }
             nscr = npend = 0;
             ui_draw(); lint();
@@ -2079,7 +2079,7 @@ static void aud_page(const char *page, int playing)
         ui.force = 1; frame(); aud_frames(2);
         px = 0;
         for (j = 0; j < 48u; j++) {
-            for (i = 0; i < NPART; i++) {
+            for (i = 0; i < NROWS; i++) {
                 track_t *u = &trk[i];
                 uint32_t ul = step_pattern_len(u) ? step_pattern_len(u) : 1u, pu = seq_div_samples((uint32_t)u->p[P_SDIV]);
                 if (u->seq_pos >= 0x7FFFFFFFu) u->seq_pos = 0;

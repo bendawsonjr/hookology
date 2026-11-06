@@ -49,8 +49,8 @@ static int serial_render;
 
 #define FRAMES (CTL * 256u)
 static int32_t reference[FRAMES * 2];
-static p5_part_t prophet_state_reference[NPART][FRAMES/CTL];
-static uint8_t prophet_state_present[NPART][FRAMES/CTL];
+static p5_part_t prophet_state_reference[NROWS][FRAMES/CTL];
+static uint8_t prophet_state_present[NROWS][FRAMES/CTL];
 static _Atomic uint32_t held_job_entered, held_job_release;
 static void held_job(void *context)
 {
@@ -78,7 +78,7 @@ static void setup_case(uint32_t alg, uint32_t eng, uint32_t voices)
     memset(resource, 0, sizeof resource);
     memset(mix_cache, 0, sizeof mix_cache);
     track_solo = 0;
-    for (uint32_t i=0;i<NPART;i++) solo_gain[i]=32768;
+    for (uint32_t i=0;i<NROWS;i++) solo_gain[i]=32768;
     lim_env = LIM_T;
     dc_l = dc_r = dce_l = dce_r = 0;
     rng_state = 0x12345678u;
@@ -87,7 +87,7 @@ static void setup_case(uint32_t alg, uint32_t eng, uint32_t voices)
     vage = 0; panic_req = 0;
     host_tracks_init();
     fm6_fn_reset();
-    for (uint32_t i = 0; i < NPART; i++) {
+    for (uint32_t i = 0; i < NROWS; i++) {
         host_preset(&trk[i], ENGI_FM6, i);
         uint8_t patch[FP_SIZE + 1];
         fm6_unpack(FM6_INIT, patch);
@@ -108,7 +108,7 @@ static void setup_case(uint32_t alg, uint32_t eng, uint32_t voices)
         trk[i].p[P_M2SRC] = MS_VEL; trk[i].p[P_M2DST] = MD_PAN; trk[i].p[P_M2AMT] = 7;
         trk[i].p[P_VOICE] = voices == 8 ? V_UNISON : V_POLY;
     }
-    for (uint32_t i = 0; i < voices; i++) trk_note_on(&trk[i % NPART], 48u + i, 70u + i * 3u);
+    for (uint32_t i = 0; i < voices; i++) trk_note_on(&trk[i % NROWS], 48u + i, 70u + i * 3u);
 }
 static void render_case(int parallel, uint32_t alg, uint32_t eng, uint32_t voices)
 {
@@ -117,8 +117,8 @@ static void render_case(int parallel, uint32_t alg, uint32_t eng, uint32_t voice
     for (uint32_t pos = 0; pos < FRAMES; pos += CTL) {
         int32_t out[2 * CTL];
         if (pos == CTL * 32u) midi_bend_target[0] = 256;
-        if (pos == CTL * 64u) for (uint32_t i = 0; i < voices; i++) trk_note_off(&trk[i % NPART], 48u + i);
-        if (pos == CTL * 96u) for (uint32_t i = 0; i < voices; i++) trk_note_on(&trk[i % NPART], 60u + i, 110u);
+        if (pos == CTL * 64u) for (uint32_t i = 0; i < voices; i++) trk_note_off(&trk[i % NROWS], 48u + i);
+        if (pos == CTL * 96u) for (uint32_t i = 0; i < voices; i++) trk_note_on(&trk[i % NROWS], 60u + i, 110u);
         if (pos == CTL * 160u) { trk[0].eng_req = 0; trk[0].p[P_E0] = 1; }
         mix_block(out, CTL);
         assert(!fm6_pending);
@@ -135,34 +135,34 @@ static void render_case(int parallel, uint32_t alg, uint32_t eng, uint32_t voice
  * mixer, and exercise native ghosts, changing releases and stolen attacks. */
 static void fm6_control_jobs(int parallel, uint32_t eng)
 {
-    static int32_t pcm_reference[256][NPART][CTL];
-    static fm6_part_t state_reference[256][NPART];
+    static int32_t pcm_reference[256][NROWS][CTL];
+    static fm6_part_t state_reference[256][NROWS];
     setup_case(7,eng,0);audio_worker_online=1;serial_render=!parallel;
     memset(midi_verb,0,sizeof midi_verb);
-    for(uint32_t p=0;p<NPART;p++) {
+    for(uint32_t p=0;p<NROWS;p++) {
         uint8_t patch[FP_SIZE+1];memcpy(patch,fm6_patch_of(p),sizeof patch);
         patch[FP_LAMD]=74;patch[FP_LPMD]=31;patch[FP_LPMS]=3;
         for(uint32_t op=0;op<6;op++)patch[op*FP_OP+FP_AMS]=(uint8_t)(op%4);
         fm6_put_patch(p,patch,1);
     }
     for(uint32_t block=0;block<256;block++) {
-        int32_t pcm[NPART][CTL];uint32_t rendered[NPART];
+        int32_t pcm[NROWS][CTL];uint32_t rendered[NROWS];
         midi_verb[1]=(uint8_t)((block/31)%3==0?0:(block/31)%3==1?86:100);
-        if(block%7==0)for(uint32_t p=0;p<NPART;p++) {
+        if(block%7==0)for(uint32_t p=0;p<NROWS;p++) {
             trk_all_off(&trk[p]);
             for(uint32_t n=0;n<3;n++)trk_note_on(&trk[p],48+(block/7+p)%12+n*4,100);
         }
         audio_batch_active=(uint8_t)parallel;audio_batch_native_fm6=1;
-        for(uint32_t p=0;p<NPART;p++) {
+        for(uint32_t p=0;p<NROWS;p++) {
             trk[p].p[P_E2]=(int16_t)((int32_t)((block+p*11)%65)-32);
             spread_on=0;rendered[p]=track_render(&trk[p],pcm[p],CTL);
             trk[p].p[P_E2]=0;
         }
         if(parallel) {
             audio_batch_flush();audio_batch_active=0;
-            for(uint32_t p=0;p<NPART;p++)fm6_post(&trk[p],pcm[p],CTL,rendered[p]);
+            for(uint32_t p=0;p<NROWS;p++)fm6_post(&trk[p],pcm[p],CTL,rendered[p]);
         }
-        for(uint32_t p=0;p<NPART;p++) {
+        for(uint32_t p=0;p<NROWS;p++) {
             const uint8_t *state=(const uint8_t *)FM6P(&trk[p]);
             if(!parallel) {memcpy(pcm_reference[block][p],pcm[p],sizeof pcm[p]);state_reference[block][p]=*FM6P(&trk[p]);}
             else {
@@ -198,9 +198,9 @@ static void prophet_allocation(void)
     audio_worker_online=1;
     for(uint32_t i=0;i<8;i++)trk_note_on(&trk[0],48+i,100);
     assert(active_voices(&trk[0])==8 && voices_busy()==VBUDGET);
-    for(uint32_t i=1;i<NPART;i++)trk_note_on(&trk[i],60+i,100);
+    for(uint32_t i=1;i<NROWS;i++)trk_note_on(&trk[i],60+i,100);
     assert(active_voices(&trk[0])==6 && voices_busy()<=VBUDGET);
-    for(uint32_t i=1;i<NPART;i++)assert(active_voices(&trk[i])==1);
+    for(uint32_t i=1;i<NROWS;i++)assert(active_voices(&trk[i])==1);
     /* Native factory unison stays at its requested five; an explicit count
      * of eight is allowed only with an online worker. */
     setup_case(0,0,0);memset(p5_ready,0,sizeof p5_ready);
@@ -274,7 +274,7 @@ static void prophet_case(int parallel,uint32_t preset,uint32_t mode,uint32_t voi
     trk[0].mw=90;trk[0].at=64;
     trk[0].p[P_M1SRC]=MS_LFO;trk[0].p[P_M1DST]=MD_PITCH;trk[0].p[P_M1AMT]=12;
     for(uint32_t i=0;i<voices;i++)trk_note_on(&trk[0],48+i*3,70+i*7);
-    if(mixed)for(uint32_t i=1;i<NPART;i++){
+    if(mixed)for(uint32_t i=1;i<NROWS;i++){
         if(mixed==2){host_preset(&trk[i],ENGI_PROPHET,0);*p5_patch_of(&trk[i])=*patch;}
         trk_note_on(&trk[i],60+i,100);
         if(mixed==2)trk_note_on(&trk[i],67+i,90);
@@ -299,7 +299,7 @@ static void prophet_case(int parallel,uint32_t preset,uint32_t mode,uint32_t voi
         }
         /* Slow factory attacks may still be silent: compare every oscillator,
          * filter and noise state too, so zero PCM cannot hide a lost voice. */
-        for(uint32_t part=0;part<NPART;part++){
+        for(uint32_t part=0;part<NROWS;part++){
             uint32_t block=pos/CTL;
             int present=trk[part].engine==ENGI_PROPHET;
             if(!parallel){
@@ -331,7 +331,7 @@ static void shared_bus_case(int parallel,uint32_t type)
 {
     setup_case(7,0,4);fx_bus_mix=fx_bus_target=0;memset(fx_state,0,sizeof fx_state);for(uint32_t i=G_MFXTYPE;i<G_COUNT;i++)song.g[i]=GP[i].def;
     song.g[G_MFXTYPE]=type;song.g[G_MFX2TYPE]=FX_TAPE;song.g[G_MFX3TYPE]=FX_ROOM;
-    for(uint32_t k=0;k<NPART;k++)trk[k].p[P_FXSEND]=40+k*20;
+    for(uint32_t k=0;k<NROWS;k++)trk[k].p[P_FXSEND]=40+k*20;
     audio_worker_online=1;serial_render=!parallel;
     for(uint32_t frame=0;frame<FRAMES;frame+=CTL){int32_t out[2*CTL];mix_block(out,CTL);assert(!fx_bus_pending && AW_LOAD(&audio_worker.complete)==AW_LOAD(&audio_worker.request));
         if(parallel)assert(!memcmp(out,reference+frame*2,sizeof out));else memcpy(reference+frame*2,out,sizeof out);

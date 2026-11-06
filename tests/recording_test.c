@@ -691,7 +691,7 @@ static int take_quantization(void)
 static int project_recording_quantization(void)
 {
     raw_begin(); seq_stop(); song.ntrk=NTRK;
-    for(uint32_t k=NPART;k<NTRK;k++) track_blank(k);
+    for(uint32_t k=NROWS;k<NTRK;k++) track_blank(k);
     song.sel=2; go_title("TEMPO"); turn(EN_K3,3);
     int ok=1;
     for(uint32_t k=0;k<NTRK;k++) {

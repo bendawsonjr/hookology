@@ -9,7 +9,7 @@
 static __attribute__((noinline)) void dsk_render_reference(track_t *t, int32_t *out, uint32_t n, const vmod_t *m,
                                                  const int16_t *p)
 {
-    dsk_part_t *K = dsk_part((uint32_t)(t - trk) % NPART);
+    dsk_part_t *K = dsk_part((uint32_t)(t - trk) % NROWS);
     const int16_t (*dac)[64] = SID_WDAC[SID_6581];
     const uint16_t *gt = SID_FC_G[SID_6581];
     int32_t a0[DSK_NCH], a1[DSK_NCH], zero = SID_ZERO[SID_6581], knee = SID_KNEE[SID_6581];

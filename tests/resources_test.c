@@ -55,7 +55,7 @@ static int audio_tests(void)
     for(uint32_t k=0;k<4u;k++){trk[k].engine=engines[k];eng_state_prepare(&trk[k]);}
     bad+=check("default engine setup and derived caches stay within 16 KiB",resource_used()==expected && expected<=16u*1024u);
     for(uint32_t cycle=0;cycle<2048u;cycle++){
-        uint32_t k=cycle%NPART,e=eng_vis(cycle/NPART);
+        uint32_t k=cycle%NROWS,e=eng_vis(cycle/NROWS);
         eng_state_clear(k);trk[k].engine=(uint8_t)e;
         if(!eng_state_prepare(&trk[k])){bad+=check("engine switching does not fragment away capacity",0);break;}
     }
@@ -64,7 +64,7 @@ static int audio_tests(void)
         uint32_t e=eng_vis(j), size=eng_state_size(e);
         if(size>largest){largest=size;largest_engine=e;}
     }
-    uint32_t maximum=largest*NPART;
+    uint32_t maximum=largest*NROWS;
     for(uint32_t k=0;k<4u;k++){
         eng_state_clear(k);trk[k].engine=(uint8_t)largest_engine;eng_state_prepare(&trk[k]);
     }

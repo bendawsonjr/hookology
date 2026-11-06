@@ -36,7 +36,7 @@ static void fresh(void)
     memset(&song, 0, sizeof song);
     memset(&chain, 0, sizeof chain);
     host_tracks_init();
-    for (p = 0; p < NPART; p++) host_preset(&trk[p], HOST_SYNTH, 0);
+    for (p = 0; p < NROWS; p++) host_preset(&trk[p], HOST_SYNTH, 0);
     memset(&melodee_dbg, 0, sizeof melodee_dbg);
     audio_cpu_rem = audio_halves = audio_max_us = 0;
     shed_req = 0; shed_count = 0; shed_over = 0;
@@ -56,7 +56,7 @@ static voice_t *held(track_t *t, uint32_t note)
 static uint32_t sounding(void)                  /* voices of all parts (voices_busy counts budget units) */
 {
     uint32_t p, i, n = 0;
-    for (p = 0; p < NPART; p++)
+    for (p = 0; p < NROWS; p++)
         for (i = 0; i < NVOICE; i++)
             n += trk[p].v[i].active && trk[p].v[i].stage != 4u;
     return n;

@@ -244,13 +244,13 @@ static void view_pulse(uint32_t k)
         m = view.lvl[k] - 1;                            /* (falls ~2 dB a frame) */
     view.lvl[k] = (uint8_t)(m < 0 ? 0 : m);
     sig = 1u + view.lvl[k] * 7u + (uint32_t)(t->p[P_MUTE] != 0) * 3u + ux.gen * 977u + ux.pal * 31u;
-    if ((stage.out && PY[k] < Y_LABEL + CARD_H) || (!ui.force && sig == view.pulse[k]))
+    if ((stage.out && PY[k % NROWS] < Y_LABEL + CARD_H) || (!ui.force && sig == view.pulse[k]))
         return;                                         /* (under the knobs: not drawn) */
     view.pulse[k] = sig;
     cv_begin(VW_PULSE, VW_PULSE, T_BG);
     cv_ring(VW_PULSE / 2, VW_PULSE / 2, VW_PULSE - 3, ux_mix(T_BG, c, 40));
     cv_disc(VW_PULSE / 2, VW_PULSE / 2, 7 + view.lvl[k] * (VW_PULSE - 11) / (TS_MH - 2), c, 0);
-    cv_blit(PX[k], PY[k]);
+    cv_blit(PX[k % NROWS], PY[k % NROWS]);
 }
 
 /* every frame the knobs; every other frame (the scope's) the pulses, the wheel and the keys when they changed */
@@ -262,7 +262,8 @@ static void view_draw(void)
     stage_knobs();
     if (!ui.force && (ui.frame & 1u))
         return;
-    for (k = 0; k < trk_parts(); k++)                   /* (the parts': a MIDI-only track has no level) */
+    for (k = trk_group(); k < trk_group() + NROWS && k < trk_parts(); k++)   /* (the selected track's four; a MIDI-only
+                                                         * track has no level) */
         view_pulse(k);
     view_notes(on, of, &faded);
     sig = 2166136261u;

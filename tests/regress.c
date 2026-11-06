@@ -66,7 +66,7 @@ static int64_t dcs[2];
 static int parts_free(void)
 {
     uint32_t p, i;
-    for (p = 0; p < NPART; p++)
+    for (p = 0; p < NROWS; p++)
         for (i = 0; i < NVOICE; i++)
             if (trk[p].v[i].active)
                 return 0;
@@ -76,7 +76,7 @@ static int parts_free(void)
 static uint32_t sounding(void)                 /* part voices sounding (not the ones fading for another part) */
 {
     uint32_t p, i, n = 0;
-    for (p = 0; p < NPART; p++)
+    for (p = 0; p < NROWS; p++)
         for (i = 0; i < NVOICE; i++)
             n += trk[p].v[i].active && trk[p].v[i].stage != 4u;
     return n;
@@ -323,7 +323,7 @@ static void job_cpu(const job_t *j)
     uint32_t p, i, k, nb = FS / CTL, drums_on = parts[3][2] == DRUM_HITS;
     uint64_t i0, t0;
     host_tracks_init();
-    for (p = 0; p < NPART; p++) {
+    for (p = 0; p < NROWS; p++) {
         if (parts[p][0] == 4u)
             host_808_kit(&trk[p]);
         else
@@ -345,7 +345,7 @@ static void job_cpu(const job_t *j)
             i0 = instr_now();
             t0 = now_ns();
         }
-        for (p = 0; p < NPART; p++)
+        for (p = 0; p < NROWS; p++)
             if (parts[p][2] != DRUM_HITS && ENGINES[parts[p][0]]->oneshot && k % 64u == 63u)
                 for (i = 0; i < parts[p][2]; i++)
                     trk_note_on(&trk[p], KIT[i], 100);
@@ -437,13 +437,13 @@ static int held_gates(char *who, size_t wn)
 {
     uint32_t p, i, n = 0;
     who[0] = 0;
-    for (p = 0; p < NPART; p++)
+    for (p = 0; p < NROWS; p++)
         if (trk[p].nheld) {                        /* a key the ARP still thinks is down: it plays on */
             if (!n)
                 snprintf(who, wn, "part %u ARP still holds %u notes (first %u)", p + 1u, trk[p].nheld, trk[p].held[0]);
             n++;
         }
-    for (p = 0; p < NPART; p++)
+    for (p = 0; p < NROWS; p++)
         for (i = 0; i < NVOICE; i++)
             if (trk[p].v[i].active && trk[p].v[i].gate) {
                 if (!n)
@@ -467,11 +467,11 @@ static void midi_pkt(uint32_t st, uint32_t d1, uint32_t d2)   /* as usb.c: the q
 #define VCAP (MELODEE_LEGACY_EXTRAS ? 4u : NVOICE)
 static int chk_budget(char *msg, uint32_t n)
 {
-    static const uint8_t E[NPART][2] = {{HOST_SYNTH, 4}, {ENGI_FM6, 1}, {VCAP_E, 1}, {4, 4}};
-    uint8_t held[NPART][128] = {{0}};
+    static const uint8_t E[NROWS][2] = {{HOST_SYNTH, 4}, {ENGI_FM6, 1}, {VCAP_E, 1}, {4, 4}};
+    uint8_t held[NROWS][128] = {{0}};
     uint32_t p, k, worst = 0, vworst = 0, fading = 0, kills0 = voice_kills;
     host_tracks_init();
-    for (p = 0; p < NPART; p++) {
+    for (p = 0; p < NROWS; p++) {
         if (E[p][0] == 4u)
             host_808_kit(&trk[p]);
         else
@@ -484,7 +484,7 @@ static int chk_budget(char *msg, uint32_t n)
         uint32_t i, a = 0, va = 0;
         if (k % 4u == 0u) {
             uint32_t note = 36u + rnd(48);
-            p = rnd(NPART);
+            p = rnd(NROWS);
             if (held[p][note]) {
                 trk_note_off(&trk[p], note);
                 held[p][note] = 0;
@@ -494,7 +494,7 @@ static int chk_budget(char *msg, uint32_t n)
             }
         }
         blk();
-        for (p = 0; p < NPART; p++)
+        for (p = 0; p < NROWS; p++)
             for (i = 0; i < NVOICE; i++) {
                 a += trk[p].v[i].active;
                 va += p == 2u && trk[p].v[i].active;
@@ -503,7 +503,7 @@ static int chk_budget(char *msg, uint32_t n)
         worst = a > worst ? a : worst;
         vworst = va > vworst ? va : vworst;
     }
-    for (p = 0; p < NPART; p++)
+    for (p = 0; p < NROWS; p++)
         for (k = 0; k < 128u; k++)
             if (held[p][k])
                 trk_note_off(&trk[p], k);
@@ -523,7 +523,7 @@ static int chk_retrigger_budget(char *msg, uint32_t n)
     for (round = 0; round < 2u; round++) {
         voice_t *old = 0;
         host_tracks_init();
-        for (p = 0; p < NPART; p++) {
+        for (p = 0; p < NROWS; p++) {
             memset(trk[p].v, 0, NVOICE * sizeof *trk[p].v);
             host_preset(&trk[p], p == 0 && round ? 5u : 0u, 0);
             trk[p].p[P_VOICE] = p >= 2u ? V_MONO : V_POLY;
@@ -549,7 +549,7 @@ static int chk_retrigger_budget(char *msg, uint32_t n)
         bad += i != NVOICE;
         blk();
         bad += voices_busy() != NVOICE || !trk[2].v[0].gate || !trk[3].v[0].gate;
-        for (p = 0; p < NPART; p++)
+        for (p = 0; p < NROWS; p++)
             trk_all_off(&trk[p]);
         for (i = 0; i < 4u * FS / CTL && !parts_free(); i++)
             blk();
@@ -567,7 +567,7 @@ static int chk_cap_mode_budget(char *msg, uint32_t n)
     uint32_t round, p, i, bad = 0, worst = 0;
     for (round = 0; round < NELEM(MODE); round++) {
         host_tracks_init();
-        for (p = 0; p < NPART; p++) {
+        for (p = 0; p < NROWS; p++) {
             memset(trk[p].v, 0, NVOICE * sizeof *trk[p].v);
             host_preset(&trk[p], HOST_SYNTH, 0);
             trk[p].p[P_VOICE] = p ? V_MONO : V_POLY;
@@ -585,7 +585,7 @@ static int chk_cap_mode_budget(char *msg, uint32_t n)
             for (i = 1; i < trk_nvoice(&trk[0]); i++)
                 voice_kill(&trk[0].v[i]);
         }
-        for (p = 1; p < NPART; p++) {
+        for (p = 1; p < NROWS; p++) {
             trk_note_on(&trk[p], 70u + p * 3u, 100);
             i = voices_busy();
             worst = i > worst ? i : worst;
@@ -598,9 +598,9 @@ static int chk_cap_mode_budget(char *msg, uint32_t n)
         bad += i > NVOICE || !trk[0].v[0].gate;
         blk();
         bad += voices_busy() > NVOICE || !trk[0].v[0].gate;
-        for (p = 1; p < NPART; p++)
+        for (p = 1; p < NROWS; p++)
             bad += !trk[p].v[0].gate;
-        for (p = 0; p < NPART; p++)
+        for (p = 0; p < NROWS; p++)
             trk_all_off(&trk[p]);
         for (i = 0; i < 4u * FS / CTL && !parts_free(); i++)
             blk();
@@ -618,7 +618,7 @@ static int chk_mode_budget(char *msg, uint32_t n)
     for (initial = 0; initial < 2u; initial++)
         for (mode = V_MONO; mode <= V_UNISON; mode++) {
             host_tracks_init();
-            for (p = 0; p < NPART; p++) {
+            for (p = 0; p < NROWS; p++) {
                 memset(trk[p].v, 0, NVOICE * sizeof *trk[p].v);
                 host_preset(&trk[p], HOST_SYNTH, 0);
                 trk[p].p[P_VOICE] = V_MONO;
@@ -631,13 +631,13 @@ static int chk_mode_budget(char *msg, uint32_t n)
                 for (i = 0; i < NVOICE; i++) trk_note_on(&trk[0], 48u + 2u * i, 100);
             bad += voices_busy() != NVOICE;
             trk[0].p[P_VOICE] = (int16_t)mode;
-            for (p = 1; p < NPART; p++) {
+            for (p = 1; p < NROWS; p++) {
                 trk_note_on(&trk[p], 72u + p, 100);
                 bad += voices_busy() > NVOICE || !trk[0].v[0].gate || !trk[p].v[0].gate;
             }
             blk();
             bad += voices_busy() > NVOICE;
-            for (p = 0; p < NPART; p++) trk_all_off(&trk[p]);
+            for (p = 0; p < NROWS; p++) trk_all_off(&trk[p]);
         }
     snprintf(msg, n, "POLY / UNISON chord -> MONO / LEGATO / UNISON: extra voices reclaimed, leads kept, budget %u", NVOICE);
     return !bad;
@@ -649,7 +649,7 @@ static void mode_release_reset(uint32_t engine, uint32_t mode)
     memset(trk, 0, sizeof trk);trk_voices_bind();
     memset(&song, 0, sizeof song);
     host_tracks_init();
-    for (p = 0; p < NPART; p++) {
+    for (p = 0; p < NROWS; p++) {
         host_preset(&trk[p], p ? 0u : engine, 0);
         trk[p].p[P_VOICE] = p ? V_POLY : mode;
         trk[p].p[P_AMODE] = trk[p].p[P_REL] = 0;
@@ -735,7 +735,7 @@ static int chk_steal_fade(char *msg, uint32_t n)
     double worst = 0;
     int32_t wat = 0, wcalm = 0;
     host_tracks_init();
-    for (p = 0; p < NPART; p++)
+    for (p = 0; p < NROWS; p++)
         xfade_sine(&trk[p]);
     for (f = 0; f < frames; f += CTL) {
         uint32_t ms = f * 1000u / FS, k0 = voice_kills;
@@ -782,7 +782,7 @@ static int chk_keep(char *msg, uint32_t n, uint32_t mode)
     trk[0].p[P_VOICE] = (int16_t)mode;
     trk[0].p[P_AMODE] = 0;
     trk[0].p[P_SUS] = 100;
-    for (k = 1; k < NPART; k++) {
+    for (k = 1; k < NROWS; k++) {
         host_preset(&trk[k], ENGI_FM6, 1);
         trk[k].p[P_VOICE] = V_POLY;
         trk[k].p[P_AMODE] = 0;
@@ -851,7 +851,7 @@ static int chk_hang(char *msg, uint32_t n)
     int bad = 0;
     for (round = 0; round < 3u && !bad; round++) {
         host_tracks_init();
-        for (k = 0; k < NPART; k++) {
+        for (k = 0; k < NROWS; k++) {
             host_preset(&trk[k], rnd(NENGINES), rnd(4));
             /* DX7 L4 may deliberately sustain after key-up (legacy DIGITAL conversions too).
              * This routing test needs terminating envelopes; sound/parity tests retain native L4. */
@@ -881,7 +881,7 @@ static int chk_hang(char *msg, uint32_t n)
                 fm1_in.notes = keys;
                 ev++;
             } else if (r == 9u) {
-                song.sel = (uint8_t)rnd(NPART);     /* another track selected */
+                song.sel = (uint8_t)rnd(NROWS);     /* another track selected */
             }
             blk();
         }
@@ -900,7 +900,7 @@ static int chk_hang(char *msg, uint32_t n)
             uint32_t cap = fpos + release_cap() * FS;
             while (!parts_free() && fpos < cap)
                 blk();
-            for (c = 0; c < NPART * NVOICE && !parts_free() && !bad; c++) {
+            for (c = 0; c < NROWS * NVOICE && !parts_free() && !bad; c++) {
                 const voice_t *v = &trk[c / NVOICE].v[c % NVOICE];
                 if (v->active) {
                     bad = 2;
@@ -973,7 +973,7 @@ int main(int argc, char **argv)
     static const char *const SN[6] = {"dry", "chorus", "delay", "reverb", "all", "dist"};
     static const uint8_t MODE_E[3][2] = {{HOST_SYNTH, 0}, {ENGI_FM6, 1}, {5, 0}};   /* engine, preset */
     static const uint8_t SEND_E[2][2] = {{HOST_SYNTH, 4}, {ENGI_FM6, 0}};
-    static uint8_t cpu_parts[MAXJ][NPART][3];
+    static uint8_t cpu_parts[MAXJ][NROWS][3];
     static kv_t gold[MAXJ], cpu[MAXJ];
     uint32_t ng, nc, e, pi, i, g0, g1, c0, c1, k0, ncpu = 0;
     uint32_t g_changed = 0, g_new = 0, g_gone = 0, h_fail = 0, c_fail = 0, c_warn = 0, k_fail = 0, crash = 0;

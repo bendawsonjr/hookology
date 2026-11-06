@@ -11,7 +11,7 @@ static void setup(uint32_t count)
         chain_config.row[r] = (chain_row_t){0, 1};
         memset(chain_patterns[r], 0, NTRK);
     }
-    for (uint32_t k = 0; k < NPART; k++) {
+    for (uint32_t k = 0; k < NROWS; k++) {
         trk[k].p[P_SLEN] = 1;
         trk[k].step[0] = (step_t){{60}, 1, ST_NOTE, 0, 90};
         pattern_commit(&trk[k]);

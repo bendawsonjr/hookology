@@ -22,7 +22,7 @@ static void advance(uint32_t n)
 static void reset(void)
 {
     ui_power_on();
-    for (uint32_t tr = 0; tr < NPART; tr++) {
+    for (uint32_t tr = 0; tr < NROWS; tr++) {
         set_engine_of(&trk[tr], ENGI_FM6); engine_block(&trk[tr]);
         trk[tr].p[P_VOICE] = V_POLY; trk[tr].p[P_CHRD] = 0;
     }

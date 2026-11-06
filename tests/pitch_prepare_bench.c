@@ -61,7 +61,7 @@ static void benchmark(void)
         }
         printf("%u,%u,%.1f,%.1f\n",hz,moving,cost[0],cost[1]);
     }
-    printf("proposed per-voice cache bytes: %zu\n",sizeof cache*NPART*NVOICE);
+    printf("proposed per-voice cache bytes: %zu\n",sizeof cache*NROWS*NVOICE);
 }
 int main(int argc,char **argv)
 {

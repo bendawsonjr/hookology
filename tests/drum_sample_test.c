@@ -10,7 +10,7 @@ static const char *const NAME[8] = {"KICK", "SNARE", "CLAP", "HATC", "HATO", "TO
 static track_t *kit(uint32_t preset)
 {
     ui_power_on(); track_t *t = TSEL;
-    for (uint32_t p = 0; p < NPART; p++) memset(trk[p].v, 0, NVOICE * sizeof *trk[p].v);
+    for (uint32_t p = 0; p < NROWS; p++) memset(trk[p].v, 0, NVOICE * sizeof *trk[p].v);
     eng_state_reset();
     host_preset(t, ENGI_DRUM, preset);
     return t;

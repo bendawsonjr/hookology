@@ -132,7 +132,7 @@ static void test_compatibility(void)
     }
     p.zoom=1;assert(settings_import(&p,sizeof p));assert(!settings_click && settings_click_level==CLICK_LEVEL_DEFAULT && !settings_countin && !settings_preview && !settings_chord_add);
     project_t q,back;project_store_t current;project_capture(&q);q.t[0].p[P_E4]=53;
-    for(uint32_t t=0;t<NPART;t++)q.t[t].p[P_RESERVED35]=77;   /* delay sends and their automation (a FUN16's are kept) */
+    for(uint32_t t=0;t<NROWS;t++)q.t[t].p[P_RESERVED35]=77;   /* delay sends and their automation (a FUN16's are kept) */
     q.g[G_RESERVED25]=3;q.g[G_RESERVED26]=9;q.g[G_RESERVED4]=2;q.motion.count=1;q.motion.event[0]=(motion_event_t){0,P_RESERVED35,100};q.sum=proj_sum(&q);
     assert(proj_pack(&current,&q));
     assert(proj_import(&back,&current,PROJ_STORE_SIZE) && back.t[1].p[P_RESERVED35]==77 && back.g[G_RESERVED25]==3 && back.g[G_RESERVED26]==9 &&

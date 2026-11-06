@@ -31,8 +31,8 @@ static int voices909(void)
     bad+=check("909 closed hat chokes open hat without ending the closed hit",k && !k->d.smp[1].playing && k->d.smp[0].playing);
     kit(DK_909);for(uint32_t i=0;i<D9_NUM;i++)trk_note_on(TSEL,DRUM_SOUND_NOTE[i],127);
     bad+=check("909 respects the eight-voice shared budget",active_count()<=8 && audio(128)>30);
-    kit(DK_909);for(uint32_t tr=0;tr<NPART;tr++){set_engine_of(&trk[tr],ENGI_DRUM);apply_preset_to(&trk[tr],1);trk[tr].engine=trk[tr].eng_req;trk_note_on(&trk[tr],36,110);trk_note_on(&trk[tr],38,110);}panic_req=0;
-    uint32_t total=0;int32_t peak=audio(128);for(uint32_t tr=0;tr<NPART;tr++)for(uint32_t v=0;v<NVOICE;v++)total+=trk[tr].v[v].active;
+    kit(DK_909);for(uint32_t tr=0;tr<NROWS;tr++){set_engine_of(&trk[tr],ENGI_DRUM);apply_preset_to(&trk[tr],1);trk[tr].engine=trk[tr].eng_req;trk_note_on(&trk[tr],36,110);trk_note_on(&trk[tr],38,110);}panic_req=0;
+    uint32_t total=0;int32_t peak=audio(128);for(uint32_t tr=0;tr<NROWS;tr++)for(uint32_t v=0;v<NVOICE;v++)total+=trk[tr].v[v].active;
     bad+=check("four independent 909 parts share the eight-voice budget and render together",total==8 && peak>30 && peak<32768);
     return bad;
 }
@@ -145,7 +145,7 @@ static int capacity_and_controls(void)
         proj_scratch.recording[i]=(recorded_note_t){.on=(uint16_t)(i*61u), .duration=(uint16_t)(65535u-i), .note7=(uint8_t)(36+i%48), .vel=(uint8_t)(1+i%127), .owner=(uint8_t)((i%8)<<5), .step=(uint8_t)(i%64), .pitch=(int8_t)((int32_t)(i%49)-24), .length=(uint8_t)(i&1)};
         recorded_set_owner(&proj_scratch.recording[i],proj_owner_id(i%32));
     }
-    for(uint32_t t=0;t<NPART;t++)for(uint32_t i=0;i<16;i++){int8_t *c=proj_scratch.drum[t].c[i];c[0]=(int8_t)((i+t)%2?24:-24);c[1]=(int8_t)((i+t)%2?63:-64);c[2]=-c[1]-1;c[3]=(int8_t)(i%2?127:0);}
+    for(uint32_t t=0;t<NROWS;t++)for(uint32_t i=0;i<16;i++){int8_t *c=proj_scratch.drum[t].c[i];c[0]=(int8_t)((i+t)%2?24:-24);c[1]=(int8_t)((i+t)%2?63:-64);c[2]=-c[1]-1;c[3]=(int8_t)(i%2?127:0);}
     project_store_t wire;project_t decoded;
     int ok=proj_pack(&wire,&proj_scratch) && proj_import(&decoded,&wire,sizeof wire);uint32_t at=0;
     if(ok)for(uint32_t o=0;o<32;o++)for(uint32_t i=0;i<RECORD_MAX;i++)if(recorded_owner(&proj_scratch.recording[i])==proj_owner_id(o))ok&=!memcmp(&decoded.recording[at++],&proj_scratch.recording[i],sizeof(recorded_note_t));

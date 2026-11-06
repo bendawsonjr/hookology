@@ -442,7 +442,7 @@ static void fx_slot_prepare(fx_plan_t *plan,uint32_t si,const int16_t *p)
     }
     if(f->epoch!=fx_epoch || (type && changed && !f->mix)){
         resource[RES_FX0+si].size=0;fx_zero(f);
-        f->epoch=fx_epoch;f->type=(uint8_t)type;f->rng=(int32_t)(0x73a9825du+(NPART*FX_SLOTS+si)*997u);
+        f->epoch=fx_epoch;f->type=(uint8_t)type;f->rng=(int32_t)(0x73a9825du+(NROWS*FX_SLOTS+si)*997u);
     }
     f->rate=(int16_t)clamp(p[2],0,127);f->character=(int16_t)clamp(p[3],0,127);
     if(fx_has_tone(f->type)){   /* the low cut (section 0: the floor, TONE above 0 higher), TONE below 0 the high cut (1) */

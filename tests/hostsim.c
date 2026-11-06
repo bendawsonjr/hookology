@@ -154,7 +154,7 @@ static void host_preset_values(track_t *t, uint32_t e, uint32_t pi, const preset
     t->p[P_ED_FLT] = p->fenv;
     t->p[P_VOICE] = p->mono ? V_LEGATO : V_POLY;
     cz_factory_loaded(t);
-    if(e==ENGI_PROPHET){uint32_t k=(uint32_t)(t-trk)%NPART;p5_ready[k]=1;p5_preset_loaded(t,pi);}   /* (its program, as ui.c) */
+    if(e==ENGI_PROPHET){uint32_t k=(uint32_t)(t-trk)%NROWS;p5_ready[k]=1;p5_preset_loaded(t,pi);}   /* (its program, as ui.c) */
     fm6_track_loaded(t);                          /* FM6: the preset's patch (ui.c apply_preset_to) */
 }
 static void host_preset_req(track_t *t, uint32_t e, uint32_t pi)
@@ -173,7 +173,7 @@ static void host_preset_req(track_t *t, uint32_t e, uint32_t pi)
 static void host_preset(track_t *t, uint32_t e, uint32_t pi)
 {
     host_preset_req(t, e, pi);
-    if (t->engine != t->eng_req && t >= &trk[0] && t < &trk[NPART])
+    if (t->engine != t->eng_req && t >= &trk[0] && t < &trk[NROWS])
         eng_state_clear((uint32_t)(t - trk));     /* as voice.c engine_block on a switch */
     t->engine = t->eng_req;
 }
@@ -211,7 +211,7 @@ static void put_step(track_t *t, uint32_t i, uint32_t n, const uint8_t *notes, u
 static uint32_t busy_now(void)                   /* sounding voices of the parts (none fading after a block) */
 {
     uint32_t p, i, n = 0;
-    for (p = 0; p < NPART; p++)
+    for (p = 0; p < NROWS; p++)
         for (i = 0; i < NVOICE; i++)
             n += trk[p].v[i].active;
     return n;
@@ -292,7 +292,7 @@ static int tracks_demo(const char *dir, const char *name, uint32_t solo)
         put_step(td, i, k, n, k ? ST_NOTE : ST_REST, i % 4u == 0u ? SF_ACCENT : 0u);
     }
     if (solo) {                                    /* the other tracks silent */
-        for (i = 0; i < NPART; i++)
+        for (i = 0; i < NROWS; i++)
             if (i + 1u != solo)
                 trk[i].p[P_LEVEL] = 0;
     }
@@ -371,7 +371,7 @@ static int tracks_demo(const char *dir, const char *name, uint32_t solo)
  * fastest of four 2 s stretches (the host's other load only ever adds). Runs in a child process
  * (a clean state each time); the result comes back through a pipe. */
 #define DRUM_HITS 0xFFu
-static double tracks_cost(const uint8_t parts[NPART][3], uint32_t *busy_max)
+static double tracks_cost(const uint8_t parts[NROWS][3], uint32_t *busy_max)
 {
     int fd[2];
     pid_t pid;
@@ -385,7 +385,7 @@ static double tracks_cost(const uint8_t parts[NPART][3], uint32_t *busy_max)
         uint32_t p, i, bm = 0;
         int32_t o[2 * CTL];
         host_tracks_init();
-        for (p = 0; p < NPART; p++) {
+        for (p = 0; p < NROWS; p++) {
             if (parts[p][0] == 4u)
                 host_808_kit(&trk[p]);
             else
@@ -448,7 +448,7 @@ static int steal_test(const char *dir)
     if (!L || !(w = fopen(path, "wb")))
         return 1;
     host_tracks_init();
-    for (p = 0; p < NPART; p++) {
+    for (p = 0; p < NROWS; p++) {
         track_t *t = &trk[p];
         host_preset(t, HOST_SYNTH, 0);             /* CZ-1 INIT TONE (DCW closed): a plain held sine, no sends */
         t->p[P_ED_FLT] = 0;
@@ -724,7 +724,7 @@ static int trs_test(void)
     uint32_t i;
     int ok_parts, ok_ch10, ok_sel, ok_off, ok_hang, ok_rec;
     host_tracks_init();
-    for (i = 0; i < NPART; i++) {
+    for (i = 0; i < NROWS; i++) {
         host_preset(&trk[i], HOST_SYNTH, 4);
         trk[i].p[P_VOICE] = V_POLY;
         trk[i].p[P_SUS] = 127;
@@ -825,7 +825,7 @@ static int tracks_test(const char *dir)
     /* one part: every preset with 8 held notes (the engine's cap: VOICE 4); the worst one */
     for (e = 0; e < NENGINES; e++)
         for (pi = 0; e != ENGI_MIDI && pi < ENGINES[e]->npresets; pi++) {
-            uint8_t parts[NPART][3] = {{(uint8_t)e, (uint8_t)pi, 8}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+            uint8_t parts[NROWS][3] = {{(uint8_t)e, (uint8_t)pi, 8}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
             double c = tracks_cost(parts, 0);
             if (c > best_e[e]) {
                 best_e[e] = c;
@@ -845,12 +845,12 @@ static int tracks_test(const char *dir)
     {   /* FM6, PHASE, VOICE (their heaviest presets) and drums on part 4 at once:
          * 3 + 3 + 2 notes and the hits in the budget of 8 */
         const uint8_t fm = ENGI_FM6;
-        uint8_t parts[NPART][3] = {{fm, (uint8_t)heavy[fm], 3}, {2, (uint8_t)heavy[2], 3}, {5, (uint8_t)heavy[5], 2},
+        uint8_t parts[NROWS][3] = {{fm, (uint8_t)heavy[fm], 3}, {2, (uint8_t)heavy[2], 3}, {5, (uint8_t)heavy[5], 2},
                                    {4, 4, DRUM_HITS}};
-        uint8_t full[NPART][3] = {{fm, (uint8_t)heavy[fm], 8}, {2, (uint8_t)heavy[2], 8}, {5, (uint8_t)heavy[5], 4},
+        uint8_t full[NROWS][3] = {{fm, (uint8_t)heavy[fm], 8}, {2, (uint8_t)heavy[2], 8}, {5, (uint8_t)heavy[5], 4},
                                   {4, 4, DRUM_HITS}};
-        uint8_t vv[NPART][3] = {{5, (uint8_t)heavy[5], 4}, {5, (uint8_t)heavy[5], 4}, {0, 0, 0}, {0, 0, 0}};
-        uint8_t idle[NPART][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {4, 4, DRUM_HITS}};
+        uint8_t vv[NROWS][3] = {{5, (uint8_t)heavy[5], 4}, {5, (uint8_t)heavy[5], 4}, {0, 0, 0}, {0, 0, 0}};
+        uint8_t idle[NROWS][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {4, 4, DRUM_HITS}};
         uint32_t bm2 = 0, bm3 = 0;
         double two_voice, none;
         four = tracks_cost(parts, &bm);

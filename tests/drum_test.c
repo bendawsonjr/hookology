@@ -51,7 +51,7 @@ static void lane_budget(void)
     uint32_t i, p, owner, kills, bad = 0;
     host_tracks_init();
     eng_state_reset();
-    for (p = 0; p < NPART; p++)
+    for (p = 0; p < NROWS; p++)
         memset(trk[p].v, 0, NVOICE * sizeof *trk[p].v);
     host_preset(&trk[0], ENGI_DRUM, 0);
     host_preset(&trk[1], HOST_SYNTH, 0);
@@ -88,7 +88,7 @@ static void lane_budget(void)
     printf("drum_test: a synth starts over the kit, a stolen drum retriggers before its fade: budget kept: %s\n",
            bad ? "FAIL" : "ok");
     fails += bad != 0;
-    for (p = 0; p < NPART; p++)
+    for (p = 0; p < NROWS; p++)
         memset(trk[p].v, 0, NVOICE * sizeof *trk[p].v);
 }
 

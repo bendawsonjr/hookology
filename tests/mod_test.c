@@ -86,7 +86,7 @@ static void fresh(uint32_t e, uint32_t pi)        /* the boot state (no FX tails
     memset(trk, 0, sizeof trk);trk_voices_bind();
     memset(&mod, 0, sizeof mod);
     host_tracks_init();
-    for (k = 0; k < NPART; k++)
+    for (k = 0; k < NROWS; k++)
         host_preset(&trk[k], k ? 0u : e, k ? 0u : pi);
     song.sel = 0;
     hash = 0xCBF29CE484222325ull;
@@ -435,13 +435,13 @@ static uint64_t instr_now(void)
 
 /* instructions per sample: parts[k] = {engine, preset, notes}; on: every slot of every sounding part active
  * (LFO -> CUT, VEL -> AMP, MODW -> VIB, LFO -> E3: per voice and per block) */
-static double cost(const uint8_t parts[NPART][3], int on)
+static double cost(const uint8_t parts[NROWS][3], int on)
 {
     static const uint8_t NOTES[8] = {48, 52, 55, 59, 60, 64, 67, 71};
     uint32_t p, i, rep;
     double best = 1e30;
     fresh(HOST_SYNTH, 0);
-    for (p = 0; p < NPART; p++) {
+    for (p = 0; p < NROWS; p++) {
         track_t *t = &trk[p];
         host_preset(t, parts[p][0], parts[p][1]);
         t->p[P_VOICE] = V_POLY;
@@ -471,8 +471,8 @@ static double cost(const uint8_t parts[NPART][3], int on)
 static void test_cost(void)
 {
     uint32_t e_phys = eng_by_name("PHYS"), pp = preset_by_name(e_phys, "BOWED METAL");
-    uint8_t phys[NPART][3] = {{(uint8_t)e_phys, (uint8_t)pp, 8}}, idle[NPART][3] = {{0}};
-    uint8_t mix[NPART][3] = {{ENGI_FM6, 0, 8}, {2, 0, 8}, {(uint8_t)e_phys, (uint8_t)pp, 4}, {6, 0, 4}};
+    uint8_t phys[NROWS][3] = {{(uint8_t)e_phys, (uint8_t)pp, 8}}, idle[NROWS][3] = {{0}};
+    uint8_t mix[NROWS][3] = {{ENGI_FM6, 0, 8}, {2, 0, 8}, {(uint8_t)e_phys, (uint8_t)pp, 4}, {6, 0, 4}};
     double c_idle, c0, c1, m0, m1;
     if (!instr_now()) {
         printf("mod: cost: no instruction counter on this host (proc_pid_rusage), skipped\n");

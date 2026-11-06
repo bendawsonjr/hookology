@@ -15,7 +15,7 @@ static void reset_midi(uint32_t track)
     memset(midi_ch, 0, sizeof midi_ch);
     memset(&um, 0, sizeof um);
     usb.config = 1;
-    if (track >= NPART) song.ntrk = NTRK;              /* (tracks 5..8: in use) */
+    if (track >= NROWS) song.ntrk = NTRK;              /* (tracks 5..8: in use) */
     set_engine_of(&trk[track], ENGI_MIDI);
     events_block(0); /* consume the sound-change panic before playing */
     assert(trk[track].engine == ENGI_MIDI);
@@ -269,11 +269,11 @@ static uint32_t slot_magic(uint32_t slot) { uint32_t m; memcpy(&m, proj_bank_slo
 static void midi_track_navigation(void)
 {
     reset_midi(0); project_new_blank();
-    for(uint32_t k=NPART;k<NTRK;k++)track_add();
+    for(uint32_t k=NROWS;k<NTRK;k++)track_add();
     go_home(); track_select(1); btn_down(B_SEQ);
     for (uint32_t k = NTRK; k-- > 0;) {
         pattern_keys(1u << key_at(1, k));
-        assert(song.sel == k && trk_group() == k / NPART * NPART);
+        assert(song.sel == k && trk_group() == k / NROWS * NROWS);
     }
     pattern_keys(1u << key_at(1, 7)); assert(song.sel == 7);
     btn_up(B_SEQ); stop_transport();
@@ -302,7 +302,7 @@ static void midi_track_navigation(void)
 }
 static void midi_only_step_entry(void)
 {
-    for(uint32_t k=NPART;k<NTRK;k++){
+    for(uint32_t k=NROWS;k<NTRK;k++){
         reset_midi(k); song.sel=(uint8_t)k; song.g[G_ROUTE]=1;
         go_page(GR_ROLL); song.seq_mode=1; ui.cursor=0;
         trk[k].p[P_QUANT]=0; trk[k].p[P_CHRD]=0; seq_midi_reset();
@@ -320,19 +320,21 @@ static void midi_only_tracks(void)
 {
     reset_midi(0);
     project_new_blank();
-    assert(trk_n() == NPART);
-    for (uint32_t k = NPART; k < NTRK; k++) {
+    assert(trk_n() == NROWS);
+    for (uint32_t k = NROWS; k < NTRK; k++) {
         track_add();
-        assert(trk_n() == k + 1u && song.sel == k && trk[k].eng_req == ENGI_MIDI && trk[k].p[P_E0] == (int32_t)k + 1);
+        assert(trk_n() == k + 1u && song.sel == k && trk[k].eng_req == trk_def_engine(k));
+        if (k < NPART) continue;                        /* (tracks 5, 6: sound tracks) */
+        assert(trk[k].eng_req == ENGI_MIDI && trk[k].p[P_E0] == (int32_t)k + 1);
         assert(cur_page()->scope == SC_ENGINE && cur_page()->id[0] == P_E0);   /* (its channel, not the browser) */
     }
     track_add(); assert(trk_n() == NTRK);
     events_block(0); mo_r = mo_w;
-    set_engine_of(&trk[5], ENGI_FM6); events_block(0);
-    assert(trk[5].eng_req == ENGI_MIDI && trk[5].engine == ENGI_MIDI);
+    set_engine_of(&trk[7], ENGI_FM6); events_block(0);
+    assert(trk[7].eng_req == ENGI_MIDI && trk[7].engine == ENGI_MIDI);
     mo_r = mo_w;
-    trk_note_on(&trk[5], 60, 90); pop_midi(0x95, 60, 90);
-    trk_note_off(&trk[5], 60); pop_midi(0x85, 60, 0); empty_midi();
+    trk_note_on(&trk[7], 60, 90); pop_midi(0x97, 60, 90);
+    trk_note_off(&trk[7], 60); pop_midi(0x87, 60, 0); empty_midi();
     for (uint32_t v = 0; v < NVOICE; v++) assert(!midi_voice[v].active);
     int32_t out[CTL * 2]; mix_block(out, CTL);
     /* the music: track 5 (index 4) two banks, track 7 (index 6) channel 11 on its third bank, a song column, a take */
@@ -346,11 +348,11 @@ static void midi_only_tracks(void)
     song.sel = 6;
     assert(!project_save_as(0, "EIGHT"));
     assert(slot_magic(0) == BANKP_MAGIC);
-    project_new_blank(); assert(trk_n() == NPART && bank_is(4, 0, 0, 0, TP[P_SLEN].def));
+    project_new_blank(); assert(trk_n() == NROWS && bank_is(4, 0, 0, 0, TP[P_SLEN].def));
     project_load(0);
     assert(trk_n() == NTRK && song.sel == 6);
     assert(bank_is(4, 0, 48, 16, 16) && bank_is(4, 3, 50, 64, 64) && bank_is(6, 2, 70, 5, 8) && bank_is(1, 1, 30, 7, 32));
-    assert(trk[6].pattern == 2 && trk[6].p[P_E0] == 11 && trk[4].p[P_E0] == 5 && trk[6].eng_req == ENGI_MIDI);
+    assert(trk[6].pattern == 2 && trk[6].p[P_E0] == 11 && trk[4].eng_req == trk_def_engine(4) && trk[6].eng_req == ENGI_MIDI);
     assert(chain_config.count == 2 && chain_patterns[1][4] == 3 && chain_patterns[0][6] == 2);
     {
         uint32_t found = 0;
@@ -358,9 +360,9 @@ static void midi_only_tracks(void)
             found += recording[i].vel == 77u && recorded_owner(&recording[i]) == 6u * NPAT + 2u && recorded_note(&recording[i]) == 61u;
         assert(found == 1u);
     }
-    /* removing track 2: track 5 (MIDI) to place 4, its banks and channel with it; the last place empty */
+    /* removing track 2: track 5 (a sound) to place 4, its banks and channel with it; the last place empty */
     assert(!track_remove(1));
-    assert(trk_n() == NTRK - 1u && trk[3].eng_req == ENGI_MIDI && trk[3].p[P_E0] == 5 && trk[5].p[P_E0] == 11);
+    assert(trk_n() == NTRK - 1u && trk[3].eng_req == trk_def_engine(4) && trk[5].eng_req == ENGI_MIDI && trk[5].p[P_E0] == 11);
     assert(bank_is(3, 0, 48, 16, 16) && bank_is(3, 3, 50, 64, 64) && bank_is(5, 2, 70, 5, 8) && trk[5].pattern == 2);
     assert(chain_patterns[1][3] == 3 && chain_patterns[0][5] == 2);
     /* four tracks in use: FBKP too (FBKK only when FBKP cannot hold a dense four-part project) */

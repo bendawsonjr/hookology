@@ -28,7 +28,7 @@ static void midi_tracks_stream(void)
     for(uint32_t k=0;k<NTRK;k++)for(uint32_t b=0;b<trk_npat(k);b++)owners[n++]=k*NPAT+b;
     for(uint32_t k=0;k<NTRK;k++){
         trk[k].p[P_ROOT]=9; trk[k].p[P_SCALE]=2;
-        if(k>=NPART)trk[k].p[P_E0]=(int16_t)(16u-k);
+        if(k>=NROWS)trk[k].p[P_E0]=(int16_t)(16u-k);
         for(uint32_t b=0;b<trk_npat(k);b++){
             pattern_t p; pattern_read(k,b,&p);
             p.step[63]=(step_t){{(uint8_t)(40u+k+b)},1,ST_NOTE,0,99};
@@ -56,7 +56,7 @@ static void midi_tracks_stream(void)
     for(uint32_t j=0;j<n;j++)assert(counts[owners[j]]==RECORD_MAX/n+(j<RECORD_MAX%n));
     for(uint32_t k=0;k<NTRK;k++){
         assert(trk[k].p[P_ROOT]==9&&trk[k].p[P_SCALE]==2);
-        if(k>=NPART)assert(trk[k].eng_req==ENGI_MIDI&&trk[k].p[P_E0]==(int32_t)(16u-k));
+        if(k>=NROWS)assert(trk[k].eng_req==ENGI_MIDI&&trk[k].p[P_E0]==(int32_t)(16u-k));
         for(uint32_t b=0;b<trk_npat(k);b++){
             pattern_t p; pattern_read(k,b,&p);
             assert(p.step[63].note[0]==40u+k+b&&p.step[63].n==1&&p.timing[0]==64);
@@ -67,11 +67,11 @@ static void midi_tracks_stream(void)
     assert(trk_n()==NTRK&&song.sel==NTRK-1u);
     for(uint32_t k=0;k<NTRK;k++)assert(trk[k].p[P_ROOT]==9&&trk[k].p[P_SCALE]==2);
     open_slot(0);
-    uint32_t before=erases; assert(!track_remove(NPART)); assert(erases==before&&trk_n()==NTRK-1u);
-    assert(trk[NPART].p[P_E0]==(int32_t)(16u-NPART-1u));
+    uint32_t before=erases; assert(!track_remove(NROWS)); assert(erases==before&&trk_n()==NTRK-1u);
+    assert(trk[NROWS].p[P_E0]==(int32_t)(16u-NROWS-1u));
     assert(chain_patterns[1][NTRK-2u]==7);
     assert(!save_slot(1,"MIDI SEVEN")); project_new_blank(); open_slot(1);
-    assert(trk_n()==NTRK-1u&&trk[NPART].p[P_E0]==(int32_t)(16u-NPART-1u));
+    assert(trk_n()==NTRK-1u&&trk[NROWS].p[P_E0]==(int32_t)(16u-NROWS-1u));
     /* A malformed extra recording directory must never publish a replacement. */
     uint32_t dir=0; wire_bits_put(oracle+BANKP_REC_OFF,&dir,RECORD_MAX+1u,11);
     bank_checksum(oracle);
@@ -82,7 +82,7 @@ static void midi_tracks_stream(void)
 static void extended_songs_stream(int punches)
 {
     reset(); song.ntrk = NTRK;
-    for (uint32_t k = NPART; k < NTRK; k++) trk[k].p[P_E0] = (int16_t)(k + 1u);
+    for (uint32_t k = NROWS; k < NTRK; k++) trk[k].p[P_E0] = (int16_t)(k + 1u);
     chain_config.count = CHAIN_ROWS;
     for (uint32_t r = 0; r < CHAIN_ROWS; r++) {
         chain_config.row[r] = (chain_row_t){r % NPAT, (r % 16u) + 1u};
@@ -131,7 +131,7 @@ static void song_sounds_stream(int patterns)
 {
     reset(); chain_config.count = 3;
     engine_load_of(&trk[0], ENGI_PROPHET, 1);
-    for (uint32_t k = NPART; k < NTRK; k++) trk[k].p[P_E0] = (int16_t)(k + 1u);
+    for (uint32_t k = NROWS; k < NTRK; k++) trk[k].p[P_E0] = (int16_t)(k + 1u);
     song_sound_t sound;
     song_sound_capture(&sound, &trk[0], "LOCAL SONG");
     assert(song_sound_valid(&sound));
@@ -164,9 +164,9 @@ static void song_sounds_stream(int patterns)
 }
 static void workload(uint32_t count,uint32_t spread,uint32_t tail,uint32_t quant,uint32_t engine)
 {
-    reset();song.ntrk=NPART;
+    reset();song.ntrk=NROWS;
     const uint8_t eng[]={19,12,15,3,10,10,0};
-    for(uint32_t k=0;k<NPART;k++){
+    for(uint32_t k=0;k<NROWS;k++){
         track_t *t=&trk[k];set_engine_of(t,eng[(engine+k)%NELEM(eng)]);apply_preset_to(t,0);
         t->p[P_VOICE]=V_POLY;t->p[P_RECQ]=quant?3:0;
         for(uint32_t b=0;b<NPAT;b++){
@@ -179,7 +179,7 @@ static void workload(uint32_t count,uint32_t spread,uint32_t tail,uint32_t quant
         r.owner=(spread?i%32u:7u)|(tail?3u<<5:0u);recording[i]=r;assert(recording_valid(&r));
     }
     recording_reindex();chain_config.count=1;chain_config.row[0]=(chain_row_t){0,2};
-    for(uint32_t k=0;k<NPART;k++)chain_patterns[0][k]=k+1;
+    for(uint32_t k=0;k<NROWS;k++)chain_patterns[0][k]=k+1;
 }
 int main(void)
 {
@@ -213,9 +213,9 @@ int main(void)
     assert(!ps_saved(OBJ_BANK0,actual)&&!memcmp(actual,oracle,sizeof actual));
     /* Track removal takes the same snapshot/restore route without using flash. */
     uint32_t erases_before=erases;assert(!track_remove(1));assert(erases==erases_before&&trk_n()==3);
-    for(uint32_t k=0;k<NPART;k++)for(uint32_t b=0;b<NPAT;b++){
+    for(uint32_t k=0;k<NROWS;k++)for(uint32_t b=0;b<NPAT;b++){
         pattern_t pat;pattern_read(k,b,&pat);
-        assert(k==NPART-1u?pat.step[3].time==ST_REST:pat.step[3].note[0]==40u+(k>=1u?k+1u:k)*8u+b);
+        assert(k==NROWS-1u?pat.step[3].time==ST_REST:pat.step[3].note[0]==40u+(k>=1u?k+1u:k)*8u+b);
     }
     for(uint32_t i=0;i<RECORD_MAX;i++)if(recording[i].vel)assert(recorded_owner(&recording[i])<3u*NPAT);
     assert(proj_image_capture(1));assert(proj_ok(&proj_scratch));

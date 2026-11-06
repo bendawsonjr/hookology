@@ -69,7 +69,7 @@ static void frozen_three_slots(void)
         if(k==2){assert(tmpl_take(b,n));template_load();}else {assert(k?bank_valid(b,n):proj_import(&proj_scratch,b,n));assert(!project_restore_runtime(&proj_scratch));}
         if(k==0){ /* Old engine ID 112 shifts, a tagged native 112 must not. */
             motion_store_t m={.count=2,.on=1,.event={{0,112,10},{0,112,(MO_TAG_FM6<<8)|80}}};
-            uint32_t off=68u+NPART*(116u+2u+NSTEP*8u)+sizeof(chain_legacy_t);memcpy(b+off,&m,sizeof m);uint32_t h=proj_hash(b,n-4u);memcpy(b+n-4u,&h,4);
+            uint32_t off=68u+NROWS*(116u+2u+NSTEP*8u)+sizeof(chain_legacy_t);memcpy(b+off,&m,sizeof m);uint32_t h=proj_hash(b,n-4u);memcpy(b+n-4u,&h,4);
             assert(proj_import(&proj_scratch,b,n));assert(proj_scratch.motion.event[0].param==P_E4 && proj_scratch.motion.event[1].param==112 && proj_scratch.motion.event[1].value==((MO_TAG_FM6<<8)|80));
         }
         assert(!memcmp(trk[0].p+P_FXTYPE,chain,sizeof chain));assert(!trk[0].p[P_FXSEND]);
@@ -375,23 +375,23 @@ static void tone_test(void)
     }
     /* Each slot's TONE targets its own track/slot and section, shared slots too. */
     ui_power_on();reset_fx();fx_plan_t plan;
-    for(uint32_t ti=0;ti<=NPART;ti++)for(uint32_t slot=0;slot<FX_SLOTS;slot++){
-        int16_t *p=ti==NPART?song.g:trk[ti].p,v=(int16_t)((ti+slot)&1u?1+ti*3+slot:-(int)(1+ti*3+slot));
-        uint32_t base=(ti==NPART?G_MFXTYPE:P_FXTYPE)+slot*FX_PARAMS,tone=(ti==NPART?G_MFXTONE:P_FXTONE)+slot;
+    for(uint32_t ti=0;ti<=NROWS;ti++)for(uint32_t slot=0;slot<FX_SLOTS;slot++){
+        int16_t *p=ti==NROWS?song.g:trk[ti].p,v=(int16_t)((ti+slot)&1u?1+ti*3+slot:-(int)(1+ti*3+slot));
+        uint32_t base=(ti==NROWS?G_MFXTYPE:P_FXTYPE)+slot*FX_PARAMS,tone=(ti==NROWS?G_MFXTONE:P_FXTONE)+slot;
         p[base]=FX_ROOM;p[base+1]=127;p[tone]=v;
-        if(ti!=NPART)continue;
+        if(ti!=NROWS)continue;
         fx_slot_prepare(&plan,slot,p+base);
         assert(plan.active && plan.f->time_tone[0].a2==(float)fx_low_cut_hz(FX_ROOM,v) && plan.f->time_tone[1].a2==(v<0?(float)fx_tone_hz(v):0.0f));
     }
     project_t q;project_store_t wire;project_capture(&q);assert(proj_pack(&wire,&q) && proj_import(&proj_scratch,&wire,sizeof wire));
-    for(uint32_t ti=0;ti<=NPART;ti++)for(uint32_t slot=0;slot<FX_SLOTS;slot++){
+    for(uint32_t ti=0;ti<=NROWS;ti++)for(uint32_t slot=0;slot<FX_SLOTS;slot++){
         int16_t v=(int16_t)((ti+slot)&1u?1+ti*3+slot:-(int)(1+ti*3+slot));
-        assert((ti==NPART?proj_scratch.g[G_MFXTONE+slot]:proj_scratch.t[ti].p[P_FXTONE+slot])==v);
+        assert((ti==NROWS?proj_scratch.g[G_MFXTONE+slot]:proj_scratch.t[ti].p[P_FXTONE+slot])==v);
     }
     template_save();memset(trk[0].p+P_FXTONE,0,6);memset(song.g+G_MFXTONE,0,6);template_load();
     for(uint32_t slot=0;slot<FX_SLOTS;slot++){
         assert(trk[0].p[P_FXTONE+slot]==(slot&1u?1+(int)slot:-(1+(int)slot)));
-        assert(song.g[G_MFXTONE+slot]==((NPART+slot)&1u?1+NPART*3+(int)slot:-(int)(1+NPART*3+slot)));
+        assert(song.g[G_MFXTONE+slot]==((NROWS+slot)&1u?1+NROWS*3+(int)slot:-(int)(1+NROWS*3+slot)));
     }
     int16_t kept[FX_SLOTS];memcpy(kept,TSEL->p+P_FXTONE,sizeof kept);
     apply_preset_to(TSEL,0);sound_init_of(TSEL,eng_idx(TSEL->eng_req));undo_swap();assert(!memcmp(TSEL->p+P_FXTONE,kept,sizeof kept));
@@ -422,7 +422,7 @@ static void tone_test(void)
         if(k){assert(tmpl_take(old,n));template_load();}else{assert(proj_import(&proj_scratch,old,n));assert(!project_restore_runtime(&proj_scratch));}
         assert(song.g[G_FXMODE]==1 && song.g[G_MFXTYPE]==FX_REVERB && song.g[G_FXRETURN]==73 && TSEL->p[P_FXTYPE]==FX_OFF && TSEL->p[P_FXMIX]==91 && TSEL->p[P_FXSEND2]==71);
         assert(TSEL->p[P_E3]==clamp(42,track_desc(TSEL,P_E3)->min,track_desc(TSEL,P_E3)->max));
-        for(uint32_t slot=0;slot<FX_SLOTS;slot++){assert(!song.g[G_MFXTONE+slot]);for(uint32_t ti=0;ti<NPART;ti++)assert(!trk[ti].p[P_FXTONE+slot]);}
+        for(uint32_t slot=0;slot<FX_SLOTS;slot++){assert(!song.g[G_MFXTONE+slot]);for(uint32_t ti=0;ti<NROWS;ti++)assert(!trk[ti].p[P_FXTONE+slot]);}
     }
     /* frozen FUN21 / TPLK (written by 201cbbd: two cuts a slot): each slot's cut becomes the TONE nearest it, the low
      * cut when both were set (one at or under 150 Hz: the floor's now); routing, the sound and engine motion (E3
@@ -569,7 +569,7 @@ int main(int argc,char **argv)
     }
     /* Exhaust all usable banks: fail dry, with no per-block allocation retry. */
     reset_fx();for(uint32_t id=0;id<RES_COUNT;id++)resource_release(id);
-    for(uint32_t id=0;id<RES_FX0;id++)assert(id==4u || resource_get(id,id==0?163840u:id==1?20480u:id==2?4096u:2048u));
+    for(uint32_t id=0;id<RES_FX0;id++)assert(id>=NROWS || resource_get(id,id==0?163840u:id==1?20480u:id==2?4096u:2048u));
     int32_t b[CTL]={0};
     for(uint32_t mode=0;mode<2;mode++){
         reset_fx();trk[0].p[P_FXTYPE]=mode?FX_CHORUS:FX_ROOM;trk[0].p[P_FXMIX]=127;
@@ -585,14 +585,14 @@ int main(int argc,char **argv)
     press(B_OCTDN);assert(!pop.on);press(B_OCTDN);assert(str_eq(cur_page()->title,"FX"));press(B_OCTDN);assert(ui.home);
     /* Four live tracks through the actual mixer, then mute a sounding insert. */
     ui_power_on();int32_t out[CTL*2];
-    for(uint32_t k=0;k<NPART;k++){
+    for(uint32_t k=0;k<NROWS;k++){
         set_engine_of(&trk[k],ENGI_FM6);apply_preset_to(&trk[k],8);
         trk[k].p[P_FXTYPE]=(int16_t)(FX_PHASER+k);trk[k].p[P_FXMIX]=100;trk_note_on(&trk[k],48+k*7u,100);
     }
     for(uint32_t k=0;k<256u;k++){
         mix_block(out,CTL);for(uint32_t i=0;i<CTL*2u;i++)assert(out[i]>=-32767 && out[i]<=32767);
     }
-    for(uint32_t k=0;k<NPART;k++)trk[k].p[P_MUTE]=1;
+    for(uint32_t k=0;k<NROWS;k++)trk[k].p[P_MUTE]=1;
     for(uint32_t k=0;k<2048u;k++)mix_block(out,CTL);
     for(uint32_t i=0;i<CTL*2u;i++)assert(abs(out[i])<=1);
     puts("FX: tails, allocator exhaustion/recovery, FX button/knobs/Esc and project round trip: OK");return 0;

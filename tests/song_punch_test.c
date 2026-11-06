@@ -190,14 +190,14 @@ static int timeline_pixels(void)
     memset(chain_config.fx[0], 0, sizeof chain_config.fx[0]);
     chain_config.row[0].repeat = 2;
     chain_config.fx[0][0] = (chain_fx_t){PX_LPF + 1, 2, 4}; ui.force = 1; frame();
-    for (uint32_t k = 0; k < trk_n() && k < NPART; k++) {
+    for (uint32_t k = 0; k < trk_n() && k < NROWS; k++) {
         trk[k].step[0] = (step_t){.time = ST_NOTE, .n = 1, .note = {60}, .vel = 96};
         pattern_commit(&trk[k]);
     }
     ui.force = 1; frame();
     uint16_t bar = ux_mix(punch_color(PX_LPF), T_TEXT, 30);
     wrong = 0;
-    for (uint32_t k = 0; k < trk_n() && k < NPART; k++) {
+    for (uint32_t k = 0; k < trk_n() && k < NROWS; k++) {
         uint32_t y = SG_ROW_Y + k * SG_ROW_H + 6u;
         wrong += host_screen[y * 240u + 15u] != swap16(bar);
         wrong += host_screen[y * 240u + 41u] != swap16(bar);
@@ -211,7 +211,7 @@ static int timeline_pixels(void)
     memcpy(saved, host_screen, sizeof saved);
     chain_config.fx[0][0] = (chain_fx_t){PX_LPF + 1, 0, 16}; frame();
     wrong = 0;
-    for (uint32_t k = 0; k < trk_n() && k < NPART; k++) for (uint32_t y = 0; y < SG_ROW_H; y++) for (uint32_t x = 0; x < 240u; x++) {
+    for (uint32_t k = 0; k < trk_n() && k < NROWS; k++) for (uint32_t y = 0; y < SG_ROW_H; y++) for (uint32_t x = 0; x < 240u; x++) {
         int inside = x >= 9u && x < 63u && y >= 2u && y < 30u;
         if (inside && (y < 7u || y >= 25u)) {
             int32_t edge = x - 9u < 62u - x ? (int32_t)(x - 9u) : (int32_t)(62u - x);

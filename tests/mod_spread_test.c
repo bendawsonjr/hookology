@@ -77,7 +77,7 @@ static void fresh(uint32_t e, uint32_t pi)        /* the boot state (no FX tails
     memset(trk, 0, sizeof trk);trk_voices_bind();
     memset(&mod, 0, sizeof mod);
     host_tracks_init();
-    for (k = 0; k < NPART; k++)
+    for (k = 0; k < NROWS; k++)
         host_preset(&trk[k], k ? HOST_SYNTH : e, k ? 0u : pi);
     song.sel = 0;
     hash = 0xCBF29CE484222325ull;

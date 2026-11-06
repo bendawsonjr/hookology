@@ -85,8 +85,8 @@ static __attribute__((noinline)) float wave_probe(const cz_hw_pd_t *b,uint32_t p
 static __attribute__((noinline)) void cz_render_reference(track_t *t,voice_t *v,int32_t *out,uint32_t n,const vmod_t *m)
 {
     if(!n)return;
-    const uint8_t *b=cz_patch_of((uint32_t)(t-trk)%NPART)->raw;
-    cz_voice_t *c=cz_voice(t,v);const cz_native_def_t (*defs)[3]=cz_part((uint32_t)(t-trk)%NPART)->native_def;cz_hw_pd_t pd[2];
+    const uint8_t *b=cz_patch_of((uint32_t)(t-trk)%NROWS)->raw;
+    cz_voice_t *c=cz_voice(t,v);const cz_native_def_t (*defs)[3]=cz_part((uint32_t)(t-trk)%NROWS)->native_def;cz_hw_pd_t pd[2];
     uint32_t inc[2],ph[2]={v->ph[0],v->ph[1]},tg[2]={(uint32_t)v->s[0],(uint32_t)v->s[1]};
     float amp[2][2],step[2];
     uint32_t ls=b[0]&3u,first=ls==1u?1u:0u,last=ls>=2u?1u:first;

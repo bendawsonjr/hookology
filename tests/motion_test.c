@@ -113,7 +113,7 @@ static void pack_np(project_store_t *out, const project_t *q, const motion_store
     memset(b + 68, 0, PROJ_FM6_OFF - 68u);
     uint32_t magic=0x46554E43u;memcpy(b,&magic,4);memcpy(b+8,q->g,2u*PROJ_GLOBALS);
     b[66] = (uint8_t)np;
-    for (t = 0; t < NPART; t++) {
+    for (t = 0; t < NROWS; t++) {
         for (i = 0; i < np; i++) b[pos++] = (uint8_t)(q->t[t].p[i < np - 8u ? i : i - (np - 8u) + P_E0] + 64);
         b[pos++] = q->t[t].engine; b[pos++] = q->t[t].preset;
         for (i = 0; i < NSTEP; i++) {
@@ -133,7 +133,7 @@ static int older_count(void)
     project_t before, after; project_store_t old; motion_store_t m;
     const uint32_t np = 104u, e0 = np - 8u;
     uint32_t i, k;
-    for (k = 0; k < NPART; k++)
+    for (k = 0; k < NROWS; k++)
         for (i = 0; i < 8u; i++) trk[k].p[P_E0 + i] = (int16_t)(ENGINES[trk[k].eng_req]->edit[i].min + (int16_t)(k + i) %
             (ENGINES[trk[k].eng_req]->edit[i].max - ENGINES[trk[k].eng_req]->edit[i].min + 1));
     t->p[P_FM1_ATK] = 33; t->p[P_LEVEL] = 20;
@@ -146,7 +146,7 @@ static int older_count(void)
     m.event[2] = (motion_event_t){6, P_FM1_ATK, 20};               /* below its P_E0: the same id then and now */
     pack_np(&old, &before, &m, np);
     ok = proj_import(&after, &old, sizeof old);
-    for (k = 0; ok && k < NPART; k++) {
+    for (k = 0; ok && k < NROWS; k++) {
         for (i = 0; i < 8u; i++) ok &= after.t[k].p[P_E0 + i] == before.t[k].p[P_E0 + i];
         for (i = 0; i < e0; i++) ok &= after.t[k].p[i] == before.t[k].p[i];
         for (i = e0; i < P_E0; i++) ok &= after.t[k].p[i] == param_desc_of(after.t[k].engine, i)->def;

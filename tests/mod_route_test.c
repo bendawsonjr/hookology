@@ -47,8 +47,8 @@ static void parity(void)
     static const uint32_t engines[]={19,12,15,3,10};
     host_tracks_init();
     for(uint32_t k=0;k<50000;k++){
-        track_t *t=&trk[k%NPART];
-        if(k<NPART || k%127u==0)host_preset(t,engines[random_next()%NELEM(engines)],0);
+        track_t *t=&trk[k%NROWS];
+        if(k<NROWS || k%127u==0)host_preset(t,engines[random_next()%NELEM(engines)],0);
         if(k%3u==0)for(uint32_t slot=0;slot<NMSLOT;slot++){
             t->p[P_M1SRC+3u*slot]=(int16_t)(random_next()%(MS_N+3u));
             t->p[P_M1DST+3u*slot]=(int16_t)(random_next()%(MD_N+34u));

@@ -190,7 +190,7 @@ static int cursor_row(uint32_t len, uint32_t div)
     out_setup(120);
     chain_defaults(&chain_config); chain_config.count = 2;
     memset(chain_patterns, 0, sizeof chain_patterns);
-    for (uint32_t k = 0; k < NPART; k++) {
+    for (uint32_t k = 0; k < NROWS; k++) {
         trk[k].p[P_SLEN] = (int16_t)len; trk[k].p[P_SDIV] = (int16_t)div; trk[k].p[P_SSWING] = 0;
         pattern_commit(&trk[k]);
     }

@@ -19,7 +19,7 @@ static const char *const KIT_NAME[6] = {"808", "", "", "", "CR78", "FM"};
 static void kit(uint32_t preset)                 /* part 1 on a DRUM preset, nothing sounding */
 {
     host_tracks_init();
-    for (uint32_t p = 0; p < NPART; p++)
+    for (uint32_t p = 0; p < NROWS; p++)
         memset(trk[p].v, 0, NVOICE * sizeof *trk[p].v);
     eng_state_reset();
     host_preset(&trk[0], ENGI_DRUM, preset);

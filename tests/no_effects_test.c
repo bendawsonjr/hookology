@@ -12,7 +12,7 @@ static uint64_t render_hash(int legacy)
     if(!pid){
         close(fds[0]);ui_power_on();set_engine_of(TSEL,ENGI_FM6);apply_preset_to(TSEL,8);
         if(legacy){
-            for(uint32_t p=0;p<NPART;p++)for(uint32_t i=0;i<P_COUNT;i++)if(param_reserved(i))trk[p].p[i]=127;
+            for(uint32_t p=0;p<NROWS;p++)for(uint32_t i=0;i<P_COUNT;i++)if(param_reserved(i))trk[p].p[i]=127;
             for(uint32_t i=0;i<G_COUNT;i++)if(global_reserved(i))song.g[i]=127;
             settings.lowcut=2;favorites.factory[15][30]|=1u;
         }
@@ -31,14 +31,14 @@ int main(void)
 {
     assert(render_hash(0)==render_hash(1));
     ui_power_on();project_t old;project_capture(&old);
-    for(uint32_t k=0;k<NPART;k++){
+    for(uint32_t k=0;k<NROWS;k++){
         old.t[k].p[P_RESERVED33]=127;old.t[k].p[P_RESERVED45]=2;
         old.t[k].step[0]=(step_t){{60,64,67},3,ST_NOTE,0,100};
     }
     for(uint32_t i=0;i<G_COUNT;i++)if(global_reserved(i))old.g[i]=127;
     old.motion.count=1;old.motion.event[0]=(motion_event_t){0,P_RESERVED36,127};
     old.sum=proj_sum(&old);assert(proj_ok(&old));assert(!project_restore_runtime(&old));
-    for(uint32_t k=0;k<NPART;k++){
+    for(uint32_t k=0;k<NROWS;k++){
         assert(trk[k].step[0].n==3 && trk[k].step[0].note[2]==67);
         for(uint32_t i=0;i<P_COUNT;i++)if(param_reserved(i))assert(trk[k].p[i]==0);
     }

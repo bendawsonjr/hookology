@@ -230,10 +230,15 @@ static int bankl_pack_tail(uint8_t *raw, const project_t *q)   /* runtime only (
                     b[i] = (uint8_t)(v + 64);
                 }
                 b[P_COUNT] = (uint8_t)(clamp(t->mpc_octave, -3, 3) + 3);
-                if (k < NPART && t->eng_req != ENGI_MIDI) {
+                if (k < NPART && k < cap_tracks() && t->eng_req != ENGI_MIDI) {
                     song_sound_t sound;
                     song_sound_capture(&sound, t, "TRACK");
-                    memcpy(raw + BANK_PART_OFF + (k - PROJ_TRK) * sizeof sound, &sound, sizeof sound);
+                    for (uint32_t i = 0; i < P_COUNT; i++) {   /* (a stray value must not cost the sound) */
+                        const param_desc_t *d = param_desc_of(sound.engine, i);
+                        sound.p[i] = (uint8_t)(clamp((int32_t)sound.p[i] - 64, d->min, d->max) + 64);
+                    }
+                    if (song_sound_valid(&sound))       /* (never a record the check would refuse) */
+                        memcpy(raw + BANK_PART_OFF + (k - PROJ_TRK) * sizeof sound, &sound, sizeof sound);
                 }
             }
         }
@@ -580,7 +585,9 @@ static void bankl_restore_tail(const uint8_t *raw)
                 own = song_sound_valid(&sound);         /* (no: steps of a file from before the block) */
             }
             if (own) engine = sound.engine;
-            if (k < NPART) set_engine_of(t, engine);
+            undo_depth++;                               /* (a load takes no undo levels) */
+            if (k < NPART && (own || k < song.ntrk)) set_engine_of(t, engine);   /* (no sound: a MIDI Track, or not in use) */
+            undo_depth--;
             for (uint32_t i = 0; i < P_COUNT; i++) {
                 const param_desc_t *d = param_desc_of(engine, i);
                 t->p[i] = param_reserved(i) ? 0 : (int16_t)clamp((int32_t)b[i] - 64, d->min, d->max);

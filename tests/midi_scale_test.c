@@ -268,11 +268,11 @@ static int share_test(void)
     ui.page = (uint8_t)k;                             /* SCALES: outside the SCL cycle, opened from its row */
     edit_param(1, 3);                                 /* SCL */
     edit_param(3, 1);                                 /* QNT */
-    for (k = 0; k < NPART; k++) ok &= trk[k].p[P_SCALE] == TSEL->p[P_SCALE] && trk[k].p[P_QUANT] == TSEL->p[P_QUANT];
+    for (k = 0; k < NROWS; k++) ok &= trk[k].p[P_SCALE] == TSEL->p[P_SCALE] && trk[k].p[P_QUANT] == TSEL->p[P_QUANT];
     bad += check("SCL and QNT turned on one track are every part's", ok && TSEL->p[P_SCALE] == 3 && TSEL->p[P_QUANT] == 1);
     song.sel = 2;                                    /* edits from another track update the project too */
     edit_param(2, 5);
-    for (k = 0; k < NPART; k++) ok &= trk[k].p[P_ROOT] == 5;
+    for (k = 0; k < NROWS; k++) ok &= trk[k].p[P_ROOT] == 5;
     bad += check("ROOT turned on another track is every part's", ok);
     return bad;
 }

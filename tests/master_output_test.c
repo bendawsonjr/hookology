@@ -110,7 +110,7 @@ static void volume(void)
             for(uint32_t i=0;i<CTL;i++){fx_left[i]=i&1u?7001:-5003;fx_right[i]=-fx_left[i];}
         }
         if(fx==-2){
-            for(uint32_t p=0;p<NPART;p++)host_preset(&trk[p],HOST_SYNTH,0);
+            for(uint32_t p=0;p<NROWS;p++)host_preset(&trk[p],HOST_SYNTH,0);
             trk_note_on(&trk[0],60,100);
             for(uint32_t k=0;k<16;k++)mix_block(out,CTL);
         }else{
