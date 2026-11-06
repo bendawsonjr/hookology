@@ -1,0 +1,18 @@
+Melodee's SAMPLE drum kit: source material
+Licence: CC0 1.0 Universal (public domain dedication)
+  https://creativecommons.org/publicdomain/zero/1.0/
+Recordings: VCSL, the Versilian Community Sample Library (Versilian Studios / Sam Gossner)
+  https://github.com/sgossner/VCSL
+Cut and normalised by SLOOP (isod89, https://github.com/isod89/sloop-fm1, assets/samples-cc0/KIT),
+then shaped and encoded by tools/gen_drum_samples.py, after SLOOP's tools/gen_samples.py.
+
+KIT/10_kick_BDrumNew_hit_v5.wav       <- Membranophones/Struck Membranophones/Bass Drum 1/BDrumNew_hit_v5_rr1_Sum.wav
+KIT/11_snare_Snare2_HitSN_v7.wav      <- Membranophones/Struck Membranophones/Snare Drum, Modern 1/Snare2_HitSN_v7_rr1_Mid.wav
+KIT/12_rim_sidestick.wav              <- Membranophones/Struck Membranophones/Legacy Snares/OldSnare/snare_rim.wav
+KIT/13_clap_Clap_rr1.wav              <- Idiophones/Struck Idiophones/Claps/Clap_rr1.wav
+KIT/14_hihat_HitC_v3.wav              <- Idiophones/Struck Idiophones/Hi-Hat Cymbal/HiHat_HitC_v3_rr1_Mid.wav
+KIT/15_ohat_HitO.wav                  <- Idiophones/Struck Idiophones/Hi-Hat Cymbal/HiHat_HitO_rr1_Mid.wav
+KIT/16_tomlo_TomL_HitS_v4.wav         <- Membranophones/Struck Membranophones/Tom 2/Stick/TomL_HitS_v4_rr1_Mid.wav
+KIT/20_cowbell_Cowbell1_Normal_v3.wav <- Idiophones/Struck Idiophones/Cowbells/Cowbell1_Normal_v3_rr1_Mid.wav
+
+Thanks to Versilian Studios and to SLOOP.
