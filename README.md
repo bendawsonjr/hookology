@@ -1,5 +1,7 @@
 # Melodee
 
+> **This is a custom build.** See [FM1-CUSTOM.md](FM1-CUSTOM.md) for what differs from Melodee 1.6.1, including the removal of Bluetooth.
+
 [![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 
 ![Current Melodee screens: HOME, SONG, MOTION and FX](docs/media/melodee-screens.svg)
