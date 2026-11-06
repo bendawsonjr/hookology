@@ -113,16 +113,16 @@ int main(void)
     value("WEIGHTS 2", 1, &vp, &label);
     ok &= str_eq(label, "BUDGET") && vp == &settings_budget;
     ok &= !page_desc(cur_page(), 2, &vp);
-    ok &= str_eq(value("WEIGHTS 2", 3, &vp, &label), "OFF") && str_eq(label, "GUARD") && vp == &settings_safety;
-    turn(EN_K4, 1);
-    ok &= settings_safety == 1 && str_eq(value("WEIGHTS 2", 3, &vp, &label), "ON");
+    ok &= str_eq(value("WEIGHTS 2", 3, &vp, &label), "ON") && str_eq(label, "GUARD") && vp == &settings_safety;
     turn(EN_K4, -1);
     ok &= settings_safety == 0 && str_eq(value("WEIGHTS 2", 3, &vp, &label), "OFF");
+    turn(EN_K4, 1);
+    ok &= settings_safety == 1 && str_eq(value("WEIGHTS 2", 3, &vp, &label), "ON");
     for (uint32_t id = G_WP5; id <= G_SAFETY; id++) ok &= !song.g[id] && global_reserved(id);
     bad += check("WEIGHTS: P5 CZ-1 FM6 SID; WEIGHTS 2: DRUM BUDGET - SAFETY; edits reach the settings only", ok);
 
     project_capture(&proj_scratch);
-    ok = !project_restore_runtime(&proj_scratch) && settings_vpoints[0] == 1 && !settings_safety;
+    ok = !project_restore_runtime(&proj_scratch) && settings_vpoints[0] == 1 && settings_safety == 1;
     for (uint32_t id = G_WP5; id <= G_SAFETY; id++) ok &= !song.g[id];
     bad += check("a project load keeps the device's weights and SAFETY", ok);
 
