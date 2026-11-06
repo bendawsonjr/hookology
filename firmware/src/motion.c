@@ -14,8 +14,8 @@ static int recording_double(track_t *t, uint32_t bank, uint32_t len, int apply);
 static void recording_drop(track_t *t, uint32_t owner);
 static void recording_reindex(void);
 static void step_clear(step_t *st);
-static int16_t motion_base[NPART][P_COUNT] __attribute__((section(".pool")));   /* (the parts': only they have motion) */
-static uint32_t motion_active[NPART][(P_COUNT + 31u) / 32u];
+static int16_t motion_base[NROWS][P_COUNT] __attribute__((section(".pool")));   /* (the parts': only they have motion) */
+static uint32_t motion_active[NROWS][(P_COUNT + 31u) / 32u];
 static uint8_t motion_base_valid, motion_full;
 /* The engines' own patches move too (what the Prophet's, the CZ-1's and FM6's pages edit, Stage's knobs on the Prophet
  * and the CZ-1): an event's param MO_NATIVE + i names byte i of the track's engine's patch (the Prophet's program, the
@@ -30,8 +30,8 @@ static int motion_native_event(uint32_t id,int32_t value){return id>=MO_NATIVE &
 static uint32_t motion_token(const motion_event_t *e){return e->param|(motion_native_event(e->param,e->value)?256u:0u);}
 
 _Static_assert(P_COUNT < 128u && MO_NATIVE + MO_NATIVE_N <= 256u, "motion: the native ids after the track's");
-static uint8_t motion_nbase[NPART][MO_NATIVE_N] __attribute__((section(".pool")));   /* (read only under its bit) */
-static uint32_t motion_nactive[NPART][(MO_NATIVE_N + 31u) / 32u];
+static uint8_t motion_nbase[NROWS][MO_NATIVE_N] __attribute__((section(".pool")));   /* (read only under its bit) */
+static uint32_t motion_nactive[NROWS][(MO_NATIVE_N + 31u) / 32u];
 static uint32_t motion_guard(void)
 {
 #if defined(FM1_IRQ_TARGET)
@@ -105,13 +105,13 @@ static int motion_native_ok(uint32_t id, int32_t value)    /* (a store's event: 
     }
     return 0;
 }
-static int motion_nbit(uint32_t k, uint32_t i) { return k < NPART && (motion_nactive[k][i / 32u] >> (i % 32u)) & 1u; }
+static int motion_nbit(uint32_t k, uint32_t i) { return k < NROWS && (motion_nactive[k][i / 32u] >> (i % 32u)) & 1u; }
 /* byte i to v (motion playing): the patch's own kept first */
 static void motion_native_set(track_t *t, uint32_t i, uint32_t v)
 {
     uint32_t k = trk_index(t);
     uint8_t *b = motion_native_at(t, i);
-    if (!b || k >= NPART)
+    if (!b || k >= NROWS)
         return;
     if (!motion_nbit(k, i)) {
         motion_nbase[k][i] = *b;
@@ -126,7 +126,7 @@ static void motion_native_set(track_t *t, uint32_t i, uint32_t v)
 static void motion_native_restore(track_t *t)           /* the patch's own bytes back */
 {
     uint32_t k = trk_index(t), i, w, any = 0;
-    if (k >= NPART)
+    if (k >= NROWS)
         return;
     for (w = 0; w < NELEM(motion_nactive[k]); w++)
         any |= motion_nactive[k][w];
@@ -161,7 +161,7 @@ static int motion_param(uint32_t id)
 static int motion_valid(const motion_store_t *m)
 {
     uint32_t i, j;
-    if (m->rsv[0] > 1u || m->count > MOTION_MAX || (m->on & ~((1u << NPART) - 1u))) return 0;
+    if (m->rsv[0] > 1u || m->count > MOTION_MAX || (m->on & ~((1u << NROWS) - 1u))) return 0;
     for (i = 0; i < m->count; i++) {
         const motion_event_t *e = &m->event[i];
         if (motion_native_event(e->param,e->value) ? !motion_native_ok(e->param, e->value) :
@@ -191,12 +191,12 @@ static int motion_has_lanes(const track_t *t)
 static int16_t motion_base_value(const track_t *t, uint32_t id)
 {
     uint32_t k = trk_index(t);
-    return k < NPART && (motion_active[k][id / 32u] >> (id % 32u)) & 1u ? motion_base[k][id] : t->p[id];
+    return k < NROWS && (motion_active[k][id / 32u] >> (id % 32u)) & 1u ? motion_base[k][id] : t->p[id];
 }
 static void motion_restore(track_t *t)
 {
     uint32_t k = trk_index(t), id, f;
-    if (k >= NPART)
+    if (k >= NROWS)
         return;
     f = motion_guard();
     for (id = 0; id < P_COUNT; id++)
@@ -208,7 +208,7 @@ static void motion_restore(track_t *t)
 static void motion_rebase(track_t *t)
 {
     uint32_t k = trk_index(t), f;
-    if (k >= NPART)
+    if (k >= NROWS)
         return;
     f = motion_guard();
     motion_restore(t);
@@ -219,20 +219,20 @@ static void motion_rebase(track_t *t)
 static void motion_begin(void)
 {
     uint32_t k;
-    for (k = 0; k < NPART; k++) {
+    for (k = 0; k < NROWS; k++) {
         motion_restore(&trk[k]);
         memcpy(motion_base[k], trk[k].p, sizeof trk[k].p);
     }
-    motion_base_valid = (1u << NPART) - 1u;
+    motion_base_valid = (1u << NROWS) - 1u;
 }
 static void motion_end(void)
 {
-    for (uint32_t k = 0; k < NPART; k++) motion_restore(&trk[k]);
+    for (uint32_t k = 0; k < NROWS; k++) motion_restore(&trk[k]);
     motion_base_valid = 0;
 }
 static void motion_set_enabled(track_t *t, uint32_t on)
 {
-    uint32_t f = motion_guard(), b = trk_index(t) < NPART ? 1u << trk_index(t) : 0u;
+    uint32_t f = motion_guard(), b = trk_index(t) < NROWS ? 1u << trk_index(t) : 0u;
     motion.on = (uint8_t)(on ? motion.on | b : motion.on & ~b);
     if (!on) motion_restore(t);
     motion_unguard(f);
@@ -259,7 +259,7 @@ static int motion_set_event(track_t *t, uint32_t step, uint32_t id, int16_t valu
 {
     uint32_t k = trk_index(t), i, f;
     const param_desc_t *d;
-    if (k >= NPART || step >= NSTEP) return 1;
+    if (k >= NROWS || step >= NSTEP) return 1;
     if (motion_native_event(id,value)) {
         if (!motion_native_ok(id, value)) return 1;
     } else {
@@ -322,7 +322,7 @@ static uint32_t motion_rec_step(track_t *t)             /* the step a move recor
 static int motion_capture(track_t *t, uint32_t id, int16_t value)
 {
     uint32_t k = trk_index(t), idx, f;
-    if (!motion_param(id) || k >= NPART) return 0;
+    if (!motion_param(id) || k >= NROWS) return 0;
     if (!rec_on(t) || t != TSEL) {
         /* A live edit becomes a new base, even when an earlier motion value is
          * currently sounding. Subsequent recorded events can still override it. */
@@ -388,7 +388,7 @@ static uint32_t motion_native_edited(track_t *t, const uint8_t *old)
 static __attribute__((noinline)) void motion_step(track_t *t, uint32_t step, const motion_store_t *m)
 {
     uint32_t k = trk_index(t), i;
-    if(k>=NPART || (motion_design_pause>>k)&1u)return;
+    if(k>=NROWS || (motion_design_pause>>k)&1u)return;
     if (!((m->on >> k) & 1u)) return;
     if (!((motion_base_valid >> k) & 1u)) {
         memcpy(motion_base[k], t->p, sizeof t->p);
@@ -451,7 +451,7 @@ static int pattern_request(track_t *t, uint32_t bank)
 static int pattern_copy_to(track_t *ts, uint32_t source, track_t *td, uint32_t dest, int live)
 {
     uint32_t ks = trk_index(ts), kd = trk_index(td), i, n = 0, f, extra = 0;
-    int own = ks == kd, moves = own || (kd < NPART && ts->eng_req == td->eng_req);
+    int own = ks == kd, moves = own || (kd < NROWS && ts->eng_req == td->eng_req);
     if (source >= trk_npat(ks) || dest >= trk_npat(kd)) return 1;
     if (own && source == dest) return 0;
     f = motion_guard();

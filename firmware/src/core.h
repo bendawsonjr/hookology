@@ -19,7 +19,7 @@
 #ifndef NPART
 #define NPART 6                  /* sound tracks: tracks 1..6 */
 #endif
-#define NROWS 4                  /* tracks a screen shows, and a new project starts with: 1..4, then 5..8 */
+#define NROWS 4                  /* tracks a screen shows, a new project starts with, and motion keeps (2 bits): 1..4 */
 #ifndef VBUDGET
 #define VBUDGET (MELODEE_RAM_AUDIO ? 18u : 16u) /* shared weighted voices; RAM profile uses 18 with CPU1 online
                                                  * at 360 MHz (voice.c voice_budget: scaled with a kept 320) */

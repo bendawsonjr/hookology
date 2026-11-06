@@ -8,11 +8,20 @@ Custom firmware for the M-VAVE FM-1, built on [Melodee](https://github.com/kerem
 - **TRACKS home page:** the FM-1 starts here. Each lane shows swing, steps, level and pan, and the dials edit the selected track. Tap HOME for Stage and the chord wheel.
 - **KIT SAMPLE:** an eight-sound acoustic drum kit with five presets. Hold OCT- or OCT+ on HOME for ghost or hard hits.
 - **REC MODE:** a menu setting. FREE lets a first take set the tempo and loop length. GRID, the default, records as Melodee always has.
+- **Six sound tracks (v1.1-beta):** tracks 5 and 6 are full sound tracks, and tracks 7 and 8 stay MIDI. A new project starts with four: use Add track for more. Turn ALGORITHM past track 4 for the second page of tracks. All six share the same 16 to 18 voices.
 - **Bluetooth removed:** to make room. Build with `MELODEE_BLE=1` to bring it back.
 
 Everything else is Melodee, and its [manual](README.md) still applies, apart from what it says about Bluetooth. Hookology still uses Melodee's USB and MIDI names, so the update tools and recovery can find it, and your computer may show it as Melodee or Felucca.
 
 Projects saved by Melodee 1.6.1 load here. Projects saved here also load in Melodee 1.6.1, but a track set to HERA falls back to AUTO2 and loses its chord set.
+
+### Beta limits on tracks 5 and 6
+
+- Motion (recorded knob moves) works on tracks 1 to 4 only.
+- FM6 function settings aren't saved, so they return to their defaults when a project loads.
+- USB 4-track recording captures tracks 1 to 4. Tracks 5 and 6 are still in the stereo mix.
+- Their page reuses the colours of tracks 1 to 4.
+- Saved projects may not open in later betas until Hookology is final. A project with tracks 5 and 6 opened in v1.0 or Melodee loses their sounds.
 
 ## Going back to the official firmware
 

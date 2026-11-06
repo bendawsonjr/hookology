@@ -80,6 +80,16 @@ static void every_sound(void)
     assert(total > 300u);
     puts("SIX: every factory sound of every engine can be stored on tracks 5 and 6 passed");
 }
+static void automation(void)
+{
+    /* motion stays on tracks 1..4 (two bits of its place): tracks 5 and 6 refuse it, and never touch 1 and 2 */
+    track_t *t = six();
+    assert(motion_set_event(t, 1, P_LEVEL, 30) && motion_set_event(&trk[5], 1, P_LEVEL, 30));
+    assert(!motion.count && !motion_count(&trk[0]) && !motion_count(&trk[1]));
+    int16_t level = t->p[P_LEVEL]; motion_capture(t, P_LEVEL, 11); assert(!motion.count && t->p[P_LEVEL] == level);
+    assert(!motion_set_event(&trk[3], 1, P_LEVEL, 30) && motion_count(&trk[3]) == 1u);
+    puts("SIX: motion stays on tracks 1 to 4, and 5 and 6 leave them alone passed");
+}
 static void older(void)
 {
     /* a project that keeps a MIDI Track on track 5, as older firmware's: no sound stored, still a MIDI Track */
@@ -103,7 +113,7 @@ static void screens(void)
 }
 int main(void)
 {
-    defaults(); sounding(); every_sound(); saved(); older(); screens();
+    defaults(); sounding(); every_sound(); saved(); automation(); older(); screens();
     puts("Six-track tests passed");
     return 0;
 }
