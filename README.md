@@ -711,6 +711,15 @@ Thanks to [@aroum](https://github.com/aroum) for the detailed feedback in
   5 seconds (no key, button, knob or MIDI), a project that has a slot saves itself there when it changed.
   Hold **HOME** and set **AUTOSAVE** to **OFF** to disable it (default **ON**). The choice survives power-off;
   manual saves still work
+- **REC MODE** (hold HOME for the menu): GRID records against the project's tempo, as always, and is the default.
+  **FREE** records without a click. On a project with no notes, tap REC (the header says PLAY FREE) and play: your first
+  note starts a free take, with no tempo or grid. Press **REC on the 1 after your last bar**: the take's length sets
+  the loop (1, 2 or 4 bars, the tempo nearest the one set, kept if you were within 3 % of it; 40 to 240 BPM), every
+  track's current pattern takes that length at 1/16, the notes land on SEQ > TEMPO > QNT's grid (OFF: 1/16) and the loop
+  plays. **PLAY** drops the take, 24 s closes it, and a take holds 192 notes (TAKE FULL: more only sound). Hold EDIT
+  to undo a take with its tempo and lengths. Free takes need the internal clock and a stopped transport, not a song.
+  With notes in the project FREE keeps the tempo. In FREE, REC while playing records at once, not at the next loop;
+  notes land where you heard them (about 12 ms earlier than the press) and on QNT's grid (OFF: 1/16) when you stop.
 - **Capture:** while the transport runs and no track is recording, Melodee keeps what you play on the selected track;
   switching tracks clears it. Hold **REC** to write the selected track's last bars into its pattern, with their timing, velocities and lengths: an
   empty pattern takes 1, 2 or 4 bars (as many as your notes span) and its LEN follows; a pattern with notes takes its
