@@ -15,7 +15,7 @@
  *
  * Built on the Mac too (tests/project_test.c, -DPROJ_HOST): the part above the #ifndef
  * PROJ_HOST needs core.h, params.c (TP) and engines.c. */
-#define PROJ_TRK NPART                         /* the tracks a FUN record (and a template) holds: the parts; an FBKL
+#define PROJ_TRK NROWS                         /* the tracks a FUN record (and a template) holds: the parts; an FBKL
                                                 * record's tail holds the MIDI-only ones (pattern_store.c) */
 #define PROJ_MAGIC 0x46554E49u                 /* FUN22: one TONE per FX slot; FUN21 and earlier convert */
 #define PROJ_CUT_MAGIC 0x46554E48u             /* FUN21: a low and a high cut per FX slot, read as TONE */
@@ -1000,7 +1000,7 @@ static int project_restore_runtime(const project_t *input)
             }
         }
     }
-    song.ntrk = (uint8_t)(p->parts - 1u < NTRK ? p->parts : NPART);
+    song.ntrk = (uint8_t)(p->parts - 1u < NTRK ? p->parts : NROWS);
     song.sel = (uint8_t)(p->sel < song.ntrk ? p->sel : 0u);
     fm1_irq_on();
     proj_name_get(proj_name, (const uint8_t *)p->name);
@@ -1273,7 +1273,7 @@ static void template_load(void)
     p->g[G_FXMODE]=tmpl.master[13];
     for(i=0;i<FX_SLOTS;i++)p->g[G_MFXTONE+i]=(int16_t)(tmpl.master[14u+i]-64);
     p->sel = tmpl.sel;
-    p->parts = tmpl.ntrk ? tmpl.ntrk : NPART;
+    p->parts = tmpl.ntrk ? tmpl.ntrk : NROWS;
     p->phys = PROJ_PHYS;
     chain_legacy_defaults(&p->chain);
     int8_t oct[PROJ_TRK];
@@ -1306,7 +1306,7 @@ static void template_load(void)
 }
 
 /* NEW SONG (ui_new.c): the tracks a new song starts with: the template's (one of before: all), else all four */
-static uint32_t template_tracks(void) { return template_used() && tmpl.ntrk ? tmpl.ntrk : NPART; }
+static uint32_t template_tracks(void) { return template_used() && tmpl.ntrk ? tmpl.ntrk : NROWS; }
 /* NEW SONG (ui_new.c): the template's key and tempo (track 1's ROOT, the song's SCALE, BPM), when there is one */
 static void template_key(uint32_t *root, uint32_t *scale, int32_t *bpm)
 {
@@ -1349,7 +1349,7 @@ static void project_new_blank(void)
     proj_cur = PROJ_NO_SLOT;
     proj_name[0] = 0;
     song.sel = 0;
-    song.ntrk = NPART;                                  /* (the four parts to start with: Stage's sheet adds, removes) */
+    song.ntrk = NROWS;                                  /* (the four parts to start with: Stage's sheet adds, removes) */
     song.g[G_SLOT] = (int16_t)(project_free_slot() + 1u);
 }
 /* the music differs from its slot (none: it holds notes): a new song asks first. Packs the project (proj_wire_u) */
@@ -1389,7 +1389,7 @@ static void project_boot(void)
             project_load(settings_boot - 1u);
         return;
     }
-    song.ntrk = NPART;                                  /* the power-on sounds: four tracks (theirs: the template's) */
+    song.ntrk = NROWS;                                  /* the power-on sounds: four tracks (theirs: the template's) */
     if (template_used()) {
         if (bootguard.failed)
             ui_message("TEMPLATE SKIPPED");

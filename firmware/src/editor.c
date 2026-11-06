@@ -98,7 +98,7 @@ static uint32_t ed_eng(const track_t *t) { return t->eng_req % NENGINES; }
 #define ED_NV (P_COUNT + G_COUNT)
 /* v4: the parameters of the tracks that are not selected which TRACK_CHANGED follows (the mixer) */
 static const uint8_t ED_TIDS[3] = {P_LEVEL, P_PAN, P_MUTE};
-#define ED_TRK NPART                                   /* the tracks the protocol lists (the web editor's four) */
+#define ED_TRK NROWS                                   /* the tracks the protocol lists (the web editor's four) */
 #define ED_NT (ED_TRK * 3u)
 /* the selected track as the protocol lists the tracks: one of the MIDI-only ones (5..8) in the last place */
 static uint32_t ed_sel(void) { return song.sel < ED_TRK ? song.sel : ED_TRK - 1u; }
@@ -387,13 +387,13 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
     case 100: {
 #ifdef FM1_IRQ_TARGET
         if(na){ed_b(1);break;}
-        uint32_t values[8u+NPART];fm1_irq_off();
+        uint32_t values[8u+NROWS];fm1_irq_off();
         values[0]=fm1_clock_mhz_of(fm1_clock_mult());values[1]=audio_timer5_max_ticks;values[2]=audio_irq_max_ticks;
         values[3]=MELODEE_AUDIO_PROFILE;values[4]=MELODEE_AUDIO_BENCH;values[5]=MELODEE_ADMISSION;values[6]=HALF_FRAMES;
-        for(uint32_t p=0;p<NPART;p++)values[7u+p]=trk_nvoice(&trk[p]);
-        values[7u+NPART]=(uint32_t)settings_budget;
-        fm1_irq_on();ed_b(0);ed_b(2);ed_b(8u+NPART);
-        for(uint32_t k=0;k<8u+NPART;k++)for(uint32_t j=0;j<5u;j++)ed_b(values[k]>>(7u*j));
+        for(uint32_t p=0;p<NROWS;p++)values[7u+p]=trk_nvoice(&trk[p]);
+        values[7u+NROWS]=(uint32_t)settings_budget;
+        fm1_irq_on();ed_b(0);ed_b(2);ed_b(8u+NROWS);
+        for(uint32_t k=0;k<8u+NROWS;k++)for(uint32_t j=0;j<5u;j++)ed_b(values[k]>>(7u*j));
 #else
         ed_b(2);
 #endif

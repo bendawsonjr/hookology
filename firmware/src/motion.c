@@ -14,7 +14,7 @@ static int recording_double(track_t *t, uint32_t bank, uint32_t len, int apply);
 static void recording_drop(track_t *t, uint32_t owner);
 static void recording_reindex(void);
 static void step_clear(step_t *st);
-static int16_t motion_base[NPART][P_COUNT];             /* (the parts': only they have motion) */
+static int16_t motion_base[NPART][P_COUNT] __attribute__((section(".pool")));   /* (the parts': only they have motion) */
 static uint32_t motion_active[NPART][(P_COUNT + 31u) / 32u];
 static uint8_t motion_base_valid, motion_full;
 /* The engines' own patches move too (what the Prophet's, the CZ-1's and FM6's pages edit, Stage's knobs on the Prophet

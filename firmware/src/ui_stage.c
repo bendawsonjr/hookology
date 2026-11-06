@@ -451,7 +451,7 @@ static void stage_row(uint32_t k)
     uint32_t next = t->pattern_next < NPAT ? t->pattern_next + 1u : 0u, sig, src, kk, cat, g;
     uint32_t n = stage_rows(), wide = n == 1u, idle = wide && stage_seq_idle(k);
     int pending = sel && browse_pending();
-    int32_t h = st_row_h(), y = st_row_y(k % NPART), top, cs = h >= 80 ? 34 : 26, tx = 6 + cs + 10, room = BOX_W - 6 - tx;
+    int32_t h = st_row_h(), y = st_row_y(k % NROWS), top, cs = h >= 80 ? 34 : 26, tx = 6 + cs + 10, room = BOX_W - 6 - tx;
     st_lay_t lay = {4, 4, 1, 1, ST_PMIN, 0, 0};
     int32_t steps_row = h >= 80, showrole = 1;          /* (one, two tracks: the role under the name; three, four: beside it,
                                                          * at the right) */
@@ -606,7 +606,7 @@ static void stage_row(uint32_t k)
  * and MIXER: *drawn their row's signature */
 static void stage_free(uint32_t k, uint32_t *drawn)
 {
-    int32_t h = st_row_h(), y = st_row_y(k % NPART), cs = h >= 80 ? 34 : 26, tx = 6 + cs + 10, top;
+    int32_t h = st_row_h(), y = st_row_y(k % NROWS), cs = h >= 80 ? 34 : 26, tx = 6 + cs + 10, top;
     const aafont_t *nf = h >= 80 ? TY_VL : TY_TX;
     uint16_t bg = ux_mix(T_BG, T_DIM, 8), nc = ux_mix(T_BG, T_DIM, 28);
     char d[2] = {(char)('1' + k), 0};

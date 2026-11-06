@@ -41,7 +41,7 @@ static void tr_row(uint32_t k)
     uint32_t sel = k == song.sel, mute = t->p[P_MUTE] != 0u, arm = (song.rec >> k) & 1u, len = (uint32_t)t->p[P_SLEN];
     uint32_t ph = song.playing && t->seq_idx < len ? t->seq_idx : 0xFFFFu, lv = stage_rec_lv(k), sig, g;
     uint32_t level = (uint32_t)clamp(t->p[P_LEVEL], 0, 127), sw = (uint32_t)track_swing(t), steps = tr_steps(t);
-    int32_t pan = clamp(t->p[P_PAN], -64, 63), y = TR_ROW_Y + (int32_t)(k % NPART) * (TR_ROW_H + TR_ROW_GAP), h = TR_ROW_H;
+    int32_t pan = clamp(t->p[P_PAN], -64, 63), y = TR_ROW_Y + (int32_t)(k % NROWS) * (TR_ROW_H + TR_ROW_GAP), h = TR_ROW_H;
     uint16_t tc = mute ? T_DIM : T_TRK(k), bg = ux_mix(T_BG, tc, sel ? 24 : 11);
     char nm[24], vals[16], d[2] = {(char)('1' + k), 0};
     sound_name(t, nm);
@@ -141,10 +141,10 @@ static void tracks_draw(void)
     tr_dials();
     if (!ui.force && (ui.frame & 1u))
         return;
-    for (k = trk_group(); k < trk_group() + NPART; k++)
+    for (k = trk_group(); k < trk_group() + NROWS; k++)
         if (k < trk_n()) {
             tr_row(k);
         } else if (ui.force) {                          /* a place not in use: Stage adds a track */
-            lcd_fill(BOX_X, (uint32_t)(TR_ROW_Y + (int32_t)(k % NPART) * (TR_ROW_H + TR_ROW_GAP)), BOX_W, TR_ROW_H, ux.panel);
+            lcd_fill(BOX_X, (uint32_t)(TR_ROW_Y + (int32_t)(k % NROWS) * (TR_ROW_H + TR_ROW_GAP)), BOX_W, TR_ROW_H, ux.panel);
         }
 }

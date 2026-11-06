@@ -26,7 +26,7 @@ static uint32_t ptc_next(uint32_t from, int32_t dir);
 static void ptc_row(uint32_t k);
 /* the track whose four rows the page shows: the selected one's (Copy to: the four of the track it goes to) */
 static uint32_t pt_track(void) { return ptc_on() ? ui.ptc_to % NTRK : song.sel % NTRK; }
-static uint32_t pt_group(void) { return pt_track() / NPART * NPART; }
+static uint32_t pt_group(void) { return pt_track() / NROWS * NROWS; }
 
 /* ------------------------------------------------------------ shared --- */
 /* pattern b of track k holds something: a note, a hit, a recorded note's step */
@@ -173,7 +173,7 @@ static void pt_row(uint32_t k, uint32_t pg)
     uint16_t tc = t->p[P_MUTE] ? T_DIM : T_TRK(k);
     uint32_t b, on = t->pattern / PT_COLS == pg, prog = on ? pt_prog(t) : 0u, sel = k == song.sel, h;
     uint32_t off = !on || (t->pattern_next < NPAT && t->pattern_next / PT_COLS != pg);   /* (on the other page) */
-    int32_t y0 = PT_ROW_Y + (int32_t)(k % NPART) * PT_ROW_H;
+    int32_t y0 = PT_ROW_Y + (int32_t)(k % NROWS) * PT_ROW_H;
     char n[2] = {(char)('1' + k), 0};
     h = fnv1(fnv1(fnv1(2166136261u, steps_hash(t)), t->pattern_gen), t->pattern + 16u * t->pattern_next + 8192u * sel +
             16384u * (uint32_t)(t->p[P_MUTE] != 0) + 65536u * (uint32_t)t->p[P_SLEN]);
@@ -272,11 +272,11 @@ static void patterns_draw(void)
     uint32_t k, pg = pt_page();
     pt_numbers(pg);
     pt_song();
-    uint32_t g = pt_group(), n = trk_n() - g < NPART ? trk_n() - g : NPART;    /* (the selected track's four) */
+    uint32_t g = pt_group(), n = trk_n() - g < NROWS ? trk_n() - g : NROWS;    /* (the selected track's four) */
     for (k = 0; k < n; k++)
         pt_row(g + k, pg);
-    if (ui.force && n < NPART)                          /* (the rows of tracks not in use: empty) */
-        lcd_fill(0, PT_ROW_Y + (int32_t)n * PT_ROW_H, 240, (NPART - n) * PT_ROW_H, T_BG);
+    if (ui.force && n < NROWS)                          /* (the rows of tracks not in use: empty) */
+        lcd_fill(0, PT_ROW_Y + (int32_t)n * PT_ROW_H, 240, (NROWS - n) * PT_ROW_H, T_BG);
 }
 /* a pattern queued on any track (PATTERNS' OCT- clears them before it leaves) */
 static int patterns_queued(void)
@@ -292,7 +292,7 @@ static int patterns_queued(void)
 static void patgrid_edit(uint32_t k, int32_t steps)
 {
     track_t *t;
-    k = pt_group() + k % NPART;                         /* (KNOB k: the four shown) */
+    k = pt_group() + k % NROWS;                         /* (KNOB k: the four shown) */
     t = &trk[k];
     if (k >= trk_n())                                   /* (no track there) */
         return;
@@ -596,7 +596,7 @@ static void sg_row(uint32_t k)
     }
     if (sg.px >= 0)
         cv_rect(sg.px, 0, 2, SG_ROW_H, T_TEXT);
-    cv_blit(0, (uint32_t)(SG_ROW_Y + (int32_t)(k % NPART) * SG_ROW_H));
+    cv_blit(0, (uint32_t)(SG_ROW_Y + (int32_t)(k % NROWS) * SG_ROW_H));
 }
 static void sg_foot(void)                               /* the sections and bars, the row's letter x repeats, how far */
 {
@@ -638,6 +638,6 @@ static void song_draw(void)
     sg_head();
     sg_foot();
     sg_labels();
-    for (k = trk_group(); k < trk_group() + NPART; k++)   /* (the selected track's four) */
+    for (k = trk_group(); k < trk_group() + NROWS; k++)   /* (the selected track's four) */
         sg_row(k);
 }

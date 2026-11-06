@@ -110,7 +110,7 @@ static void events_block(uint32_t n);
 #if MELODEE_USB_AUDIO
 static int ua_capture_active(void);
 static uint8_t track_capture_on, master_capture_on;   /* track_capture holds the stems, or the stereo mix at unity */
-static int32_t track_capture[CTL * NPART];
+static int32_t track_capture[CTL * NROWS];   /* USB's four stems: tracks 1..4 */
 #endif
 
 typedef struct {
@@ -149,7 +149,7 @@ static __attribute__((noinline)) void mix_spread(track_t *t, int32_t *b, uint32_
         int32_t y=mix_level((d[i]<<1)-b[i],lvl,i+dk+4u);
         int32_t a=x<0?-x:x;
 #if MELODEE_USB_AUDIO
-        if(track_capture_on)track_capture[i*NPART+(uint32_t)(t-trk)]=x;
+        if(track_capture_on&&t<trk+NROWS)track_capture[i*NROWS+(uint32_t)(t-trk)]=x;
 #endif
         if(a>pk)pk=a;
         mix_add(((x*glm)>>12)+((y*gld)>>12),((x*grm)>>12)+((y*grd)>>12),i,send);
@@ -169,7 +169,7 @@ static __attribute__((noinline,section(".dsp_text"))) void MIX_MONO_GENERAL(trac
     for(uint32_t i=0;i<n;i++){
         int32_t x=mix_level(b[i],lvl,i+dk),a=x<0?-x:x;
 #if MELODEE_USB_AUDIO
-        if(track_capture_on)track_capture[i*NPART+(uint32_t)(t-trk)]=x;
+        if(track_capture_on&&t<trk+NROWS)track_capture[i*NROWS+(uint32_t)(t-trk)]=x;
 #endif
         if(a>pk)pk=a;
         mix_add((x*gl)>>12,(x*gr)>>12,i,send);
@@ -187,7 +187,7 @@ static __attribute__((noinline,section(".dsp_text"))) void mix_mono_dry(track_t 
     for(uint32_t i=0;i<n;i++){
         int32_t x=mix_level(b[i],lvl,i+dk),a=x<0?-x:x;
 #if MELODEE_USB_AUDIO
-        if(track_capture_on)track_capture[i*NPART+(uint32_t)(t-trk)]=x;
+        if(track_capture_on&&t<trk+NROWS)track_capture[i*NROWS+(uint32_t)(t-trk)]=x;
 #endif
         if(a>pk)pk=a;
         mix_l[i]+=x;mix_r[i]+=x;
@@ -207,7 +207,7 @@ static __attribute__((noinline,section(".dsp_text"))) void mix_mono_samples(trac
     for(uint32_t i=0;i<n;i++){
         int32_t x=mix_level(b[i],lvl,i+dk),a=x<0?-x:x;
 #if MELODEE_USB_AUDIO
-        if(track_capture_on)track_capture[i*NPART+(uint32_t)(t-trk)]=x;
+        if(track_capture_on&&t<trk+NROWS)track_capture[i*NROWS+(uint32_t)(t-trk)]=x;
 #endif
         if(a>pk)pk=a;
         mix_add(x,x,i,send);
@@ -216,7 +216,7 @@ static __attribute__((noinline,section(".dsp_text"))) void mix_mono_samples(trac
 }
 #endif
 
-static int32_t solo_gain[NPART]={32768,32768,32768,32768};
+static int32_t solo_gain[NPART]={[0 ... NPART-1u]=32768};
 static void mix_solo(track_t *t,int32_t *b,uint32_t n)
 {
     uint32_t ti=(uint32_t)(t-trk);
@@ -348,7 +348,7 @@ static __attribute__((noinline)) void mix_block(int32_t *out,uint32_t n)
 #endif
 #if MELODEE_USB_AUDIO
     {int cap=ua_capture_active();track_capture_on=(uint8_t)(cap==4);master_capture_on=(uint8_t)(cap==2);}
-    if(track_capture_on)memset(track_capture,0,n*NPART*sizeof *track_capture);
+    if(track_capture_on)memset(track_capture,0,n*NROWS*sizeof *track_capture);
 #endif
     memset(mix_l,0,n*sizeof *mix_l);memset(mix_r,0,n*sizeof *mix_r);
     dither_block();                                     /* (before any engine renders: dsp.c) */

@@ -16,7 +16,8 @@
 /* ------------------------------------------------------------ sizes --- */
 #define NVOICE 16                /* voice slots per part (FM6 plays Dexed's 16) */
 #define NPOLY 8                  /* the voices of an engine without its own cap (its per-voice state: engines.c eng_state) */
-#define NPART 4                  /* synth parts: tracks 1..4 */
+#define NPART 6                  /* sound tracks: tracks 1..6 */
+#define NROWS 4                  /* tracks a screen shows, and a new project starts with: 1..4, then 5..8 */
 #ifndef VBUDGET
 #define VBUDGET (MELODEE_RAM_AUDIO ? 18u : 16u) /* shared weighted voices; RAM profile uses 18 with CPU1 online
                                                  * at 360 MHz (voice.c voice_budget: scaled with a kept 320) */
@@ -29,7 +30,7 @@
 #define MELODEE_AUDIO_BENCH 0 /* laboratory fixed-voice admission bypass; never a release default */
 #endif
 #ifndef NMIDI
-#define NMIDI 4                  /* MIDI-only tracks: tracks 5..8, the MIDI Track engine and no audio */
+#define NMIDI 2                  /* MIDI-only tracks: tracks 7 and 8, the MIDI Track engine and no audio */
 #endif
 #define NTRK (NPART + NMIDI)     /* tracks: the parts, then the MIDI-only ones (a project's first NPART on its FUN wire) */
 /* Shared with engine-buffer placement: the queued recorder needs one runtime
@@ -581,7 +582,7 @@ static int32_t input_octave(const track_t *t)
 { return t->p[P_QUANT] == Q_MPC ? t->mpc_octave : song.octave; }
 /* The tracks in use: 1..trk_n(), always from track 1 (it clocks the song). The others keep their structs, sound and
  * play nothing (voice.c trk_note_on), are drawn nowhere and get a fresh sound when added (project.c track_add) */
-static inline uint32_t trk_n(void) { return song.ntrk - 1u < NTRK ? song.ntrk : NPART; }
+static inline uint32_t trk_n(void) { return song.ntrk - 1u < NTRK ? song.ntrk : NROWS; }
 /* the parts in use: the tracks the audio renders and mixes (a MIDI-only track never sounds) */
 static inline uint32_t trk_parts(void) { uint32_t n = trk_n(); return n < NPART ? n : NPART; }
 /* track k can only be a MIDI Track (tracks 5..8) */

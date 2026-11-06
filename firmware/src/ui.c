@@ -118,11 +118,11 @@ static void glo_select_set(uint32_t v) { GLO_SELECT = (uint8_t)((GLO_SELECT & ~0
 #define REC_MODE_FREE 64u
 /* the four tracks Stage, MIXER, PATTERNS and SONG show: the selected one's (1..4, or the MIDI-only
  * 5..8); a row k of them is track trk_group() + k */
-static uint32_t trk_group(void) { return song.sel / NPART * NPART; }
+static uint32_t trk_group(void) { return song.sel / NROWS * NROWS; }
 static uint32_t stage_rows(void)
 {
     uint32_t g = trk_group(), n = trk_n() > g ? trk_n() - g : 0u;
-    return GLO_SELECT & TRACKS_HIDE ? (n < NPART ? n : NPART) : NPART;
+    return GLO_SELECT & TRACKS_HIDE ? (n < NROWS ? n : NROWS) : NROWS;
 }
 
 static uint8_t sync_reload;                  /* engine / preset / project / user preset loaded: editor RELOAD push */
