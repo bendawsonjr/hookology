@@ -43,7 +43,7 @@ _Static_assert(BANK_FN_OFF + 4u + PROJ_TRK * FM6_NFN <= BANK_STORE_SIZE - 4u, "b
 #define BANKL_REC_OFF (BANKL_FN_OFF + 4u + PROJ_TRK * FM6_NFN)
 #define BANKL_TRK_OFF (BANKL_REC_OFF + PROJ_REC_DIR_BYTES)
 #define BANKL_TRK_BYTES (P_COUNT + 1u)                  /* the parameters + 64, the MPC octave + 3 */
-#define BANKL_STEPS_OFF (BANKL_TRK_OFF + NMIDI * BANKL_TRK_BYTES)
+#define BANKL_STEPS_OFF (BANKL_TRK_OFF + (NTRK - PROJ_TRK) * BANKL_TRK_BYTES)
 #define BANKM_SONG_BYTES (4u + CHAIN_ROWS * (NTRK + 1u))
 #define BANKN_FX_BYTES (CHAIN_ROWS * CHAIN_FX_EVENTS * 3u)
 _Static_assert(sizeof(chain_fx_t) == 3u, "song punch wire event");
@@ -54,7 +54,7 @@ _Static_assert(sizeof(chain_fx_t) == 3u, "song punch wire event");
 #define BANKP_FN_OFF (BANKP_MOTION_OFF + MOTION_MAX)
 #define BANKP_REC_OFF (BANKP_FN_OFF + 4u + PROJ_TRK * FM6_NFN)
 #define BANKP_TRK_OFF (BANKP_REC_OFF + BANKP_REC_BYTES)
-#define BANKP_STEPS_OFF (BANKP_TRK_OFF + NMIDI * BANKL_TRK_BYTES)
+#define BANKP_STEPS_OFF (BANKP_TRK_OFF + (NTRK - PROJ_TRK) * BANKL_TRK_BYTES)
 /* the FBKL family's layout: FBKL..FBKO (NPAT_V1 a track, one mask byte) or FBKP (NPAT, two) */
 typedef struct { uint32_t npat, timing, chain, motion, fn, rec, recn, trk, steps, mask; } bank_lay_t;
 static const bank_lay_t BANK_LAY[2] = {
@@ -128,6 +128,11 @@ static int bank_step_pack(uint8_t *b, const step_t *s)
     return 1;
 }
 #define BANK_TAIL_SIZE (BANK_STORE_SIZE-BANK_ACTIVE_OFF)
+/* the sounds of the parts past the FUN record (tracks 5, 6), song_sound_t bytes at the tail's end; zero: not one in use
+ * as a sound (a MIDI Track there, a project from before them). A file that kept steps here has none */
+#define BANK_PART_N (NPART - PROJ_TRK)
+#define BANK_PART_BYTES (BANK_PART_N * sizeof(song_sound_t))
+#define BANK_PART_OFF (BANK_TAIL_SIZE - 4u - BANK_PART_BYTES)
 /* timed notes of an owner past the FUN record's directory: the count FBKL keeps */
 static uint32_t bank_rec_count(const project_t *q, uint32_t owner)
 {
@@ -150,7 +155,7 @@ static int bankl_pack_tail(uint8_t *raw, const project_t *q)   /* runtime only (
     uint32_t pos = BT(bank_steps_off()), f = motion_guard();
     step_t empty = {{0}, 0, ST_REST};
     memset(raw, 0, BANK_TAIL_SIZE);
-    if (pos + NTRK > BANK_TAIL_SIZE - 4u) { bank_too_full = 1; motion_unguard(f); return 0; }
+    if (pos + NTRK > BANK_PART_OFF) { bank_too_full = 1; motion_unguard(f); return 0; }
     if (bank_sounds) {
         uint8_t *out = raw + bank_sound_off();
         out[0] = bank_sound_count; out[1] = P_COUNT;
@@ -186,7 +191,7 @@ static int bankl_pack_tail(uint8_t *raw, const project_t *q)   /* runtime only (
         }
     }
     if (bank_songfx) memcpy(raw + BT(BL.steps) + BANKM_SONG_BYTES, chain_config.fx, BANKN_FX_BYTES);
-    if (pos + NTRK * BL.mask > BANK_TAIL_SIZE - 4u) { bank_too_full = 1; motion_unguard(f); return 0; }
+    if (pos + NTRK * BL.mask > BANK_PART_OFF) { bank_too_full = 1; motion_unguard(f); return 0; }
     for (uint32_t k = 0; k < NTRK; k++) {
         uint32_t src = cap_map(k), active = src < NTRK ? trk[src].pattern : 0u, at = pos;
         pos += BL.mask;
@@ -206,7 +211,7 @@ static int bankl_pack_tail(uint8_t *raw, const project_t *q)   /* runtime only (
                 n++;
             }
             if (!n) continue;
-            if (pos + 8u + n * BANK_STEP_SIZE > BANK_TAIL_SIZE - 4u) { bank_too_full = 1; motion_unguard(f); return 0; }
+            if (pos + 8u + n * BANK_STEP_SIZE > BANK_PART_OFF) { bank_too_full = 1; motion_unguard(f); return 0; }
             raw[at + b / 8u] |= (uint8_t)(1u << (b % 8u));
             for (uint32_t i = 0; i < 4u; i++) { raw[pos + i] = (uint8_t)(lo >> (8u * i)); raw[pos + 4u + i] = (uint8_t)(hi >> (8u * i)); }
             pos += 8u;
@@ -225,6 +230,11 @@ static int bankl_pack_tail(uint8_t *raw, const project_t *q)   /* runtime only (
                     b[i] = (uint8_t)(v + 64);
                 }
                 b[P_COUNT] = (uint8_t)(clamp(t->mpc_octave, -3, 3) + 3);
+                if (k < NPART && t->eng_req != ENGI_MIDI) {
+                    song_sound_t sound;
+                    song_sound_capture(&sound, t, "TRACK");
+                    memcpy(raw + BANK_PART_OFF + (k - PROJ_TRK) * sizeof sound, &sound, sizeof sound);
+                }
             }
         }
         for (uint32_t r = 0; r < CHAIN_LEGACY_ROWS; r++) {
@@ -249,7 +259,7 @@ static int bankl_pack_tail(uint8_t *raw, const project_t *q)   /* runtime only (
  * (pattern.c pattern_fits) */
 static uint32_t pattern_room(void)
 {
-    uint32_t fixed = BT(BANKP_STEPS_OFF) + BANKM_SONG_BYTES + BANKN_FX_BYTES + 2u * NTRK + 4u;
+    uint32_t fixed = BT(BANKP_STEPS_OFF) + BANKM_SONG_BYTES + BANKN_FX_BYTES + 2u * NTRK + 4u + BANK_PART_BYTES;
     if (pattern_sounds_any()) fixed += BANKQ_PATTERN_BYTES;
     if (song_sound_count) fixed += BANKO_HEAD_BYTES + song_sound_count * (uint32_t)sizeof(song_sound_t);
     return fixed < BANK_TAIL_SIZE ? BANK_TAIL_SIZE - fixed : 0u;
@@ -363,6 +373,13 @@ static int bankl_step_ok(const uint8_t *b)
     step_t s = step_packed_get(b);
     return (b[3] >> 4 & 7u) != 7u && s.probability <= 101u && step_acc_valid(&s);
 }
+/* part k's sound past the FUN record is in the tail (k: 0 track 5) */
+static int bank_part_used(const uint8_t *raw, uint32_t k)
+{
+    const uint8_t *b = raw + BANK_PART_OFF + k * sizeof(song_sound_t);
+    for (uint32_t i = 0; i < sizeof(song_sound_t); i++) if (b[i]) return 1;
+    return 0;
+}
 static int bankl_tail_valid(const uint8_t *raw)
 {
     bank_sound_bytes = 0;
@@ -455,7 +472,14 @@ static int bankl_tail_valid(const uint8_t *raw)
             if (b[P_COUNT] > 6u) return 0;
         }
     }
-    for (; pos < BANK_TAIL_SIZE - 4u; pos++) if (raw[pos]) return 0;
+    for (; pos < BANK_PART_OFF; pos++) if (raw[pos]) return 0;
+    if (pos == BANK_PART_OFF)                           /* (past it: steps of a file from before the block) */
+        for (uint32_t k = 0; k < BANK_PART_N; k++)
+            if (bank_part_used(raw, k)) {
+                song_sound_t sound;
+                memcpy(&sound, raw + BANK_PART_OFF + k * sizeof sound, sizeof sound);
+                if (!song_sound_valid(&sound)) return 0;
+            }
     for (uint32_t i = 0; i < CHAIN_LEGACY_ROWS * NTRK; i++) if (raw[BT(BL.chain) + i] >= BL.npat) return 0;
     if (!bank_tail_common(raw, BL.motion, BL.fn)) return 0;
     /* Reserve before project_restore_runtime replaces any active music. The
@@ -549,11 +573,20 @@ static void bankl_restore_tail(const uint8_t *raw)
         pos += BL.mask;
         if (k >= PROJ_TRK) {                            /* (project_restore_runtime made it a blank MIDI Track) */
             const uint8_t *b = raw + BT(BL.trk) + (k - PROJ_TRK) * BANKL_TRK_BYTES;
+            song_sound_t sound;
+            uint32_t own = 0, engine = ENGI_MIDI;
+            if (k < NPART && bank_part_used(raw, k - PROJ_TRK)) {
+                memcpy(&sound, raw + BANK_PART_OFF + (k - PROJ_TRK) * sizeof sound, sizeof sound);
+                own = song_sound_valid(&sound);         /* (no: steps of a file from before the block) */
+            }
+            if (own) engine = sound.engine;
+            if (k < NPART) set_engine_of(t, engine);
             for (uint32_t i = 0; i < P_COUNT; i++) {
-                const param_desc_t *d = param_desc_of(ENGI_MIDI, i);
+                const param_desc_t *d = param_desc_of(engine, i);
                 t->p[i] = param_reserved(i) ? 0 : (int16_t)clamp((int32_t)b[i] - 64, d->min, d->max);
             }
             t->mpc_octave = (int8_t)((int32_t)b[P_COUNT] - 3);
+            if (own) song_sound_apply(k, &sound);
         }
         t->pattern = raw[k]; t->pattern_next = 0xff; t->pattern_gen++;
         for (uint32_t b = 0; b < trk_npat(k); b++) {     /* (an older record's banks past its NPAT_V1: empty) */
