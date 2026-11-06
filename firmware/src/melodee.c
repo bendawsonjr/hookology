@@ -36,7 +36,7 @@
 #define MELODEE_UART 1           /* TRS MIDI IN on UART1 / PH8 */
 #endif
 #ifndef MELODEE_BLE
-#define MELODEE_BLE 1           /* Optimist LE MIDI: one bidirectional peripheral or central link */
+#define MELODEE_BLE 0           /* off in this build; 1: Optimist LE MIDI, one bidirectional peripheral or central link */
 #endif
 #ifndef MELODEE_ID
 #define MELODEE_ID "FM-1_900"    /* package identity (build.py: the .fwsc marker string) */
