@@ -194,6 +194,7 @@ static void melodee_init(void)
     song.sel = 0;
     song.master_q12 = 2048;
     ui.home = 1;
+    ui.home_pg = HP_TRACKS;
     ui.force = 1;
 }
 

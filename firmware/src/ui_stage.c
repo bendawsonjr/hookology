@@ -672,7 +672,7 @@ static void stage_draw(void)
     stage_knobs();
     if (!ui.force && (ui.frame & 1u))
         return;
-    if (stage.out && !ui.home_pg)
+    if (stage.out && ui.home_pg == HP_STAGE)
         stage_shape();
     for (k = trk_group(); k < trk_group() + stage_rows(); k++)   /* (the selected track's four) */
         if (k < trk_n())

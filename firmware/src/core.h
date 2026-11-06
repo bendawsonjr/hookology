@@ -499,6 +499,7 @@ typedef struct track {
     /* sequencer */
     step_t step[NSTEP];
     volatile uint8_t pattern, pattern_next;             /* active bank, queued bank (0xff: none) */
+    volatile uint8_t slen_next;                         /* LEN waiting for the loop end (HOME's TRACKS); 0: none */
     volatile uint32_t pattern_gen;                      /* invalidates editor history even for identical banks */
     uint32_t seq_pos;            /* samples (INT), or MIDI musical units, into the step */
     uint16_t seq_idx;

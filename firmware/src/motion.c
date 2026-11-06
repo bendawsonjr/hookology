@@ -527,6 +527,7 @@ static int pattern_clear(track_t *t, uint32_t bank)
  * running), 2 = no room, 3 = 64 steps at most */
 static int pattern_double(track_t *t, uint32_t bank, int apply)
 {
+    if (apply && bank == t->pattern) t->slen_next = 0;  /* (one length: this edit's) */
     uint32_t k = trk_index(t), len, i, j, n = 0, add = 0, drop = 0, f;
     step_t *s;
     pattern_t copy;
@@ -573,6 +574,7 @@ static int pattern_double(track_t *t, uint32_t bank, int apply)
  * apply 0: only asks. 1 = refused (a song running), 3 = one step already */
 static int pattern_half(track_t *t, uint32_t bank, int apply)
 {
+    if (apply && bank == t->pattern) t->slen_next = 0;  /* (one length: this edit's) */
     uint32_t len, f;
     int16_t *lp;
     if (bank >= NPAT) return 1;

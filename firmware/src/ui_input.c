@@ -570,6 +570,52 @@ static void tracks_edit(uint32_t slot, int32_t steps)
     motion_capture(t, (uint32_t)(vp - t->p), *vp);
 }
 
+/* HOME's TRACKS (ui_tracks.c): the selected track's KNOB 1 SWING, 2 LEVEL, 3 STEPS, 4 PAN. ALGORITHM picks the track */
+static void tracks_value(track_t *t, uint32_t id, uint32_t k, int32_t s)
+{
+    int16_t *vp = &t->p[id];
+    const param_desc_t *d = &TP[id];
+    *vp = (int16_t)clamp(*vp + accel(EN_K1 + k, s, d->max - d->min), d->min, d->max);
+    motion_capture(t, id, *vp);
+}
+/* a fast turn stops at the common lengths: from .. to, the first of them it crosses */
+static int32_t steps_land(int32_t from, int32_t to)
+{
+    static const int8_t COMMON[4] = {8, 16, 32, 64};
+    for (uint32_t i = 0; i < 4u; i++) {
+        int32_t v = COMMON[to > from ? i : 3u - i];
+        if ((from < v && v < to) || (to < v && v < from)) return v;
+    }
+    return to;
+}
+/* STEPS: LEN, as SEQ's and the pattern dialog's: shorter hides the steps past it, longer shows them again. Playing, at
+ * the track's loop end (seq.c); STOP does it at once */
+static void tracks_steps(track_t *t, int32_t s)
+{
+    char v[8];
+    int32_t len = t->p[P_SLEN], from = t->slen_next ? t->slen_next : len;
+    int32_t to = steps_land(from, clamp(from + accel(EN_K3, s, NSTEP - 1), 1, NSTEP));
+    if (to == from) return;
+    fm1_irq_off();
+    if (song.playing) t->slen_next = (uint8_t)(to == len ? 0 : to);
+    else t->p[P_SLEN] = (int16_t)to;
+    fm1_irq_on();
+    fmt_int(v, to);
+    ui_say("STEPS ", v);
+    if (t->slen_next) ui_message("STEPS AT LOOP END");
+}
+static void tracks_knob(uint32_t k, int32_t s)
+{
+    track_t *t = TSEL;
+    if (k != 1u && k != 3u && chain_busy()) {           /* (the song owns the timing, as on SEQ) */
+        ui_message("STOP TO EDIT");
+        return;
+    }
+    if (k == 0u) tracks_value(t, P_SSWING, k, s);
+    else if (k == 2u) tracks_steps(t, s);
+    else if (!midi_track_only(t)) tracks_value(t, k == 1u ? P_LEVEL : P_PAN, k, s);
+}
+
 /* REC latches recording; SEQ's pattern shortcuts arm only one pass. During
  * playback both wait for loop zero; another tap cancels or finishes the take.
  * On STEP, armed keys audition/record instead of writing the cursor step. */
@@ -1153,6 +1199,7 @@ static void edit_param(uint32_t slot, int32_t steps)
        ((uint32_t)(vp-song.g)-G_MFXTYPE)%FX_PARAMS==0u){
         uint32_t flags=motion_guard();shared_fx_select(song.g,((uint32_t)(vp-song.g)-G_MFXTYPE)/FX_PARAMS,v);motion_unguard(flags);
     }else *vp = (int16_t)v;
+    if (vp == &TSEL->p[P_SLEN]) TSEL->slen_next = 0;     /* (one length: this edit's) */
     if(pg->scope==SC_P5){
         uint8_t old[MO_NATIVE_N];uint32_t f=motion_guard();
         motion_native_peek(TSEL,old);p5_edit_value(TSEL,pg->id[slot],p5_panel_raw(TSEL,pg->id[slot],v));native_motion(old);
@@ -1881,6 +1928,10 @@ static void page_knob_edit(uint32_t k, int32_t s)
         motion_knob(k, s);
         return;
     }
+    if (ui.home && ui.home_pg == HP_TRACKS) {
+        tracks_knob(k, s);
+        return;
+    }
     momentary_take(k);
     if (ui.home) {                                      /* Stage: the selected track's engine's four, as its pages; they
                                                          * drop in */
@@ -2468,7 +2519,7 @@ static void ui_input(void)
         open_family(FAM_SEQ);
     }
     if (home == BT_TAP && ui.home && !pop.on) {         /* HOME acts on release (a hold opens the menu); on HOME: its */
-        ui.home_pg = (uint8_t)!ui.home_pg;              /* other page (ui_view.c) */
+        ui.home_pg = ui.home_pg == HP_STAGE ? HP_VIEW : ui.home_pg == HP_VIEW ? HP_TRACKS : HP_STAGE;   /* the next page */
         ui.force = 1;
     } else if (home == BT_TAP) {
         go_home();                                      /* (to the page it was on) */

@@ -1096,7 +1096,10 @@ static void seq_stop(void)
         trk[i].rh_n = 0;                           /* a recorded note held over the stop: as far as it got */
     }
     chain_stop();
-    for (i = 0; i < NTRK; i++) if (trk[i].pattern_next < NPAT) pattern_switch(&trk[i], trk[i].pattern_next);
+    for (i = 0; i < NTRK; i++) {
+        if (trk[i].slen_next) { trk[i].p[P_SLEN] = trk[i].slen_next; trk[i].slen_next = 0; }
+        if (trk[i].pattern_next < NPAT) pattern_switch(&trk[i], trk[i].pattern_next);
+    }
     motion_end();
 }
 
@@ -1199,6 +1202,11 @@ static void seq_grid_tick(track_t *t, uint32_t n)
                 song.rec_pass |= bit;
                 punch_in = 1;
             }
+        }
+        if (!t->seq_idx && t->slen_next) {              /* HOME's STEPS: the length at the loop end */
+            t->p[P_SLEN] = t->slen_next;
+            t->slen_next = 0;
+            len = (uint32_t)t->p[P_SLEN];
         }
         if (!t->seq_idx && !chain.running && t->pattern_next < NPAT) {
             pattern_switch(t, t->pattern_next);
