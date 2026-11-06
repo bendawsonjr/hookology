@@ -77,6 +77,7 @@ class FakeROM(R.Link):
     def __init__(self, nor, key=0x980F):
         self.nor = bytearray(nor)
         self.key = key
+        self.flash_id = 0x856014
         self.erases = []
         self.programs = 0
         self.fail_program = None
@@ -104,7 +105,7 @@ class FakeROM(R.Link):
         if cmd == 0xFC0A:
             data = bytearray(14)
             data[0] = 3
-            data[2:6] = (0x856014).to_bytes(4, "little")
+            data[2:6] = self.flash_id.to_bytes(4, "little")
             return bytes(data)
         address = struct.unpack_from(">I", args)[0]
         if cmd == 0xFD05:
@@ -217,6 +218,18 @@ class RecoveryTests(unittest.TestCase):
     def test_chip_key_mismatch_precedes_flash_access(self):
         self.link.key = 0x1234
         with self.assertRaisesRegex(R.RecoveryError, "Chip-key mismatch"):
+            R.recover(self.link, self.package, bytes(512), self.output, True)
+        self.assertNotIn(0xFD05, self.link.calls)
+        self.assertEqual(self.link.erases, [])
+
+    def test_both_flash_parts_are_accepted(self):
+        for flash_id in (0x856014, 0xB36014):
+            self.link.flash_id = flash_id
+            self.assertEqual(self.link.load(bytes(512)), self.link.key)
+
+    def test_unknown_flash_part_is_refused_before_flash_access(self):
+        self.link.flash_id = 0x123456
+        with self.assertRaisesRegex(R.RecoveryError, "Unexpected flash type"):
             R.recover(self.link, self.package, bytes(512), self.output, True)
         self.assertNotIn(0xFD05, self.link.calls)
         self.assertEqual(self.link.erases, [])
