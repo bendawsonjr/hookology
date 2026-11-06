@@ -30,6 +30,10 @@ python3 tools/fm1_install.py /path/to/FM-1.fwsc --no-resources
 
 The web installer's **Return to official V15** also works with this build.
 
+## Updating
+
+Keep the FM-1 on a HOME page, such as TRACKS, with other MIDI apps closed. On the settings page it may not answer the update tools.
+
 ## If an install goes wrong
 
 1. Switch the FM-1 on, or hold **OCT-** alone while switching on. Three short key-light flashes mean the update loader is starting. Reconnect USB and install the same file again.
