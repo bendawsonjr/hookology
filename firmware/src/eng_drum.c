@@ -16,7 +16,7 @@ enum { DVT_PUNCH, DVT_ROUND, DVT_SNARE, DVT_CLAP, DVT_HATC, DVT_HATO, DVT_TOM, D
 #include "drum_808.c"
 #include "x0x/drum909.c"
 
-enum { DK_808 = 4, DK_909 = 5, DK_SID = 6, DK_CR78 = 7, DK_FM = 8 }; /* Retain the stored value of existing 808 patches. */
+enum { DK_808 = 4, DK_909 = 5, DK_SID = 6, DK_CR78 = 7, DK_FM = 8, DK_SAMPLE = 9 }; /* Retain the stored value of existing 808 patches. */
 static const uint8_t DV_TYPE_LANE[DVT_COUNT] = {
     DV_KICK, DV_KICK, DV_SNARE, DV_CLAP, DV_HATC, DV_HATO, DV_TOM, DV_TOM, DV_RIM, DV_RIM, DV_BELL, DV_BELL,
 };
@@ -170,7 +170,7 @@ static void drum_block(track_t *t)
     if(drum_is909(t)) { drum909_part_t *k=drum909_of(t); if(k)k->nz=d9_noise_block(&k->d,CTL); }
 }
 
-static const char *const N_DRUM_KIT[] = {"808", "808", "808", "808", "808", "909", "SID", "CR78", "FM"};
+static const char *const N_DRUM_KIT[] = {"808", "808", "808", "808", "808", "909", "SID", "CR78", "FM", "SAMPLE"};
 static const char *const N_DRUM_KICK[] = {"PUNCH", "ROUND"};
 
 /* General MIDI notes 35..81 -> the drum (DVT_*; DVT_PUNCH: the kick KICK picks) and semitones from its
@@ -476,7 +476,7 @@ static void drum_render(track_t *t,voice_t *v,int32_t *out,uint32_t n,const vmod
 /* the GM drum map, the first C (key 7) is the kick (C2, 36) */
 static int32_t drum_keys(const track_t *t, uint32_t k)
 {
-    return clamp(29 + 12 * input_octave(t) + (int32_t)k, 0, 127);
+    return clamp(29 + 12 * (t->p[P_E0] == DK_SAMPLE ? 0 : input_octave(t)) + (int32_t)k, 0, 127);   /* (SAMPLE: OCT- / OCT+ are hit levels) */
 }
 
 /* {KIT, TUNE, TONE, DECY, SNAP, ACC, KICK, DRV} (SID: DIGI, RES; CR78: HATS); every kit suggests the BEAT pattern (GM notes) */
@@ -487,6 +487,11 @@ static const preset_t DRUM_PRESETS[] = {
     {"SID DIGI", {DK_SID, 64, 80, 64, 64, 100, 1, 0}, {0, 100, 127, 100}, 0, 0},   /* kick, snare on $D418 */
     {"CR78 KIT", {DK_CR78, 64, 64, 64, 64, 100, 0, 0}, {0, 100, 127, 100}, 0, 0},
     {"FM KIT", {DK_FM, 64, 64, 64, 64, 100, 0, 0}, {0, 100, 127, 100}, 0, 0},
+    {"ACOUSTIC KIT", {DK_SAMPLE, 64, 64, 64, 64, 100, 0, 0}, {0, 100, 127, 100}, 0, 0},
+    {"DEEP KIT", {DK_SAMPLE, 56, 40, 64, 64, 100, 0, 0}, {0, 100, 127, 100}, 0, 0},
+    {"TIGHT KIT", {DK_SAMPLE, 66, 70, 34, 64, 100, 0, 0}, {0, 100, 127, 100}, 0, 0},
+    {"BRIGHT KIT", {DK_SAMPLE, 68, 110, 64, 64, 100, 0, 0}, {0, 100, 127, 100}, 0, 0},
+    {"DUST KIT", {DK_SAMPLE, 62, 28, 48, 64, 100, 0, 50}, {0, 100, 127, 100}, 0, 0},
 };
 /* KIT SID: KICK is DIGI (KICK and SNARE on $D418), DRV the filter's resonance */
 static const char *const N_DRUM_DIGI[] = {"OFF", "ON"};
@@ -504,7 +509,7 @@ static const engine_t ENG_DRUM = {
     .name = "DRUM",
     .page_title = {"KIT", "HIT"},
     .edit = {
-        {"KIT", F_ENUM, DK_808, DK_FM, DK_808, N_DRUM_KIT, 0},
+        {"KIT", F_ENUM, DK_808, DK_SAMPLE, DK_808, N_DRUM_KIT, 0},
         {"TUNE", F_PCT, 0, 127, 64, 0, 0},
         {"TONE", F_PCT, 0, 127, 64, 0, 0},
         {"DECY", F_PCT, 0, 127, 64, 0, 0},

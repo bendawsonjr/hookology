@@ -51,6 +51,7 @@ Melodee's additions and modifications are credited separately in the source file
 
 | What | Licence | Where |
 | --- | --- | --- |
+| KIT SAMPLE's drum recordings: VCSL, the Versilian Community Sample Library (Versilian Studios / Sam Gossner, <https://github.com/sgossner/VCSL>), as cut for SLOOP by isod89 (`assets/samples-cc0/KIT`, provenance in `assets/samples-cc0/ATTRIBUTION.txt`). `tools/gen_drum_samples.py` and `firmware/src/drum_sample.c` follow SLOOP's sample tools and IMA ADPCM player (GPL-3.0-only) | CC0 1.0 | `assets/samples-cc0/ATTRIBUTION.txt` |
 | HOME's TRACKS page follows the layout of SLOOP's home screen by isod89 ([sloop-fm1](https://github.com/isod89/sloop-fm1)): `firmware/src/ui_tracks.c`, written for Melodee, no SLOOP code | GPL-3.0-only | `LICENSE` |
 | HERA chord sets (Ben Badio, [hera-fm1](https://github.com/benbadio/hera-fm1)): `assets/hera/chordsets.json`, the 100 chord sets, as HERA lists them from the Roland J-6 manual. No HERA code | GPL-3.0-only | `LICENSE` |
 | SLOOP master punch, stereo reverb/freeze and pedal-effect adaptations by isod89, from `isod89/sloop-fm1` at `4ec1ac829fd2bdf2c571ea215fb3d62477d01220`. Retained Felucca filters, input diffusers and insert portions keep Leo Kuroshita / Hügelton Instruments' notices; Melodee's integration retains its own credit. | GPL-3.0-only | `firmware/src/punch.c`, `fx_sloop_reverb.h`, `fx_sloop_insert.h`; source history and attribution in `docs/SLOOP_PUNCH_FX.md` |

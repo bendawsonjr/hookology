@@ -1169,6 +1169,14 @@ MPC DRUM layout for 808 and SID, viewed from above (pad 01 is bottom left):
 | 05 Closed hat | 06 Open hat | 07 Cowbell | 08 Cymbal |
 | 01 Kick | 02 Snare | 03 Clap | 04 Rim |
 
+**KIT SAMPLE** plays recorded acoustic drums: one CC0 sample each for kick, snare, clap, closed and open hat, tom, rim
+and cowbell, the cuts and balance after SLOOP's kit. PRESETS has it as ACOUSTIC, DEEP, TIGHT, BRIGHT and DUST KIT. Pads
+without a sample of their own borrow one: congas the tom, claves the rim, cymbals the open hat pitched down. TUNE
+works on every drum, TONE below 64 darkens and above it brightens, DECY below 64 ends the drums sooner. On HOME's
+pages, with this kit on the selected track, hold **OCT-** for ghost hits and **OCT+** for hard ones while you play;
+recordings keep the level. The keys stay in one place on this kit, so the OCT buttons shift nothing, and holding
+OCT+ does not open the sound's sheet there. If the resource file is missing, only the hats play until it is installed.
+
 The 909 keeps the same main positions: pad 07 is Ride and 08 is Crash. Its extra pads repeat useful
 hits: 12 Ride, 13 Kick, 14 Snare, 15 Closed hat and 16 Open hat. Each pad retriggers the hit even
 while its duplicate is held. CR78 and FM use the 808's pad positions and play their own sound for each; on CR78, for

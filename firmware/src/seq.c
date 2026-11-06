@@ -741,13 +741,14 @@ static void input_off(track_t *t, uint32_t note)
 
 /* Start only this tone's ownership before input_on: note-triggered recording can
  * re-enter seq_advance(0). Shared tones retain the existing single-note policy. */
+static volatile uint8_t key_hit_vel;           /* a key's velocity while OCT- / OCT+ set the hit level (ui_input.c), 0: 100 */
 static void key_chord_tone(uint32_t k, track_t *t)
 {
-    uint32_t x = kb_chord[k][kb_chn[k]], held = midi_local_held(t, x);
+    uint32_t x = kb_chord[k][kb_chn[k]], held = midi_local_held(t, x), vel = key_hit_vel ? key_hit_vel : 100u;
     kb_chn[k]++;
     if (held) return;
-    input_on(t, x, 100);
-    if (!midi_track_only(t)) midi_out_event(0x09u | (0x90u | trk_midi_ch(trk_index(t))) << 8 | x << 16 | 100u << 24);
+    input_on(t, x, vel);
+    if (!midi_track_only(t)) midi_out_event(0x09u | (0x90u | trk_midi_ch(trk_index(t))) << 8 | x << 16 | vel << 24);
 }
 
 static void key_on(uint32_t k, track_t *t)

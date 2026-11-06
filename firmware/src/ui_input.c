@@ -53,6 +53,10 @@ static int oct_nav(void)
 {
     return designer_on() || !ui.home || ui.menu || ui.confirm || name_on() || new_on() || layer_set_open() || pop.on || smap.on;
 }
+/* KIT SAMPLE on Stage and TRACKS: OCT- held plays ghost hits, OCT+ held hard ones (as SLOOP), no octave to shift */
+#define HIT_GHOST 42u
+#define HIT_HARD 127u
+static int oct_hits(void) { return !oct_nav() && drum_track(TSEL) && TSEL->p[P_E0] == DK_SAMPLE; }
 static int oct_enter_ok(void)                           /* OCT+ would do something here */
 {
     return list_on() || slot_kind() || motion_page() || (!ui.home && cur_page()->graph == GR_SCALE_PICKER) || page_sheet() || pop.on || smap.on || (!ui.home && cur_page()->graph == GR_BROWSE) || ptc_on();
@@ -2264,7 +2268,9 @@ static void ui_input(void)
     if (seq_long) seq = BT_HOLD;
     uint32_t save = btn_hold(&ui.save_t0, B_SAVE, now, !ui.menu && !ui.confirm);
     uint32_t edit = btn_hold(&ui.edit_t0, B_EDIT, now, !ui.menu && !ui.confirm && !name_on() && !new_on() && !ui.ly);
-    uint32_t octup = btn_hold(&ui.oct_t0, B_OCTUP, now, page_sheet() != 0u);   /* held: the page's sheet */
+    key_hit_vel = !oct_hits() ? 0u : (uint8_t)((fm1_in.buttons >> panel.btn[B_OCTDN]) & 1u ? HIT_GHOST :
+                                               (fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u ? HIT_HARD : 0u);
+    uint32_t octup = btn_hold(&ui.oct_t0, B_OCTUP, now, page_sheet() != 0u && !oct_hits());   /* held: the page's sheet */
     uint32_t oct;
     if (octup == BT_HOLD) {
         oct_eat |= 2u;                                  /* (its release is no OCT+) */
@@ -2586,6 +2592,8 @@ static void ui_input(void)
                 break;
             }
             if (oct_nav())                              /* off Stage: Esc / Enter, on release (below) */
+                break;
+            if (oct_hits())
                 break;
             if ((fm1_in.buttons & both) == both) {
                 *octave_control() = 0;

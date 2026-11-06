@@ -114,6 +114,7 @@ static __attribute__((noinline)) int dlk_noise(dlk_ch_t *restrict c, int32_t *y,
 
 #include "drum_cr78.c"
 #include "drum_fm.c"
+#include "drum_sample.c"
 
 static dlk_part_t *dlk_of(const track_t *t)
 {
@@ -137,7 +138,7 @@ static void dlk_hit(track_t *t, uint32_t note, uint32_t vel)
     int16_t q[8];
     if (!K)
         return;
-    uint32_t lane = DV_TYPE_LANE[drum_gm(t->p, note, &st)], sound = drum_sound_of(t, note) & 15u;
+    uint32_t role = drum_gm(t->p, note, &st), lane = DV_TYPE_LANE[role], sound = drum_sound_of(t, note) & 15u;
     const int8_t *pc = drum_patch_of(t - trk)->c[sound];
     dlk_ch_t *c = &K->ch[lane];
     if (lane == DV_HATC && K->ch[DV_HATO].on && !K->ch[DV_HATO].fade)
@@ -149,8 +150,9 @@ static void dlk_hit(track_t *t, uint32_t note, uint32_t vel)
     c->left = (int32_t)drum_event_length;
     c->v = (int32_t)vel * DLK_HIT_V;
     /* the same drum still ringing (not fading) may be struck again as it rings; else it starts from rest */
-    if (K->kit == DK_CR78 ? cr_hit(c, sound, tune, q, pc[1], c->on && !c->fade && c->sound == sound)
-                          : fmk_hit(c, sound, tune, q, pc[1])) {
+    if (K->kit == DK_SAMPLE ? smpk_hit(c, role, tune, q)
+        : K->kit == DK_CR78 ? cr_hit(c, sound, tune, q, pc[1], c->on && !c->fade && c->sound == sound)
+                            : fmk_hit(c, sound, tune, q, pc[1])) {
         c->ease = c->last;                       /* the old drum's last sample eases out */
         c->g = -1;                               /* (at its level from the first sample) */
     }
@@ -188,7 +190,7 @@ static __attribute__((noinline)) void dlk_render(track_t *t, int32_t *out, uint3
             continue;
         for (i = 0; i < n; i++)
             x[i] = 0;
-        if (c->on && !(K->kit == DK_CR78 ? cr_run(c, x, n) : fmk_run(c, x, n)))
+        if (c->on && !(K->kit == DK_SAMPLE ? smpk_run(c, x, n) : K->kit == DK_CR78 ? cr_run(c, x, n) : fmk_run(c, x, n)))
             c->on = 0;
         c->t += n;
         if (c->on && c->left > 0 && (c->left -= (int32_t)n) <= 0 && !c->fade)
