@@ -1,6 +1,6 @@
-# Melodee for FM-1, custom build
+# Hookology
 
-A personal build of [Melodee](https://github.com/keremimo/melodee) 1.6.1 for the M-VAVE FM-1. It is not an official Melodee release, and it has not been made or endorsed by the Melodee, HERA, SLOOP or Felucca authors, or by M-VAVE.
+Custom firmware for the M-VAVE FM-1, built on [Melodee](https://github.com/keremimo/melodee) 1.6.1. It is not an official Melodee release, and it has not been made or endorsed by the Melodee, HERA, SLOOP or Felucca authors, or by M-VAVE.
 
 ## What's different from Melodee 1.6.1
 
@@ -10,7 +10,7 @@ A personal build of [Melodee](https://github.com/keremimo/melodee) 1.6.1 for the
 - **REC MODE:** a menu setting. FREE lets a first take set the tempo and loop length. GRID, the default, records as Melodee always has.
 - **Bluetooth removed:** to make room. Build with `MELODEE_BLE=1` to bring it back.
 
-Everything else is Melodee, and its [manual](README.md) still applies, apart from what it says about Bluetooth.
+Everything else is Melodee, and its [manual](README.md) still applies, apart from what it says about Bluetooth. Hookology still uses Melodee's USB and MIDI names, so the update tools and recovery can find it, and your computer may show it as Melodee or Felucca.
 
 Projects saved by Melodee 1.6.1 load here. Projects saved here also load in Melodee 1.6.1, but a track set to HERA falls back to AUTO2 and loses its chord set.
 
@@ -23,8 +23,10 @@ You need the unmodified official V15 `FM-1.fwsc` from M-VAVE. Its SHA-256 must b
 Back up anything you want to keep first, because official firmware can overwrite Melodee's songs, sounds and settings. Then, with the FM-1 charged and connected over USB, run:
 
 ```
-python3 tools/fm1_install.py /path/to/FM-1.fwsc
+python3 tools/fm1_install.py /path/to/FM-1.fwsc --no-resources
 ```
+
+`--no-resources` matters if a `melodee-res.bin` sits beside that file: without it, the tool tries to send it to the official firmware.
 
 The web installer's **Return to official V15** also works with this build.
 

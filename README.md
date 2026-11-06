@@ -1,6 +1,6 @@
 # Melodee
 
-> **This is a custom build.** See [FM1-CUSTOM.md](FM1-CUSTOM.md) for what differs from Melodee 1.6.1, including the removal of Bluetooth.
+> **This is Hookology, a custom build.** See [HOOKOLOGY.md](HOOKOLOGY.md) for what differs from Melodee 1.6.1, including the removal of Bluetooth.
 
 [![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 
