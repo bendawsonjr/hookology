@@ -654,7 +654,12 @@ Thanks to [@aroum](https://github.com/aroum) for the detailed feedback in
   **OFF** (default) the audio may glitch instead, and an overload that lasts several seconds can freeze the panel and
   restart the FM-1. Device settings, kept across projects
 - SCL, ENV, LFO, EDIT, GLO, SAVE, ARP and SEQ open their pages; press again for the next page.
-  HOME returns home; on HOME, tap HOME again for its second page: the chord in the middle of a wheel
+  HOME returns home, and the FM-1 starts on **TRACKS**: a lane for each of four tracks showing its swing (SW), steps
+  (ST), level and pan, with four dials for the selected track: **SWING**, **LEVEL**, **STEPS** and **PAN**. ALGORITHM
+  picks the track. SWING is the track's own and adds to the song's, as on SEQ; the dial shows the total. STEPS is the
+  pattern's LEN, the same number SEQ and the pattern dialog show: a fast turn stops at 8, 16, 32 and 64, shorter hides
+  the steps past the end and longer brings them back. While playing, a new length waits for the track's loop end
+  (shown in the accent colour); STOP applies it at once. Tap HOME for Stage, and again for the chord in the middle of a wheel
   of the twelve notes in fifths (the key's notes marked, the notes sounding lit in their track's colour and joined
   into the chord's shape), each track's level pulsing in the corners, the output's waveform and four octaves of keys
   lit as they sound. The knobs and octave buttons work there as on Stage
