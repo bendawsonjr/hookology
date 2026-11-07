@@ -26,7 +26,7 @@ static void fresh(void)
 
 int main(void)
 {
-    fresh();assert(voice_budget()==76u);               /* 19 points of four units: the measured steady load */
+    fresh();assert(voice_budget()==80u);               /* 20 points of four units: the highest clean setting on an FM-1 */
     for(unsigned p=0;p<NROWS;p++)for(unsigned n=0;n<2u;n++)trk_note_on(&trk[p],48u+4u*n,100);
     assert(voices_busy()==8u*6u && !voice_kills);      /* the host synth is CZ: six units a voice */
 
@@ -39,9 +39,9 @@ int main(void)
     audio_worker_online=1;
     /* main.c clock_boot: the CPU1 budget follows the clock running (a 320 a soft reset kept); one core keeps 16 */
     audio_worker_online=1;
-    vbudget_cpu1=VBUDGET*320u/360u; assert(voice_budget()==4u*(19u*(VBUDGET*320u/360u)/VBUDGET));
+    vbudget_cpu1=VBUDGET*320u/360u; assert(voice_budget()==4u*(20u*(VBUDGET*320u/360u)/VBUDGET));
     audio_worker_online=0; assert(voice_budget()==64u);
     vbudget_cpu1=VBUDGET;
-    printf("Resident voice budget: 76 units (64 at 320 MHz or one core), bounded admission, protected bass, CPU1 fallback to 16: OK\n");
+    printf("Resident voice budget: 80 units (64 at 320 MHz or one core), bounded admission, protected bass, CPU1 fallback to 16: OK\n");
     return 0;
 }

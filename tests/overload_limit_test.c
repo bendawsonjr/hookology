@@ -31,10 +31,10 @@ int main(void)
     fresh();
     poly(0,ENGI_PROPHET,0);poly(1,ENGI_FM6,0);poly(2,ENGI_CZ,0);poly(3,ENGI_DRUM,0);
     check("a Prophet voice costs most, FM6 least of the synths",voice_units(&trk[0])==9u&&voice_units(&trk[1])==4u&&voice_units(&trk[2])==6u);
-    check("no shared effect: the whole budget",voice_budget()==76u);
-    song.g[G_MFXTYPE]=FX_ROOM;check("a shared effect takes 8 units off",voice_budget()==68u);
-    song.g[G_MFXTYPE]=FX_REVERB;check("REVERB takes 15 units off",voice_budget()==61u);
-    song.g[G_MFX2TYPE]=FX_CHORUS;song.g[G_MFX3TYPE]=FX_FLANGER;check("every shared slot counts",voice_budget()==45u);
+    check("no shared effect: the whole budget",voice_budget()==80u);
+    song.g[G_MFXTYPE]=FX_ROOM;check("a shared effect takes 8 units off",voice_budget()==72u);
+    song.g[G_MFXTYPE]=FX_REVERB;check("REVERB takes 15 units off",voice_budget()==65u);
+    song.g[G_MFX2TYPE]=FX_CHORUS;song.g[G_MFX3TYPE]=FX_FLANGER;check("every shared slot counts",voice_budget()==49u);
 
     /* a chord over a full budget keeps its low notes and a single-note track keeps its note */
     fresh();
