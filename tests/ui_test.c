@@ -153,7 +153,7 @@ static void ui_power_on(void)
     memset(&song, 0, sizeof song);
     memset(&chain, 0, sizeof chain);
     chain_defaults(&chain_config);
-    pattern_init();
+    pattern_init(); sec_reset();
     memset(&ui, 0, sizeof ui);
     memset(&boot_work, 0, sizeof boot_work);
     memset(&step_history, 0, sizeof step_history);
@@ -2802,9 +2802,11 @@ static int test_product_ux(void)
         press(B_REC);
         if (PAGES[i].graph == GR_SONG)
             ok &= song.rec == 0 && !transport_req && msg_is("[SEQ] TO RECORD");
+        else if (PAGES[i].graph == GR_SECTIONS)        /* SECTIONS: REC records the song (Hookology) */
+            ok &= song.rec == 0 && transport_req == 1 && secs.rec && msg_is("SONG REC");
         else ok &= song.rec == 1 && transport_req == 0 && ui.page == i && !ui.home;
     }
-    bad += check("REC stays on every page, SONG stopped asks for pattern recording", ok);
+    bad += check("REC stays on every page, SONG stopped asks for pattern recording, SECTIONS records the song", ok);
     ui_power_on(); hold(B_HOME); press(B_REC);
     bad += check("REC in the MENU does nothing (the menu stays, no arm, no transport start)",
                  ui.menu == 1 && song.rec == 0 && !transport_req);
@@ -2825,7 +2827,7 @@ static int test_product_ux(void)
     go_home(); hold(B_SEQ);
     bad += check("long SEQ goes directly to PATTERNS (the song under it) with no tap on release", cur_page()->graph == GR_PATGRID);
     turn(EN_SELECT, 1);
-    bad += check("  SELECT: SONG next to it", cur_page()->graph == GR_SONG);
+    bad += check("  SELECT: SECTIONS next to it", cur_page()->graph == GR_SECTIONS);
     song.rec = 1; chain.armed = 1; press(B_REC);
     bad += check("REC cannot write borrowed patterns while SONG is armed", song.rec == 1 && msg_is("STOP TO RECORD"));
     ui_power_on(); open_family(FAM_EDIT);
@@ -5434,7 +5436,9 @@ static int test_pattern_page_keys(void)
     press(B_REC);
     bad += check("cancelling REC on PATTERNS immediately restores selection", !song.rec && song.grid == 2u);
     turn(EN_SELECT, 1);
-    bad += check("PATTERNS SELECT navigates to SONG and restores playing", cur_page()->graph == GR_SONG && !song.grid);
+    bad += check("PATTERNS SELECT navigates to SECTIONS, whose keys are the sections", cur_page()->graph == GR_SECTIONS && song.grid == 2u);
+    turn(EN_SELECT, 1);
+    bad += check("SECTIONS SELECT navigates to SONG and restores playing", cur_page()->graph == GR_SONG && !song.grid);
 
     /* PLAY retains the configured count-in; cancelling it restores selection. */
     ui_power_on(); hold(B_SEQ);
@@ -5521,7 +5525,7 @@ static int test_pattern_preset_audition(void)
     turn(EN_PRESET, 1); press(B_OCTDN);
     bad += check("OCT- dismisses preset audition and keeps PATTERNS", !pop.on && cur_page()->graph == GR_PATGRID && song.grid == 2u);
     turn(EN_PRESET, 1); turn(EN_SELECT, 1);
-    bad += check("leaving PATTERNS cancels the audition", !pop.on && cur_page()->graph == GR_SONG && !song.grid);
+    bad += check("leaving PATTERNS cancels the audition", !pop.on && cur_page()->graph == GR_SECTIONS && !song.grid);
 
     ui_power_on(); hold(B_SEQ); song.ntrk = NTRK;
     for (uint32_t t = NPART; t < NTRK; t++) {

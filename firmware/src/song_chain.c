@@ -21,6 +21,7 @@ static void seq_release(track_t *t);
 static void seq_stop(void);
 static uint32_t div_samples(uint32_t div);
 static uint32_t step_samples(const track_t *t, uint32_t period, uint32_t idx);
+#include "sections.c"                                   /* SECTIONS: A..H, track 1's loop end (Hookology) */
 
 static void chain_defaults(chain_config_t *c)
 {
@@ -255,7 +256,7 @@ static void pattern_poll(void)
     if (!song_sound_count) resource_release(RES_SONG_SOUNDS);
     if (!song_sounds.mask && !chain.armed && !pattern_sounds_any()) resource_release(RES_SONG_BASE);
     for (uint32_t k = 0; k < NTRK; k++) {
-        uint32_t bank = trk[k].pattern_next;
+        uint32_t bank = sec_bank(k, trk[k].pattern_next);
         if (chain.armed) bank = chain_bank(chain.start, k);
         else if (chain.running) {
             uint32_t row = chain.row + 1u;

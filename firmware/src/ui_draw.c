@@ -266,6 +266,39 @@ static void ble_head_text(char text[24])
     else if (ui.menu == 3) str_cpy(text, mel_ble_status(), 24);
 }
 #endif
+/* HOME's TRACKS (Hookology): in the BPM's place, the section playing (sections.c): its letter in the track's colour, red
+ * while a take or SONG REC records into it (SONG REC: a dot too), the section waiting for track 1's loop end beside it
+ * dashed; '*' when the tracks play no one section. The tempo again while SELECT turns it (bpm_t) */
+static uint32_t sec_queued(void);                       /* ui_song_sections.c */
+static int head_badge_on(void) { return ui.home && ui.home_pg == HP_TRACKS && !ui.bpm_t; }
+static uint32_t head_badge_rec(void) { return secs.rec ? 2u : song.playing && (song.rec & ~song.rec_wait) ? 1u : 0u; }
+static uint32_t head_badge_sig(void)
+{
+    uint32_t q = chain.running ? SEC_NONE : sec_queued();
+    return 1u + sec_playing() + 256u * q + 65536u * head_badge_rec();
+}
+static void head_badge(void)                            /* (into the header's canvas) */
+{
+    uint32_t p = sec_playing(), q = chain.running ? SEC_NONE : sec_queued(), rec = head_badge_rec();
+    uint32_t two = q < SEC_N && q != p;
+    int32_t w = two ? 20 : 26, x = BPM_X;
+    uint16_t fill = rec ? T_REC : T_THEME;
+    char l[2] = {p < SEC_N ? (char)('A' + p) : '*', 0};
+    if (p < SEC_N) {
+        cv_rrect(x, 4, w, 22, 6, fill, T_BG);
+        cv_text_c(x + w / 2, ty_y(H_HEAD / 2, two ? TY_LB : TY_TX), two ? TY_LB : TY_TX, l, T_INK, fill);
+    } else {
+        cv_rrect(x, 4, w, 22, 6, rec ? T_REC : T_LINE, T_BG);
+        cv_rrect(x + 1, 5, w - 2, 20, 5, T_BG, rec ? T_REC : T_LINE);
+        cv_text_c(x + w / 2, ty_y(H_HEAD / 2, two ? TY_LB : TY_TX), two ? TY_LB : TY_TX, l, rec ? T_REC : T_MID, T_BG);
+    }
+    if (rec == 2u && !two) cv_rrect(x + w + 4, H_HEAD / 2 - 3, 6, 6, 3, T_REC, T_BG);   /* SONG REC: a dot beside it */
+    if (two) {                                          /* the next one, waiting: dashed */
+        char n[2] = {(char)('A' + q), 0};
+        cv_dashed(x + 23, 4, 19, 22, 6, T_THEME);
+        cv_text_c(x + 23 + 10, ty_y(H_HEAD / 2, TY_LB), TY_LB, n, T_THEME, T_BG);
+    }
+}
 static void draw_head(void)
 {
     char b[16], chip[20];                               /* (chip: "copy 16 to T2 16") */
@@ -289,6 +322,7 @@ static void draw_head(void)
     sig += uh.on ? (1u + uh.run) * 6151u : 0u;          /* the HOST tag: waiting, or a controller connected */
 #endif
     sig += load * 2147483u;
+    if (head_badge_on()) sig += head_badge_sig() * 2654435769u;
     if (bpm != ui.roll_bpm) {
         char a[8];
         fmt_int(a, ui.roll_bpm);
@@ -301,7 +335,7 @@ static void draw_head(void)
     }
     fmt_int(b, bpm);
     if (!ui.force && sig == ui.head_sig) {
-        if (ui.roll[ROLL_BPM].from[0] || moved) {       /* rolling, or snapped to the new value: the BPM's strip only */
+        if ((ui.roll[ROLL_BPM].from[0] || moved) && !head_badge_on()) {   /* rolling, or snapped: the BPM's strip only */
             cv_begin(BPM_W, H_HEAD, T_BG);
             roll_text(ROLL_BPM, 0, ty_y(H_HEAD / 2, TY_TX), b, ui.bpm_t ? T_ACCENT : T_TEXT);
             cv_blit(BPM_X, Y_HEAD);
@@ -312,7 +346,8 @@ static void draw_head(void)
     cv_begin(240, H_HEAD, T_BG);
     cv_icon_mid(5, H_HEAD / 2, 16, chain.running ? ICON_X_SONG : song.playing ? ICON_X_PLAY : ICON_X_STOP,
                 song.playing ? T_TEXT : T_MID, T_BG);
-    roll_text(ROLL_BPM, BPM_X, ty_y(H_HEAD / 2, TY_TX), b, ui.bpm_t ? T_ACCENT : T_TEXT);
+    if (head_badge_on()) head_badge();                  /* TRACKS: the section (Hookology) */
+    else roll_text(ROLL_BPM, BPM_X, ty_y(H_HEAD / 2, TY_TX), b, ui.bpm_t ? T_ACCENT : T_TEXT);
     x = BPM_X + BPM_W;                                  /* (past the widest BPM) */
     if (song.rec) {                                     /* (16 px, as the transport) */
         cv_icon_mid(x, H_HEAD / 2, 16, ((song.rec & ~song.rec_wait) >> song.sel) & 1u ? ICON_X_REC : ICON_X_REC_O, T_REC, T_BG);
@@ -739,6 +774,7 @@ static void draw_foot(void)
 #include "ui_view.c"                                    /* HOME's second page: the chord, pictures of what plays */
 #include "ui_browser.c"                                 /* SAVE > PRESETS, the sound browser */
 #include "ui_patterns.c"                                /* SEQ > PATTERNS, SEQ > SONG */
+#include "ui_song_sections.c"                           /* SEQ > SECTIONS (Hookology) */
 static int own_screen(void);
 static void draw_columns(void)
 {
@@ -1028,6 +1064,16 @@ static void confirm_text(char *a, char *b)
         str_cpy(a, "START A NEW SONG?", 24);
         str_cpy(b, "Unsaved changes", 24);
         break;
+    case CF_SEC_COPY:                                   /* SECTIONS: what plays over a section with notes */
+        str_cpy(a, "REPLACE SECTION A?", 24);
+        a[16] = (char)('A' + k % SEC_N);
+        str_cpy(b, "With what plays now", 32);
+        break;
+    case CF_SEC_SONG:                                   /* SECTIONS: SONG REC over a song */
+        str_cpy(a, "RECORD A NEW SONG?", 24);
+        fmt_int(b, (int32_t)chain_config.count);
+        str_cpy(b + str_len(b), chain_config.count == 1u ? " entry replaced" : " entries replaced", 20);
+        break;
     case CF_TAKE_JAM:                                   /* the rows it replaces */
         str_cpy(a, "SONG FROM JAM?", 24);
         fmt_int(b, (int32_t)chain_config.count);
@@ -1207,7 +1253,7 @@ static void draw_confirm(void)
 static int own_screen(void)                             /* a page drawn whole by its own code, no cards or footer */
 {
     uint32_t g = cur_page()->graph;
-    return !ui.home && (g == GR_BROWSE || g == GR_PATGRID || g == GR_SONG || g == GR_SCALE_PICKER);
+    return !ui.home && (g == GR_BROWSE || g == GR_PATGRID || g == GR_SECTIONS || g == GR_SONG || g == GR_SCALE_PICKER);
 }
 /* the page (or Stage): its own screen, the redesign's, else its cards, panel and footer */
 static void draw_page(void)
@@ -1239,7 +1285,10 @@ static void draw_page(void)
             scales_draw();
         else if (cur_page()->graph == GR_SONG)
             song_draw();
-        else {
+        else if (cur_page()->graph == GR_SECTIONS) {
+            draw_head();
+            sections_draw();
+        } else {
             draw_head();
             patterns_draw();
         }

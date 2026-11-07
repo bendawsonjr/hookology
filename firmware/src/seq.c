@@ -1093,6 +1093,7 @@ static void seq_stop(void)
     seq_erase_transport++;
     uint8_t takes = song.playing ? song.rec & ~song.rec_wait : 0;
     song.playing = 0;
+    secs.next = SEC_NONE;                            /* (a queued section: dropped) */
     song.rec_wait = song.rec_pass = 0;
     if (midi_sync_active)                           /* external clock: the arp stops with the transport, */
         for (i = 0; i < NTRK; i++)                 /* its sounding note too (HOLD keeps the latched chord) */
@@ -1202,7 +1203,7 @@ static void seq_grid_tick(track_t *t, uint32_t n)
             break;
         uint32_t starting = t->seq_pos >= 0x7FFFFFFFu;
         uint32_t punch_in = 0;
-        t->seq_pos = starting ? (chain.running ? chain.carry : 0u) : t->seq_pos - cur_len;
+        t->seq_pos = starting ? (chain.running ? chain.carry : secs.carry) : t->seq_pos - cur_len;
         if (starting) {
             t->seq_pos += chain.seek_phase[trk_index(t)]; chain.seek_phase[trk_index(t)] = 0;
         }
@@ -1357,6 +1358,7 @@ static void seq_advance_part(uint32_t n)
 {
     uint32_t i, beat = seq_beat_samples(), nt = trk_n();
     if (nt < NPART) nt = NPART;                       /* unused MIDI slots have no clock state to maintain */
+    sec_tick(n);                                      /* SECTIONS: a queued section at track 1's loop end */
     chain_tick(n);
     for (i = 0; i < nt; i++)
         seq_tick(&trk[i], n);

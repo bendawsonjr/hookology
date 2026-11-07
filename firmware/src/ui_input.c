@@ -466,8 +466,8 @@ static void ui_leds(void)
     led_put(nl, panel.btn[B_OCTDN], (int)(k & 1u));
     led_put(nl, panel.btn[B_OCTUP], (int)(k >> 1));
     uint32_t song_fx = song_punch_on() && !ui.menu && !ui.confirm;
-    play = !song_fx && !pattern_keys_on() && ui.confirm != CF_PAT_KEY && !(name_on() && !ui.menu) && !ui.layer && !grid_on();
-    c = song_fx ? song_punch_leds() : pattern_keys_on() || ui.confirm == CF_PAT_KEY ? pattern_leds(&pdim, &pbr) : name_on() && !ui.menu ? name_leds() :
+    play = !song_fx && !pattern_keys_on() && !sections_keys_on() && ui.confirm != CF_PAT_KEY && !(name_on() && !ui.menu) && !ui.layer && !grid_on();
+    c = song_fx ? song_punch_leds() : sections_keys_on() ? sections_leds(&pdim, &pbr) : pattern_keys_on() || ui.confirm == CF_PAT_KEY ? pattern_leds(&pdim, &pbr) : name_on() && !ui.menu ? name_leds() :
         ui.layer ? layer_leds() : grid_on() ? grid_leds() : fm1_in.notes & ~kb_layer;   /* the patterns (SEQ held, its
                                                          * dialog), NAME's keys, the map, the grid, the keys held */
 #if MELODEE_SLICE
@@ -829,6 +829,7 @@ static void capture_take(void)
 }
 
 /* SEQ > SONG TAKE JAM: the patterns played since PLAY (seq.c jam) become the song's rows */
+static int sec_pop_on(void) { return pop.on != 0; }
 static void jam_take(void)
 {
     uint32_t i, k;
@@ -1125,6 +1126,10 @@ static void edit_param(uint32_t slot, int32_t steps)
     }
     if (pg->graph == GR_PATGRID) {                      /* PATTERNS: KNOB k queues track k's (ui_stage.c) */
         patgrid_edit(slot, steps);
+        return;
+    }
+    if (pg->graph == GR_SECTIONS) {                   /* KNOB 1 the entry, 2 its section, 3 repeats, 4 the length */
+        sections_edit(slot, steps);
         return;
     }
     if (pg->graph == GR_SONG) {                       /* KNOB 1 the section, 2 the track, 3 its pattern there, 4 the
@@ -2146,6 +2151,10 @@ static void ui_confirm_accept(void)
         track_remove(ui.confirm_trk % NTRK);
     } else if (kind == CF_TAKE_JAM) {
         jam_take();
+    } else if (kind == CF_SEC_COPY) {           /* SECTIONS: what plays into a section with notes */
+        sec_copy(ui.confirm_trk % SEC_N);
+    } else if (kind == CF_SEC_SONG) {           /* SECTIONS: SONG REC over a song */
+        sec_rec_start();
     } else if (kind == CF_NEW_SONG) {
         new_open();
     } else if (kind == CF_CLEAR_SONG) {
@@ -2411,6 +2420,7 @@ static void ui_input(void)
         ui.seen_pattern_gen = TSEL->pattern_gen;
     }
     song_edit_sync();
+    sec_poll();                                         /* SECTIONS: STOP finishes SONG REC */
     if (ui.home || cur_page()->graph != GR_SONG) se.pending = se.range = 0;
     if(bulk.on && (ui.home || slot_kind()==SK_PROJECT || bulk.track!=song.sel || bulk.pattern!=TSEL->pattern || bulk.engine!=library_engine() ||
        (!slot_kind() && (cur_page()->graph!=GR_ROLL || (bulk.on==1u?bulk.generation!=TSEL->pattern_gen:bulk.generation!=recording_generation)))))bulk_clear();
@@ -2435,6 +2445,8 @@ static void ui_input(void)
         ui_message("STOP TO RECORD");
     } else if (song_punch_on() && rec) {
         ui_message("FX EDITOR");
+    } else if (rec == BT_TAP && sections_page()) {
+        sec_rec_tap();                                  /* SECTIONS: SONG REC */
     } else if (rec == BT_TAP) {
         rec_tap();
     } else if (rec == BT_HOLD) {
@@ -2483,7 +2495,7 @@ static void ui_input(void)
         step_history_end();
         if (chain_busy()) ui_message("STOP TO UNDO");
         else if (dir == 3u) ui_message("USE ONE OCT BUTTON");
-        else if (!ui.home && cur_page()->graph == GR_SONG) song_edit_history(edit_oct && dir == 2u);
+        else if (!ui.home && (cur_page()->graph == GR_SONG || cur_page()->graph == GR_SECTIONS)) song_edit_history(edit_oct && dir == 2u);
         else if (edit_oct) {
             if (step_page()) {
                 if (!step_history_apply(dir == 2u)) ui_message(dir == 2u ? "NOTHING TO REDO" : "NOTHING TO UNDO");
@@ -2601,6 +2613,8 @@ static void ui_input(void)
                 transport_req = 2;
             else if (!ui.home && cur_page()->graph == GR_SONG)
                 chain_play_ui();
+            else if (sections_page())
+                sections_play();
             else
                 transport_req = 1;
             break;
@@ -2719,9 +2733,10 @@ static void ui_input(void)
     if (notes && slice_page_on())                       /* SLICES: a key picks the slice it plays */
         slice_keys_pick(notes);
 #endif
+    sections_keys(bank_notes);                          /* SECTIONS: A..H on the white keys */
     pattern_keys(bank_notes);
     song.grid = (uint8_t)keys_mode();                 /* a pattern key can arm REC: play from this frame */
-    if (pattern_keys_on() || ui.pat_key) {
+    if (pattern_keys_on() || ui.pat_key || sections_keys_on() || scs.key) {
         seq_midi_events(0);
     } else if (song.grid) {
         if (!seq_erase_active(TSEL)) grid_keys(notes);

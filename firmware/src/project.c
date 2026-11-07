@@ -939,7 +939,7 @@ static int project_restore_runtime(const project_t *input)
     seq_stop();
     fx_clear_all();
     transport_req = 0;
-    pattern_init();
+    pattern_init(); sec_reset();
     memcpy(recording, p->recording, sizeof recording);
     for (k = 0; k < PROJ_TRK; k++) (*drum_patch_of(k)) = p->drum[k];
     recording_reindex();
@@ -1327,7 +1327,7 @@ static void project_new_blank(void)
         kept[k] = song.g[GLO_KEPT[k]];
     fm1_irq_off();
     chain_defaults(&chain_config);
-    pattern_init();
+    pattern_init(); sec_reset();
     fm1_irq_on();
     for (i = 0; i < G_COUNT; i++)
         song.g[i] = GP[i].def;

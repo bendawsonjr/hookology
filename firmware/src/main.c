@@ -174,7 +174,7 @@ static void melodee_init(void)
     midi_insert_init();
     punch_reset();
     chain_defaults(&chain_config);
-    pattern_init();
+    pattern_init(); sec_reset();
     for (i = 0; i < G_COUNT; i++)
         song.g[i] = GP[i].def;
     undo_depth++;                             /* (no undo copy of the power-on loads) */
