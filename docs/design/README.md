@@ -283,6 +283,10 @@ place status cards over knobs, lists, waveforms, or notes.
 - **Screens with their own headers:** while waiting, use the shared transport header; restore the screen's header
   on start, cancel, or a change to a track that is not waiting. Dialogs and pickers retain the header above them.
 
+- **`LOAD` / `OVER` (2026-11-06):** while a song plays on HOME, `LOAD 87%` (or `87%`) shows the worst audio half of the last second or two, in
+  the optional context's place. At 100% or more `OVER` replaces the title in REC colour. State: `load_percent()`; priority: below
+  `ERASING`, `WAIT LOOP` and the free-take states, above action feedback's title. It warns and limits nothing.
+
 - **`HOST` (USB HOST, 2026-10-21):** the USB-C port is a USB-MIDI host (menu USB HOST). State: `uh.on`; lifetime: from
   switching USB HOST on to switching it off (or a power-cycle: it is never saved); priority: normal context, below
   `ERASING`, `WAIT LOOP` and messages; label `HOST` in the compact label font left of the page name and the

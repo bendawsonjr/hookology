@@ -21,7 +21,7 @@
 #endif
 #define NROWS 4                  /* tracks a screen shows, a new project starts with, and motion keeps (2 bits): 1..4 */
 #ifndef VBUDGET
-#define VBUDGET (MELODEE_RAM_AUDIO ? 18u : 16u) /* shared weighted voices; RAM profile uses 18 with CPU1 online
+#define VBUDGET (MELODEE_RAM_AUDIO ? 19u : 16u) /* shared weighted voices; RAM profile uses 18 with CPU1 online
                                                  * at 360 MHz (voice.c voice_budget: scaled with a kept 320) */
 #endif
 #ifndef MELODEE_ADMISSION

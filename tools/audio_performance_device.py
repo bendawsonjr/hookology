@@ -98,7 +98,7 @@ def stats(d,reset=False):
 
 def setup(d,categories,voices,variant):
     d.silence()
-    previous=getattr(d,'performance_categories',[None]*4)
+    previous=getattr(d,'performance_categories',[None]*len(categories))
     for p,c in enumerate(categories):
         if previous[p]==c:
             if c==0:
@@ -111,8 +111,9 @@ def setup(d,categories,voices,variant):
             elif c==3:d.params(p,dict(P_E0=variant&1,P_E2=(1,5,6)[variant%3]))
             continue
         # Track selection ignores tracks not in use; never load into another track.
+        # The reply names at most track 4 (the web editor's), so tracks 5 and 6 are checked by their sounding voices.
         r=d.request(27,[p])
-        if not r or r[0]!=p:raise RuntimeError(f'Track {p+1} is not in use; screening needs all four tracks')
+        if not r or r[0]!=min(p,3):raise RuntimeError(f'Track {p+1} is not in use; load a project with every track in use')
         r=d.request(8,[ENGINES[c],PRESETS[c]])
         if r[:2]!=[ENGINES[c],PRESETS[c]]:raise RuntimeError(f'Preset rejected: {p}/{c}')
         common=dict(P_VOICE=0,P_LEVEL=getattr(d,'performance_track_level',35),P_ALLOC=0,P_MUTE=0,P_GLIDE=0,P_AMODE=0,P_QUANT=0,P_CHRD=0,P_TRANS=0,P_SPRD=0,

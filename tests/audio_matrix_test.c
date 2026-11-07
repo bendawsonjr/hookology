@@ -9,6 +9,7 @@ static const uint8_t matrix_engines[6]={ENGI_PROPHET,ENGI_FM6,ENGI_CZ,3,ENGI_DRU
 static uint64_t matrix_hash;
 static void matrix_setup(const uint32_t cat[4],uint32_t variant)
 {
+    settings_budget=19;                                 /* (the resident build's budget) */
     memset(trk,0,sizeof trk);trk_voices_bind();memset(&song,0,sizeof song);eng_state_reset();
     memset(fm6_eff,0,sizeof fm6_eff);memset(p5_ready,0,sizeof p5_ready);cz_init();
     memset(mix_cache,0,sizeof mix_cache);memset(&mod,0,sizeof mod);memset(fx_state,0,sizeof fx_state);

@@ -541,14 +541,14 @@ static int chk_retrigger_budget(char *msg, uint32_t n)
                 old = &trk[0].v[i];
         trk_note_off(&trk[0], 52);
         trk_note_on(&trk[3], 79, 100);
-        bad += !old || old->stage != 4u || voices_busy() != NVOICE;
+        bad += !old || old->stage != 4u || (voices_busy() / VOICE_SCALE) != NVOICE;
         /* Same pitch, then a new pitch with all four local VOICE slots still active. */
         trk_note_on(&trk[0], round ? 57u : 52u, 100);
-        i = voices_busy();
+        i = (voices_busy() / VOICE_SCALE);
         worst = i > worst ? i : worst;
         bad += i != NVOICE;
         blk();
-        bad += voices_busy() != NVOICE || !trk[2].v[0].gate || !trk[3].v[0].gate;
+        bad += (voices_busy() / VOICE_SCALE) != NVOICE || !trk[2].v[0].gate || !trk[3].v[0].gate;
         for (p = 0; p < NROWS; p++)
             trk_all_off(&trk[p]);
         for (i = 0; i < 4u * FS / CTL && !parts_free(); i++)
@@ -587,17 +587,17 @@ static int chk_cap_mode_budget(char *msg, uint32_t n)
         }
         for (p = 1; p < NROWS; p++) {
             trk_note_on(&trk[p], 70u + p * 3u, 100);
-            i = voices_busy();
+            i = (voices_busy() / VOICE_SCALE);
             worst = i > worst ? i : worst;
             bad += i > NVOICE || !trk[0].v[0].gate || trk[0].v[0].note != 48u;
         }
         trk[1].p[P_VOICE] = V_POLY;
         trk_note_on(&trk[1], 84, 100);
-        i = voices_busy();
+        i = (voices_busy() / VOICE_SCALE);
         worst = i > worst ? i : worst;
         bad += i > NVOICE || !trk[0].v[0].gate;
         blk();
-        bad += voices_busy() > NVOICE || !trk[0].v[0].gate;
+        bad += (voices_busy() / VOICE_SCALE) > NVOICE || !trk[0].v[0].gate;
         for (p = 1; p < NROWS; p++)
             bad += !trk[p].v[0].gate;
         for (p = 0; p < NROWS; p++)
@@ -629,14 +629,14 @@ static int chk_mode_budget(char *msg, uint32_t n)
                 trk_note_on(&trk[0], 48, 100);
             else
                 for (i = 0; i < NVOICE; i++) trk_note_on(&trk[0], 48u + 2u * i, 100);
-            bad += voices_busy() != NVOICE;
+            bad += (voices_busy() / VOICE_SCALE) != NVOICE;
             trk[0].p[P_VOICE] = (int16_t)mode;
             for (p = 1; p < NROWS; p++) {
                 trk_note_on(&trk[p], 72u + p, 100);
-                bad += voices_busy() > NVOICE || !trk[0].v[0].gate || !trk[p].v[0].gate;
+                bad += (voices_busy() / VOICE_SCALE) > NVOICE || !trk[0].v[0].gate || !trk[p].v[0].gate;
             }
             blk();
-            bad += voices_busy() > NVOICE;
+            bad += (voices_busy() / VOICE_SCALE) > NVOICE;
             for (p = 0; p < NROWS; p++) trk_all_off(&trk[p]);
         }
     snprintf(msg, n, "POLY / UNISON chord -> MONO / LEGATO / UNISON: extra voices reclaimed, leads kept, budget %u", NVOICE);
@@ -679,7 +679,7 @@ static int chk_mode_release(char *msg, uint32_t n)
                     trk[0].p[P_VOICE] = (int16_t)to;
                     trk_note_off(&trk[0], order ? 60u : 64u);
                     trk_note_off(&trk[0], order ? 64u : 60u);
-                    bad += mode_release_gates() != 0 || trk[0].nmono != 0 || voices_busy() > VBUDGET;
+                    bad += mode_release_gates() != 0 || trk[0].nmono != 0 || (voices_busy() / VOICE_SCALE) > VBUDGET;
                     for (i = 0; i < FS / CTL && !parts_free(); i++) blk();
                     bad += !parts_free();
                     cases++;
@@ -714,7 +714,7 @@ static int chk_mode_release(char *msg, uint32_t n)
             trk_note_off(&trk[0], lead);
             bad += mode_release_gates() != want || trk[0].v[0].note != 76u || trk[0].mono_note != 76u;
             trk_note_off(&trk[0], 76);
-            bad += mode_release_gates() != 0 || trk[0].nmono != 0 || voices_busy() > VBUDGET;
+            bad += mode_release_gates() != 0 || trk[0].nmono != 0 || (voices_busy() / VOICE_SCALE) > VBUDGET;
             cases++;
         }
     }
@@ -965,6 +965,8 @@ static job_t *add(uint32_t kind, const char *name)
 
 int main(int argc, char **argv)
 {
+    settings_vpoints[1] = settings_vpoints[4] = 2;   /* CZ, DRUM: these checks fill a budget of 16 two-point voices */
+    settings_vpoints[1] = settings_vpoints[4] = 2;   /* CZ, DRUM: the allocation checks fill a budget of 16 two-point voices */
     const char *gpath = argc > 1 ? argv[1] : "tests/golden.txt";
     const char *cpath = argc > 2 ? argv[2] : "tests/cpu_baseline.txt";
     int gupd = getenv("GOLDEN_UPDATE") != 0, cupd = getenv("BUDGET_UPDATE") != 0, verbose = getenv("VERBOSE") != 0;

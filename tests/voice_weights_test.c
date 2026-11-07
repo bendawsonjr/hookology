@@ -6,11 +6,14 @@
 #include "ui_test.c"
 
 static const uint8_t kinds[VOICE_KINDS] = {ENGI_PROPHET, ENGI_CZ, ENGI_FM6, 3u /* SID */, 10u /* DRUM */};
-/* The rule before GLO > WEIGHTS (admission off): what AUTO must keep. */
+/* The measured FM-1 costs (admission off): what AUTO must keep. */
 static uint32_t builtin(const track_t *t)
 {
     const engine_t *e = ENGINES[t->engine];
-    return e->units ? e->units(t) : trk_nvoice(t) > NPOLY ? 1u : 2u;
+    if (e == &ENG_FM6) return 4u;
+    if (e == &ENG_CZ || e == &ENG_SID) return 6u;
+    if (e == &ENG_DRUM) return drum_is909(t) ? 5u : drum_isone(t) ? 6u : 3u;
+    return e->units(t);
 }
 static uint32_t sounding(const track_t *t)
 {
@@ -41,9 +44,9 @@ int main(void)
         ok &= voice_units(&trk[0]) == auto_units;
         for (int16_t pts = 1; pts <= 15; pts++) {
             settings_vpoints[k] = pts;
-            ok &= voice_units(&trk[0]) == (uint32_t)pts;
+            ok &= voice_units(&trk[0]) == (uint32_t)pts * VOICE_SCALE;
             settings_vpoints[(k + 1u) % VOICE_KINDS] = 9;      /* another engine's weight never applies here */
-            ok &= voice_units(&trk[0]) == (uint32_t)pts;
+            ok &= voice_units(&trk[0]) == (uint32_t)pts * VOICE_SCALE;
             settings_vpoints[(k + 1u) % VOICE_KINDS] = 0;
         }
         settings_vpoints[k] = 0;
@@ -60,7 +63,7 @@ int main(void)
     for (uint32_t i = 0; i < NVOICE; i++) memset(&trk[0].v[i], 0, sizeof trk[0].v[i]);
     settings_vpoints[0] = 1;
     trk_note_on(&trk[0], 60, 100); trk_note_on(&trk[0], 64, 100); trk_note_on(&trk[0], 67, 100);
-    ok &= sounding(&trk[0]) == 3u && voices_busy() == 3u;
+    ok &= sounding(&trk[0]) == 3u && voices_busy() == 3u * VOICE_SCALE;
     bad += check("BUDGET 16: Prophet at 8 points sounds two voices of a triad, at 1 point all three", ok);
     for (uint32_t i = 0; i < NVOICE; i++) memset(&trk[0].v[i], 0, sizeof trk[0].v[i]);
 

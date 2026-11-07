@@ -7,13 +7,13 @@
  *
  * Each synth part has its own NVOICE voices (so MONO / LEGATO / UNISON keep using
  * v[0..]; POLY uses the engine's cap, NPOLY or FM6's 16), but the parts' sounding voices
- * share a weighted budget (voice_budget: normally 16, resident audio with CPU1
- * online 18 at 360 MHz, scaled with the clock running; FM6 takes one unit,
- * ordinary engines two, serial Prophet three).
+ * share a budget of measured FM-1 cost (voice_units, voice_budget: one unit is about 25 us
+ * of a half; a shared effect takes its own cost off the budget).
  * A part that starts
  * a voice while the budget is full takes one from any part (voice_victim): the oldest
- * released voice, else the oldest extra UNISON voice, else the oldest held voice of a
- * POLY part that is not its lowest note. A voice taken from another part fades out
+ * released voice, else the oldest extra UNISON voice, else the highest note of the
+ * fullest chord (voice_refused: the new note itself, when it would be that note).
+ * A track's lowest note and a single-note track are kept. A voice taken from another part fades out
  * over one block (stage 4: the envelope goes to 0, the block's amplitude ramp
  * declicks it); one of the part's own is restarted in place, as before. Extra UNISON
  * voices only start when there is room. */
@@ -129,13 +129,16 @@ static uint32_t voice_p5_parts(void)
     return parts;
 }
 #endif
+/* Budget units: one is about 25 us of a half at 360 MHz, from six-track runs on an FM-1 (2026-11-06, about 225 us a
+ * Prophet voice). BUDGET and the WEIGHTS points stay coarse, four units each. */
+#define VOICE_SCALE (MELODEE_ADMISSION ? 1u : 4u)
 static uint32_t voice_units(const track_t *t)
 {
     const engine_t *e = ENGINES[t->engine];
     /* GLO > WEIGHTS: the player's points per voice replace the built-in rule; AUTO (0) keeps it. */
     int k = e == &ENG_P5_TEST ? 0 : e == &ENG_CZ ? 1 : e == &ENG_FM6 ? 2 : e == &ENG_SID ? 3 : e == &ENG_DRUM ? 4 : -1;
     if (k >= 0 && settings_vpoints[k] > 0)
-        return (uint32_t)settings_vpoints[k];
+        return (uint32_t)settings_vpoints[k] * VOICE_SCALE;
 #if MELODEE_ADMISSION
     if(e==&ENG_P5_TEST){
         return voice_p5_parts()>1u?4u:3u;
@@ -143,17 +146,43 @@ static uint32_t voice_units(const track_t *t)
     if(e==&ENG_CZ)return 3u;
     if(e==&ENG_FM6 || e==&ENG_SID || e==&ENG_DRUM)return 2u;
 #endif
-    return e->units ? e->units(t) : trk_nvoice(t) > NPOLY ? 1u : 2u;
+#if !MELODEE_ADMISSION
+    if (k == 1 || k == 3) return 6u;                    /* CZ, SID: 140 to 160 us */
+    if (k == 2) return 4u;                              /* FM6: 80 to 130 us */
+    if (k == 4) return drum_is909(t) ? 5u : drum_isone(t) ? 6u : 3u;   /* 909 120 us, a kit on one voice 150, 808 65 */
+#endif
+    return e->units ? e->units(t) : VOICE_SCALE * (trk_nvoice(t) > NPOLY ? 1u : 2u);
+}
+
+/* A shared effect's cost in units, off the budget: about 200 us, REVERB 377 */
+static uint32_t voice_fx_units(void)
+{
+#if MELODEE_ADMISSION
+    return 0;
+#else
+    uint32_t u = 0;
+    for (uint32_t k = 0; k < FX_SLOTS; k++) {
+        int32_t type = song.g[G_MFXTYPE + k * FX_PARAMS];
+        u += type == FX_REVERB ? 15u : type != FX_OFF ? 8u : 0u;
+    }
+    return u;
+#endif
 }
 
 /* the budget with CPU1: VBUDGET at 360 MHz, scaled with the clock running by main.c clock_boot (16 at a 320 MHz a
  * soft reset kept from a 1.3.x session); VBUDGET on the host */
 static uint32_t vbudget_cpu1 = VBUDGET;
+static uint32_t voice_budget_points(void);
 static uint32_t voice_budget(void)
 {
 #if MELODEE_AUDIO_BENCH
-    if(audio_bench_active())return NPART*NVOICE*3u;
+    if(audio_bench_active())return NPART*NVOICE*13u;
 #endif
+    uint32_t b = voice_budget_points() * VOICE_SCALE, fx = voice_fx_units();
+    return b > fx + 16u ? b - fx : 16u;                 /* (an effect never leaves too little for a note on each track) */
+}
+static uint32_t voice_budget_points(void)
+{
 #if MELODEE_RAM_AUDIO
 #if MELODEE_DUAL_CORE
     /* CPU1 retirement removes the extra headroom. New notes then use the
@@ -188,12 +217,40 @@ static uint32_t lowest_held(const track_t *t)           /* index of the lowest h
     return low;
 }
 
+/* the fullest chord: the POLY part with the most held notes (two at least, not hits); *top its highest. NPART = none */
+static uint32_t voice_fullest(uint32_t *top)
+{
+    uint32_t p, i, full = NPART, most = 1u;
+    for (p = 0; p < NPART; p++) {
+        const track_t *t = &trk[p];
+        uint32_t n = 0, high = NVOICE;
+        if (trk_vmode(t) != V_POLY || ENGINES[t->engine]->oneshot)
+            continue;
+        for (i = 0; i < NVOICE; i++) {
+            const voice_t *v = &t->v[i];
+            if (!v->active || !v->gate || v->stage == 4u)
+                continue;
+            n++;
+            if (high == NVOICE || v->note > t->v[high].note)
+                high = i;
+        }
+        if (n > most) {
+            most = n;
+            full = p;
+            *top = high;
+        }
+    }
+    return full;
+}
+
 /* the voice to give up for a new one (see the top); soft: only released voices and
  * extra voices of other non-POLY parts (also ones left after a mode change).
  * Returns its index, *pp its part; NVOICE = none */
 static uint32_t voice_victim(const track_t *self, int soft, track_t **pp)
 {
-    uint32_t p, i, best = NVOICE, cat = 4;
+    uint32_t p, i, best = NVOICE, cat = 5, full = NPART, top = NVOICE;
+    if (!soft)
+        full = voice_fullest(&top);
     for (p = 0; p < NPART; p++) {
         track_t *t = &trk[p];
         uint32_t mode = trk_vmode(t);
@@ -210,7 +267,7 @@ static uint32_t voice_victim(const track_t *self, int soft, track_t **pp)
             else if (mode != V_POLY && i > 0)
                 c = 2;                                  /* extra UNISON, or a voice left by a mode / cap change */
             else if (!soft && mode == V_POLY && i != low)
-                c = 3;                                  /* held, not the bass */
+                c = p == full && i == top ? 3u : 4u;    /* the top of the fullest chord, else any held but the bass */
             else
                 continue;
             if (c < cat || (c == cat && v->age < (*pp)->v[best].age)) {
@@ -223,6 +280,24 @@ static uint32_t voice_victim(const track_t *self, int soft, track_t **pp)
     return best;
 }
 
+/* LOAD on HOME: the worst half of the last second or two, in % of its time. Real timing, so it is right for any sound. */
+#define LOAD_HALVES 345u                                /* a second of halves */
+static uint8_t load_window, load_previous;
+static uint16_t load_halves;
+static void load_note(uint32_t percent)                 /* the audio interrupt, each half */
+{
+    percent = percent > 199u ? 199u : percent;
+    if (percent > load_window)
+        load_window = (uint8_t)percent;
+    if (++load_halves >= LOAD_HALVES) {
+        load_halves = 0;
+        load_previous = load_window;
+        load_window = 0;
+    }
+}
+static uint32_t load_percent(void) { return load_window > load_previous ? load_window : load_previous; }
+
+static uint32_t voice_refusals;                         /* notes of a full chord not started: console, hostsim */
 static uint32_t voice_kills;                            /* voices given up (budget, overload): console, hostsim */
 static uint32_t voice_kills_part[NPART];                /* identify the audible victim, not only total load */
 static void voice_kill(voice_t *v)                      /* fade out over the next block (env_tick stage 4) */
@@ -259,6 +334,32 @@ static voice_t *voice_reuse(track_t *t, voice_t *v)
     if (v->stage == 4u)
         voice_room(t, 0);                               /* its budget was taken before this block */
     return v;
+}
+
+/* The budget is full, no tail is left to take, and this note would be the top of the fullest chord: it does not start.
+ * A note of a chord the budget has room for always starts, so a chord loses its top only under a real limit. */
+static int voice_refused(track_t *t, uint32_t note)
+{
+    uint32_t i, top = NVOICE;
+    track_t *vp = 0;
+    if (ENGINES[t->engine]->oneshot || voices_busy() + voice_units(t) <= voice_budget())
+        return 0;
+    for (i = 0; i < NVOICE; i++)
+        if (t->v[i].active && t->v[i].stage != 4u && t->v[i].note == note)
+            return 0;                                   /* a retrigger takes no new room */
+    if (voice_fullest(&top) != (uint32_t)(t - trk) || note < t->v[top].note)
+        return 0;
+    while (voices_busy() + voice_units(t) > voice_budget()) {
+        i = voice_victim(t, 0, &vp);
+        if (i < NVOICE && vp == t && vp->v[i].gate) {
+            voice_refusals++;                           /* no tail left, only this chord: its new top waits out */
+            return 1;
+        }
+        if (i >= NVOICE)
+            return 0;
+        voice_capacity_kill(&vp->v[i]);                 /* a tail goes first */
+    }
+    return 0;
 }
 
 /* POLY allocation (within the engine's voice cap). DRUM: reuse its lane; other engines: the same note.
@@ -519,6 +620,8 @@ static void trk_note_on_work(track_t *t, uint32_t note, uint32_t vel)
         t->lfo_fade = 0;
     }
     if (mode == V_POLY) {
+        if (voice_refused(t, note))
+            return;
         AP_START(alloc_start);voice_t *v = voice_alloc(t, note);AP_END(AP_ALLOC,alloc_start);
         if (!trk_chord(t) || !any)
             t->nmono = 0;                               /* no stale mono stack after a mode change */
@@ -544,7 +647,7 @@ static void trk_note_on_work(track_t *t, uint32_t note, uint32_t vel)
     }
 }
 
-static void trk_note_on_engine(track_t *t,uint32_t note,uint32_t vel)
+static void trk_note_on_now(track_t *t,uint32_t note,uint32_t vel)
 {
 #if MELODEE_ADMISSION
     const track_t *previous=voice_admitting;uint8_t previous_parts=voice_admitting_p5parts;
@@ -557,9 +660,66 @@ static void trk_note_on_engine(track_t *t,uint32_t note,uint32_t vel)
 #endif
 }
 
+/* Note pacing. Starting notes is CPU0's work and cannot be shared with CPU1, so a downbeat of many tracks spikes one
+ * half past its deadline (324 to 576 us on an FM-1, against 33 on average). While the FM-1 is busy a half starts at most
+ * PACE_HALF melodic notes and the rest follow in the next halves, in order: a big downbeat's last notes come 3 to 9 ms
+ * late. Drums start at once, for the groove, in the place the allowance leaves them (their hits on top of three notes
+ * were the last spikes past the deadline). A light song is never paced, so its timing stays exact. */
+#define PACE_QUEUE 16u
+#define PACE_HALF 2u
+#define PACE_BUSY_Q8 128u                               /* song.cpu_q8: 50 % (a busy song averages 60 to 67: it spikes all the same) */
+#define PACE_BLOCKS (HALF_FRAMES / CTL)
+static struct { uint8_t track, note, vel; } pace_q[PACE_QUEUE];
+static uint8_t pace_n, pace_used, pace_block;
+static uint32_t pace_late;                              /* notes paced: console, hostsim */
+static void pace_remove(uint32_t k)
+{
+    for (pace_n--; k < pace_n; k++)
+        pace_q[k] = pace_q[k + 1u];
+}
+static void trk_note_on_engine(track_t *t,uint32_t note,uint32_t vel)
+{
+    uint32_t tr = (uint32_t)(t - trk), mine = 0;
+    for (uint32_t k = 0; k < pace_n; k++)
+        mine |= pace_q[k].track == tr;                  /* a track's notes stay in order */
+    if (ENGINES[t->engine] != &ENG_DRUM && pace_n < PACE_QUEUE &&
+        (mine || (song.cpu_q8 >= PACE_BUSY_Q8 && pace_used >= PACE_HALF))) {
+        pace_q[pace_n].track = (uint8_t)tr;
+        pace_q[pace_n].note = (uint8_t)note;
+        pace_q[pace_n++].vel = (uint8_t)vel;
+        pace_late++;
+        return;
+    }
+    if (pace_used < 255u)
+        pace_used++;
+    trk_note_on_now(t, note, vel);
+}
+/* each block, before the sequencer: a new half's allowance, the waiting notes first */
+static void pace_tick(void)
+{
+    if (++pace_block >= PACE_BLOCKS) {
+        pace_block = 0;
+        pace_used = 0;
+    }
+    while (pace_n && pace_used < PACE_HALF) {
+        track_t *t = &trk[pace_q[0].track];
+        uint32_t note = pace_q[0].note, vel = pace_q[0].vel;
+        pace_remove(0);
+        pace_used++;
+        trk_note_on_now(t, note, vel);
+    }
+}
+static void pace_forget(const track_t *t, int all, uint32_t note)
+{
+    for (uint32_t k = pace_n; k--;)
+        if (pace_q[k].track == (uint32_t)(t - trk) && (all || pace_q[k].note == note))
+            pace_remove(k);
+}
+
 static void trk_note_off_engine(track_t *t, uint32_t note)
 {
     uint32_t i, k = 0, mode = trk_vmode(t), chord = trk_chord(t), held = 0;
+    pace_forget(t, 0, note);                            /* a note not started yet never starts */
     for (i = 0; i < t->xp_n; i++)                       /* not sounding yet (engine switch): forget it */
         if (t->xp_note[i] != note) {
             t->xp_note[k] = t->xp_note[i];
@@ -610,6 +770,7 @@ static void trk_note_off(track_t *t, uint32_t note)
 
 static void trk_all_off(track_t *t)
 {
+    pace_forget(t, 1, 0u);
     midi_track_all_off(t);
     midi_insert_cancel((uint32_t)(t - trk));
     memset(midi_insert.held[t-trk], 0, sizeof midi_insert.held[0]);

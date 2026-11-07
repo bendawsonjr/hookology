@@ -274,7 +274,7 @@ static void draw_head(void)
 #endif
     int32_t x;
     uint32_t low = !(usb.config && !usb.suspended) && batt_level() <= 1, msg = ui.msg_t || ui.layer || song_edit_status()[0];
-    uint32_t sig, moved = 0;
+    uint32_t sig, moved = 0, load = ui.home && song.playing ? load_percent() : 0u;
     int16_t bpm = song.g[G_BPM];                        /* (read once: what is noted is what is drawn) */
     int32_t octave = input_octave(TSEL);
     head_chip_text(chip);
@@ -288,6 +288,7 @@ static void draw_head(void)
 #if MELODEE_USB_HOST
     sig += uh.on ? (1u + uh.run) * 6151u : 0u;          /* the HOST tag: waiting, or a controller connected */
 #endif
+    sig += load * 2147483u;
     if (bpm != ui.roll_bpm) {
         char a[8];
         fmt_int(a, ui.roll_bpm);
@@ -326,6 +327,8 @@ static void draw_head(void)
         cv_text_r(236, ty_y(H_HEAD / 2, TY_TX), TY_TX, "WAIT LOOP", T_REC, T_BG);
     } else if (ft_on || ft_ready) {
         cv_text_r(236, ty_y(H_HEAD / 2, TY_TX), TY_TX, ft_on ? "FREE TAKE" : "PLAY FREE", T_REC, T_BG);
+    } else if (load >= 100u && !msg) {                  /* past the deadline: a status, in the title's place */
+        cv_text_r(236, ty_y(H_HEAD / 2, TY_TX), TY_TX, "OVER", T_REC, T_BG);
 #if MELODEE_BLE
     } else if (ble_text[0] && (!msg || mel_ble_code() != BLE_NO_PASSKEY)) {
         const aafont_t *f = ty_fit(TY_TX, ble_text, 236 - x - 6);
@@ -383,7 +386,17 @@ static void draw_head(void)
             if (x + 2 + text_w(TY_LB, b) + 6 <= 236 - cw - (low ? 22 : 0) - hw - 6)
                 x = cv_text_on(x + 2, ty_y(H_HEAD / 2, TY_LB), TY_LB, b, T_MID, T_BG) + 6;
         }
-        if (!ui.home) {                                 /* a page: where it is in its family */
+        if (load) {                                     /* HOME while playing: the worst load just now, where there is room */
+            str_cpy(b, "LOAD ", 8);
+            fmt_int(b + 5, (int32_t)load);
+            str_cpy(b + str_len(b), "%", 2);
+            if (x + 6 + text_w(TY_LB, b) > 236 - cw - (low ? 22 : 0) - hw - 6) {
+                fmt_int(b, (int32_t)load);
+                str_cpy(b + str_len(b), "%", 2);
+            }
+            if (x + 6 + text_w(TY_LB, b) <= 236 - cw - (low ? 22 : 0) - hw - 6)
+                cv_text_on(x + 6, ty_y(H_HEAD / 2, TY_LB), TY_LB, b, T_MID, T_BG);
+        } else if (!ui.home) {                          /* a page: where it is in its family */
             head_pages(x + 6, 236 - cw - (low ? 22 : 0) - hw);
         } else if (x + 6 + 40 <= 236 - cw - (low ? 22 : 0) - hw - 6) {   /* HOME: its pages, where there is room */
             static const uint8_t ORDER[3] = {HP_TRACKS, HP_STAGE, HP_VIEW};

@@ -1387,6 +1387,7 @@ static void seq_advance(uint32_t n)
 /* everything that happens between two rendered blocks */
 static void events_block(uint32_t n)
 {
+    pace_tick();
     chord_auto_tick(n);
     ft_block();
     seq_advanced = 0;

@@ -54,7 +54,7 @@ int main(int argc,char **argv)
     undo.keep=0;load_begin(t,UNDO_SOUND);q=p;q.raw[97]^=255;p5_patch[0]=q;load_end(t);undo_swap();bad+=check("sound undo restores opaque Prophet bytes",!memcmp(p5_patch_of(t),&p,sizeof p));undo_step(1);bad+=check("sound redo restores the second complete Prophet program",!memcmp(p5_patch_of(t),&q,sizeof q));
     bad+=check("erasing P128 clears its star and track origin",!native_put(ENGI_PROPHET,127,0)&&!favorite_has(USER_NATIVE_P5,127)&&!t->user);
     host_preset(t,ENGI_PROPHET,0);p5_patch_t *live=p5_patch_of(t);live->raw[P5_UNISON]=1;live->raw[P5_UNISON_COUNT]=5;p5_track_accept(t);trk_note_on(t,60,100);
-    bad+=check("native unison allocates five voices within the shared budget",p5_active(t)==5&&voices_busy()<=VBUDGET);panic_req|=1u;events_block(CTL);
+    bad+=check("native unison allocates five voices within the shared budget",p5_active(t)==5&&voices_busy()<=voice_budget());panic_req|=1u;events_block(CTL);
     live->raw[P5_UNISON]=0;live->raw[P5_GLIDE]=120;p5_track_accept(t);trk_note_on(t,48,100);p5_tick(t,2);trk_note_off(t,48);trk_note_on(t,72,100);p5_tick(t,2);voice_t *v=0;for(uint32_t k=0;k<NVOICE;k++)if(t->v[k].gate)v=&t->v[k];
     bad+=check("native poly glide begins between the preceding and target pitches",v&&p5_voice(t,v)->glide_pitch>48*16&&p5_voice(t,v)->glide_pitch<72*16);
     live->raw[P5_GLIDE]=0;p5_tick(t,80);bad+=check("matrix ENV source follows the native amplifier envelope",v&&p5_env_source(t,v)>0);panic_req|=1u;events_block(CTL);

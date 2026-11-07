@@ -83,6 +83,7 @@ static uint32_t shed_part[NPART];
  * both; shed after 2 overloaded halves in a row (out of line: keeps the ISR's render loops as they were) */
 static __attribute__((noinline)) uint32_t shed_check(uint32_t all)
 {
+    load_note(all / ((HALF_FRAMES * 1000000u / FS) * FM1_TICKS_PER_US / 100u));
     shed_over = (uint8_t)(shed_over << 1 | (all > SHED_TICKS));
     shed_hot = (uint8_t)(shed_hot << 1 | (all > SHED_HELD_TICKS));
     if ((shed_over & 3u) == 3u && shed_req < SHED_TAIL)

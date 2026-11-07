@@ -456,6 +456,7 @@ static int steal_test(const char *dir)
         t->p[P_VOICE] = V_POLY;
         t->p[P_LEVEL] = 90;
     }
+    settings_vpoints[1] = 2;                       /* (the allocation under test, not the cost: 8 voices fill it) */
     kills0 = voice_kills;
     wav_hdr(w, frames);
     for (f = 0; f < frames; f += CTL) {
@@ -492,6 +493,7 @@ static int steal_test(const char *dir)
             bad++;
     }
     (void)prev;
+    settings_vpoints[1] = 0;
     printf("tracks: stealing across parts: %u voices taken; largest sample step at a take / before it: at most %.2f x "
            "(a hard cut: several x) %s\n", voice_kills - kills0, worst, nev >= 4u && !bad ? "ok" : "FAIL");
     free(L);

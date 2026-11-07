@@ -66,7 +66,7 @@ class Device:
             self.request(31,[track,params[key],v & 127,(v >> 7) & 127])
     def silence(self):
         self.outgoing.send(mido.Message('stop'))
-        for ch in range(4):
+        for ch in range(6):
             self.outgoing.send(mido.Message('control_change',channel=ch,control=64,value=0))
             self.outgoing.send(mido.Message('control_change',channel=ch,control=120,value=0))
         time.sleep(.3)

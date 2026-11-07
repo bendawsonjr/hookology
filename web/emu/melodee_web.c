@@ -9,6 +9,7 @@
 #include <stdint.h>
 #define main melodee_ui_test_main
 #include "ui_test.c"
+static uint32_t web_load_blocks;
 #undef main
 #undef __attribute__
 
@@ -119,6 +120,7 @@ static void tick(void)
         uint32_t i;
         owed -= 1000u * CTL;
         mix_block(o, CTL);
+        if (!(++web_load_blocks & 3u)) load_note(voices_busy() * 100u / voice_budget());   /* (no audio timing here: LOAD shows the budget, for the look) */
         for (i = 0; i < CTL; i++) {
             uint32_t r = (ring_w++ % RING) * 2u;
             ring[r] = (float)o[2u * i] / 65536.0f;       /* Q15, 6 dB down as audio.c sends it to the codec */

@@ -19,6 +19,8 @@ import time
 import zlib
 from pathlib import Path
 
+import mido
+
 from prophet_device import inventory, pack, param_ids, r32, u32, unpack
 from audio_performance_device import (ReliableDevice, metadata, run,
                                       DEADLINE_US)
@@ -27,6 +29,8 @@ from audio_cpu_sequence import build_fixture, run_sequence, require_disarmed
 from audio_cpu_take import take_spec, build_take, run_take, drum_channel
 
 MAX_RUNTIME_BYTES = 256 * 1024
+DK_SAMPLE = 9                                  # eng_drum.c
+AUDIO_FX = (1, 2, 3, 4, 5, 7, 8, 9, 12, 16, 17, 18, 19)   # core.h: the effects a shared slot can hold
 PREFERENCE_BYTES = 604
 
 
@@ -187,10 +191,21 @@ def configure_workload(d, categories, variant, notes):
     if d.cpu_drum_note is not None:
         notes = [(track, d.cpu_drum_note if categories[track] >= 4 else note)
                  for track, note in notes]
+    if getattr(d, 'cpu_sample_kit', False):
+        # The sampled kit plays every hit on one circuit: only one held lane.
+        for track, category in enumerate(categories):
+            if category >= 4:
+                d.params(track, dict(P_E0=DK_SAMPLE))
     return notes
 
 
 def control_updates(d, categories, notes, tick):
+    if getattr(d, 'cpu_retrigger', 0) and tick % d.cpu_retrigger == 0:
+        # Every track restarts at once: the attack peak of a shared downbeat.
+        for track, note in notes:
+            d.outgoing.send(mido.Message('note_off', channel=track, note=note))
+        for track, note in notes:
+            d.outgoing.send(mido.Message('note_on', channel=track, note=note, velocity=110))
     if d.cpu_event_bursts:
         from audio_performance_adversarial import events
         events(d, categories, notes, tick)
@@ -271,6 +286,9 @@ def main():
     p.add_argument('--variant', type=int, default=0)
     p.add_argument('--drum-note', type=int, help='Single GM circuit per active drum track; requires one voice per drum track')
     p.add_argument('--fx', action='store_true')
+    p.add_argument('--fx-type', type=int, default=9, help='shared effect with --fx: an FX index from core.h (9 Chorus)')
+    p.add_argument('--sample-kit', action='store_true', help='drum tracks use the sampled kit')
+    p.add_argument('--retrigger', type=int, default=0, metavar='TICKS', help='restart every note together each TICKS status reads (0 off)')
     p.add_argument('--modulation', action='store_true')
     p.add_argument('--modulation-routing', choices=('voice', 'engine'), default='voice')
     p.add_argument('--source-churn', action='store_true', help='Host-paced changes through all ten modulation sources')
@@ -291,14 +309,18 @@ def main():
     p.add_argument('--input-lateness-ms', type=float, default=3)
 
     a = p.parse_args()
-    if len(a.assignment) != 4 or any(c not in '012345' for c in a.assignment):
-        p.error('assignment: four category digits 0..5')
+    if len(a.assignment) not in (4, 6) or any(c not in '012345' for c in a.assignment):
+        p.error('assignment: four or six category digits 0..5')
     try:
         voices = list(map(int, a.voices.split(',')))
     except ValueError:
-        p.error('voices: four counts 0..16')
-    if len(voices) != 4 or any(v < 0 or v > 16 for v in voices) or (not sum(voices) and not a.recording_events):
-        p.error('voices: four counts 0..16, at least one sounding voice')
+        p.error('voices: one count 0..16 per track')
+    if len(voices) != len(a.assignment) or any(v < 0 or v > 16 for v in voices) or (not sum(voices) and not a.recording_events):
+        p.error('voices: one count 0..16 per track, at least one sounding voice')
+    if a.fx_type not in AUDIO_FX:
+        p.error('fx-type: a shared audio effect index')
+    if a.retrigger < 0 or (a.sample_kit and any(int(c) >= 4 and v > 1 for c, v in zip(a.assignment, voices))):
+        p.error('retrigger: 0 or more; sample-kit: one held voice on each drum track')
     if not math.isfinite(a.seconds) or a.seconds <= 0 or a.repeat < 1 or not 8 <= a.budget <= 32:
         p.error('seconds/repeat positive; budget 8..32')
     if a.seconds > 120:
@@ -368,12 +390,14 @@ def main():
         d.cpu_event_bursts = a.event_bursts
         d.cpu_source_churn = a.source_churn
         d.cpu_drum_note = a.drum_note
+        d.cpu_sample_kit = a.sample_kit
+        d.cpu_retrigger = a.retrigger
         d.cpu_sequence_bpm = a.sequence_bpm
         d.cpu_clock_jitter_ms = a.clock_jitter_ms
         d.cpu_sequence_clock = a.sequence_clock
-        if a.modulation or a.drum_note is not None:
+        if a.modulation or a.drum_note is not None or a.sample_kit:
             d.performance_patch_hook = configure_workload
-        if a.event_bursts or a.source_churn:
+        if a.event_bursts or a.source_churn or a.retrigger:
             d.performance_step_hook = control_updates
         (a.output/'run.json').write_text(json.dumps(dict(build=manifest, identity=identity,
             metadata=m, workload=vars(a), recording_fixture=fixture_info,
@@ -394,7 +418,7 @@ def main():
             if fixture is not None or plan:
                 values['G_BPM'] = round(a.sequence_bpm)
             if a.fx:
-                values.update(G_FXMODE=0, G_MFXTYPE=9, G_MFXMIX=127, G_MFXRATE=127, G_MFXCHAR=127, G_FXRETURN=127)
+                values.update(G_FXMODE=0, G_MFXTYPE=a.fx_type, G_MFXMIX=127, G_MFXRATE=127, G_MFXCHAR=127, G_FXRETURN=127)
             def apply_globals():
                 for key, value in values.items():
                     v = value+8192
