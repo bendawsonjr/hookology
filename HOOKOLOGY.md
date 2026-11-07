@@ -9,7 +9,7 @@ Custom firmware for the M-VAVE FM-1, built on [Melodee](https://github.com/kerem
 - **KIT SAMPLE:** an eight-sound acoustic drum kit with five presets. Hold OCT- or OCT+ on HOME for ghost or hard hits.
 - **REC MODE:** a menu setting. FREE lets a first take set the tempo and loop length. GRID, the default, records as Melodee always has.
 - **Six sound tracks (v1.1-beta):** tracks 5 and 6 are full sound tracks, and tracks 7 and 8 stay MIDI. A new project starts with four: use Add track for more. Turn ALGORITHM past track 4 for the second page of tracks. All six share the same 16 to 18 voices.
-- **SAFETY on by default:** when the FM-1 runs out of time it cuts the voices it judges least noticeable, so audio doesn't break up. On GLO > WEIGHTS 2.
+- **SAFETY on by default:** when the FM-1 nears its limit, GUARD fades the quietest release tails, starting at 80% load. Held notes go only in an emergency: 97% load for 8 audio blocks in a row, about 23 ms, with no tails left. On GLO > WEIGHTS 2, shown as GUARD.
 - **Bluetooth removed:** to make room. Build with `MELODEE_BLE=1` to bring it back.
 
 Everything else is Melodee, and its [manual](README.md) still applies, apart from what it says about Bluetooth. Hookology still uses Melodee's USB and MIDI names, so the update tools and recovery can find it, and your computer may show it as Melodee or Felucca.

@@ -27,6 +27,7 @@ COMPLETE_FIELDS=('audio_full_max_us','audio_full_last_us','audio_deadline_misses
                  'audio_batch_pairs','capacity_steals','admission_rejections','admission_enabled','fixed_voice_bench')
 STACK_FIELDS = ('stack_cpu0_user_peak', 'stack_cpu0_user_size', 'stack_cpu0_system_peak', 'stack_cpu0_system_size',
                 'stack_cpu1_user_peak', 'stack_cpu1_system_peak')
+PART_FIELDS_2 = tuple(f'track_{p}_{field}' for field in ('voices_shed', 'voices_given_up') for p in (5, 6))
 
 
 def snapshot(incoming, outgoing, window=False, voices=False, cores=False, memory=False, parts=False, complete=False, stacks=False):
@@ -42,11 +43,11 @@ def snapshot(incoming, outgoing, window=False, voices=False, cores=False, memory
                       5: FIELDS + VOICE_FIELDS + CORE_FIELDS + MEMORY_FIELDS,
                       6: FIELDS + VOICE_FIELDS + CORE_FIELDS + MEMORY_FIELDS + PART_FIELDS,
                       7: FIELDS + VOICE_FIELDS + CORE_FIELDS + MEMORY_FIELDS + PART_FIELDS + COMPLETE_FIELDS,
-                      8: FIELDS + VOICE_FIELDS + CORE_FIELDS + MEMORY_FIELDS + PART_FIELDS + COMPLETE_FIELDS + STACK_FIELDS}.get(data[0] if data else 0, ())
+                      9: FIELDS + VOICE_FIELDS + CORE_FIELDS + MEMORY_FIELDS + PART_FIELDS + COMPLETE_FIELDS + STACK_FIELDS + PART_FIELDS_2}.get(data[0] if data else 0, ())
             if not fields or len(data) != 1 + 5 * len(fields):
                 raise RuntimeError('Unsupported audio diagnostics schema')
-            if stacks and data[0] < 8:
-                raise RuntimeError('Stack high-water marks require AUDIO_STATS schema 8')
+            if stacks and data[0] < 9:
+                raise RuntimeError('Stack high-water marks require AUDIO_STATS schema 9')
             if complete and data[0]<7:
                 raise RuntimeError('Complete timing requires AUDIO_STATS schema 7')
             if cores and data[0] < 4:

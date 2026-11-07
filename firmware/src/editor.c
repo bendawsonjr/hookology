@@ -506,7 +506,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
 #if MELODEE_USB_AUDIO
     case ED_AUDIO_STATS: {                         /* flags: 1 resets maxima, 2 voices, 4 cores, 8 memory, 16 part victims,
                                                     * 32 complete timing, 64 stack high-water marks */
-        uint32_t snapshot[70] = {0}, k, count = na && (a[0] & 64u) ? 70u : na && (a[0] & 32u) ? 64u : na && (a[0] & 16u) ? 55u : na && (a[0] & 8u) ? 47u : na && (a[0] & 4u) ? 32u : na && (a[0] & 2u) ? 26u : 20u;
+        uint32_t snapshot[74] = {0}, k, count = na && (a[0] & 64u) ? 74u : na && (a[0] & 32u) ? 64u : na && (a[0] & 16u) ? 55u : na && (a[0] & 8u) ? 47u : na && (a[0] & 4u) ? 32u : na && (a[0] & 2u) ? 26u : 20u;
         fm1_irq_off();
         snapshot[0] = ua.play_alt;
         snapshot[1] = ua.cap_alt;
@@ -573,8 +573,8 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         }
         if (count >= 55u)
             for (uint32_t p = 0; p < NPART; p++) {
-                snapshot[47u+p] = shed_part[p];
-                snapshot[51u+p] = voice_kills_part[p];
+                snapshot[p < NROWS ? 47u+p : 70u+p-NROWS] = shed_part[p];    /* tracks 5, 6: appended */
+                snapshot[p < NROWS ? 51u+p : 72u+p-NROWS] = voice_kills_part[p];
             }
         if(count>=64u){
             /* Upper envelope includes measured C entry/exit and allows one
@@ -590,7 +590,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
 #endif
         }
 #ifdef FM1_IRQ_TARGET
-        if (count == 70u)
+        if (count == 74u)
             stack_report(snapshot + 64);           /* main.c */
 #endif
         if (na && (a[0] & 1u)) {
@@ -603,7 +603,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
 #endif
         }
         fm1_irq_on();
-        ed_b(count == 70u ? 8u : count == 64u ? 7u : count == 55u ? 6u : count == 47u ? 5u : count == 32u ? 4u : count == 26u ? 3u : 2u);
+        ed_b(count == 74u ? 9u : count == 64u ? 7u : count == 55u ? 6u : count == 47u ? 5u : count == 32u ? 4u : count == 26u ? 3u : 2u);
         for (i = 0; i < count; i++)
             for (k = 0; k < 5u; k++)
                 ed_b(snapshot[i] >> (7u * k));

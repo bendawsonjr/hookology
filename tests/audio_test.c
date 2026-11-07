@@ -39,7 +39,7 @@ static void fresh(void)
     for (p = 0; p < NROWS; p++) host_preset(&trk[p], HOST_SYNTH, 0);
     memset(&melodee_dbg, 0, sizeof melodee_dbg);
     audio_cpu_rem = audio_halves = audio_max_us = 0;
-    shed_req = 0; shed_count = 0; shed_over = 0;
+    shed_req = 0; shed_count = 0; shed_over = 0; shed_hot = 0;
     memset(shed_part, 0, sizeof shed_part);
     memset(voice_kills_part, 0, sizeof voice_kills_part);
     host_clock = host_us = host_half_reads = host_dma_advanced = host_acks = host_nest = 0;
@@ -73,35 +73,59 @@ static void overload(void)
     trk_note_on(&trk[1], 48, 100);
     trk_note_on(&trk[1], 60, 100);
     lead = held(&trk[0], 40); bass = held(&trk[1], 48); extra = held(&trk[1], 60);
-    shed_voice();
+    shed_voice(SHED_HELD);
     check("overload keeps each part's MONO lead and lowest POLY note",
           lead && bass && extra && lead->gate && bass->gate && extra->stage == 4u && shed_count == 1u);
     check("part diagnostics attribute the cut to its actual track",
           shed_part[0] == 0u && shed_part[1] == 1u && voice_kills_part[0] == 0u && voice_kills_part[1] == 1u);
     mix_block(out, CTL);
     check("overload frees its victim within one control block", extra && !extra->active && sounding() == 2u);
-    shed_voice();
+    shed_voice(SHED_HELD);
     check("a lead alone on each part stays protected", lead->gate && bass->gate && shed_count == 1u);
+
+    fresh();
+    trk[0].p[P_VOICE] = V_POLY;
+    for (i = 0; i < 4u; i++) trk_note_on(&trk[0], 48u + 4u * i, 100);
+    shed_voice(SHED_TAIL);
+    check("an ordinary overload never cuts a held chord note", shed_count == 0u && sounding() == 4u);
+    trk_note_off(&trk[0], 60);
+    shed_voice(SHED_TAIL);
+    check("an ordinary overload still takes a release tail", shed_count == 1u && held(&trk[0], 60)->stage == 4u);
+
+    fresh();
+    trk[0].p[P_VOICE] = V_POLY;
+    for (i = 0; i < 4u; i++) trk_note_on(&trk[0], 48u + 4u * i, 100);
+    host_us = 2700;                                   /* 93 % of a half: over 80 %, under 97 % */
+    for (i = 0; i < 40u; i++) { fm1_alnk0_irq(); shed_req = shed_req == SHED_TAIL ? 0 : shed_req; }
+    check("a long load between 80 and 97 % asks for no held note", shed_req == 0u && !shed_count);
+    host_us = 3000;                                   /* over 97 % */
+    for (i = 0; i < 7u; i++) fm1_alnk0_irq();
+    check("seven very slow halves are not yet an emergency", shed_req != SHED_HELD);
+    fm1_alnk0_irq();
+    check("eight very slow halves in a row are an emergency", shed_req == SHED_HELD);
+    host_us = 100; fm1_alnk0_irq();
+    check("the emergency cuts one held note, never the lowest",
+          shed_count == 1u && sounding() == 3u && held(&trk[0], 48)->gate && !shed_req);
 
     fresh();
     host_preset(&trk[0], ENGI_DRUM, 0);
     trk_note_on(&trk[0], 36, 100); trk_note_on(&trk[0], 38, 100);
     lead = held(&trk[0], 36); extra = held(&trk[0], 38);
-    shed_voice(); mix_block(out, CTL);
+    shed_voice(SHED_HELD); mix_block(out, CTL);
     check("overload frees a held one-shot drum without waiting for its decay",
           lead && extra && lead->active && !extra->active && sounding() == 1u);
 
     fresh();
     trk[0].p[P_VOICE] = V_UNISON;
     trk_note_on(&trk[0], 55, 100);
-    shed_voice(); mix_block(out, CTL);
+    shed_voice(SHED_HELD); mix_block(out, CTL);
     check("UNISON loses an extra voice and retains its lead", trk[0].v[0].active && trk[0].v[0].gate && sounding() == NPOLY - 1u);
 
     for (mode = V_MONO; mode <= V_LEGATO; mode++) {
         fresh(); trk[0].p[P_VOICE] = V_POLY;
         for (i = 0; i < NPOLY; i++) trk_note_on(&trk[0], 48u + 2u * i, 100);
         trk[0].p[P_VOICE] = (int16_t)mode;
-        shed_voice(); mix_block(out, CTL);
+        shed_voice(SHED_HELD); mix_block(out, CTL);
         check("overload can reclaim stale POLY voices after a MONO / LEGATO change",
               shed_count == 1u && trk[0].v[0].gate && sounding() == NPOLY - 1u);
     }
@@ -112,7 +136,7 @@ static void overload(void)
     lead = held(&trk[0], 60); extra = held(&trk[0], 64);
     trk_note_off(&trk[0], 60); trk_note_off(&trk[0], 64);
     lead->env = 10000; extra->env = 10;
-    shed_voice();
+    shed_voice(SHED_HELD);
     check("released voices shed the quieter tail first", extra->stage == 4u && lead->stage != 4u);
 }
 static void dma(void)

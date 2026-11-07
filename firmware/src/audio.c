@@ -63,12 +63,16 @@ static void audio_block(int32_t *out, uint32_t n)       /* mix (mix.c), then Q15
     AP_END(AP_OUTPUT,output_start);
 }
 
-/* Overload: two halves in a row above 85 % (the render plus TIMER5 nested in it), fade one voice over the
- * next block, and one more each half while it lasts. Keep each part's
- * lowest POLY note and MONO / LEGATO / UNISON lead, as the shared budget does. */
-static volatile uint8_t shed_req;
-static uint8_t shed_over;                              /* bit k: the half k halves ago was over 85 % */
-#define SHED_TICKS ((HALF_FRAMES * 1000000u / FS) * 85u / 100u * FM1_TICKS_PER_US)   /* 85 % of a half */
+/* Overload: two halves in a row above 80 % (the render plus TIMER5 nested in it), fade the quietest
+ * release tail over the next block, and one more each half while it lasts. Held notes are heard, so
+ * they go only in an emergency: eight halves in a row above 97 %, with no tail left to take. Then keep
+ * each part's lowest POLY note and MONO / LEGATO / UNISON lead, as the shared budget does. */
+enum { SHED_NONE, SHED_TAIL, SHED_HELD };
+static volatile uint8_t shed_req;                      /* SHED_*: the most a coming half may cut */
+static uint8_t shed_over;                              /* bit k: the half k halves ago was over 80 % */
+static uint8_t shed_hot;                               /* bit k: the half k halves ago was over 97 % */
+#define SHED_TICKS ((HALF_FRAMES * 1000000u / FS) * 80u / 100u * FM1_TICKS_PER_US)        /* 80 % of a half */
+#define SHED_HELD_TICKS ((HALF_FRAMES * 1000000u / FS) * 97u / 100u * FM1_TICKS_PER_US)   /* 97 % of a half */
 static uint32_t shed_count;
 #if MELODEE_AUDIO_BENCH
 static uint32_t audio_bench_shed_requests;
@@ -80,12 +84,17 @@ static uint32_t shed_part[NPART];
 static __attribute__((noinline)) uint32_t shed_check(uint32_t all)
 {
     shed_over = (uint8_t)(shed_over << 1 | (all > SHED_TICKS));
-    if ((shed_over & 3u) == 3u)
-        shed_req = 1;
+    shed_hot = (uint8_t)(shed_hot << 1 | (all > SHED_HELD_TICKS));
+    if ((shed_over & 3u) == 3u && shed_req < SHED_TAIL)
+        shed_req = SHED_TAIL;
+    if (shed_hot == 0xFFu) {
+        shed_req = SHED_HELD;
+        shed_hot = 0;                                   /* the next one waits to hear what this frees */
+    }
     return (all - t5_nested_ticks) / FM1_TICKS_PER_US;
 }
 
-static void shed_voice(void)
+static void shed_voice(uint32_t level)
 {
     uint32_t p, i;
     voice_t *best = 0;
@@ -101,6 +110,8 @@ static void shed_voice(void)
         shed_part[voice_part(best) % NPART]++;
         return;
     }
+    if (level < SHED_HELD)
+        return;
     for (p = 0; p < NPART; p++) {
         const track_t *t = &trk[p];
         uint32_t mode = trk_vmode(t), low = mode == V_POLY ? lowest_held(t) : 0u;
@@ -141,13 +152,14 @@ void fm1_alnk0_irq(void)                       /* via isr_alnk0 (hal/fm1_isr.S) 
         uint32_t half = fm1_audio_free_half(), b, us;
         int32_t *o = &abuf[half * HALF_WORDS];
         if (shed_req) {
+            uint32_t shed_level = shed_req;
             shed_req = 0;
 #if MELODEE_AUDIO_BENCH
             if(audio_bench_active())audio_bench_shed_requests++;
             else
 #endif
             if (settings_safety)                        /* GLO > WEIGHTS 2 SAFETY OFF: overload cuts nothing */
-                shed_voice();
+                shed_voice(shed_level);
         }
 #if MELODEE_DUAL_CORE
         audio_worker_check();                   /* a CPU1 that misread or faulted: render alone from here */
