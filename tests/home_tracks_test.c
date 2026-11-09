@@ -115,13 +115,21 @@ static void drum_levels(void)
     int16_t lv=t->p[P_LEVEL], sn=t->p[P_LN0+1], kick=t->p[P_LN0];
     key_down(key); page_knob(0,-5); ui.force=1; ui_draw();
     assert(t->p[P_LN0+1]<sn && t->p[P_LEVEL]==lv && t->p[P_LN0]==kick && tracks.lane==2u && tracks.out);
-    page_knob(1,1); assert(!tracks.lane);                                  /* another knob: the strip's own cards */
-    key_up(key); page_knob(0,-1); assert(t->p[P_LEVEL]==lv-1 && !tracks.lane);
+    {   /* KNOB 2..4 with it held: the drum's TUNE DECAY TONE (EDIT > DRUM SOUND), not PAN SWING STEPS */
+        uint32_t sd=drum_sound_of(t,kb_map(t,key))%drum_sound_count(t); int8_t *c=drum_patch_of(song.sel)->c[sd];
+        int8_t tu=c[0], de=c[1], to=c[2]; int16_t pan=t->p[P_PAN], sw=t->p[P_SSWING], len=t->p[P_SLEN];
+        page_knob(1,2); page_knob(2,-3); page_knob(3,4); ui.force=1; ui_draw();
+        assert(c[0]==tu+2 && c[1]==de-3 && c[2]==to+4 && tracks.lane==2u && tracks.sound==sd);
+        assert(t->p[P_PAN]==pan && t->p[P_SSWING]==sw && t->p[P_SLEN]==len && !t->slen_next);
+        page_knob(1,100); assert(c[0]==24);                                /* (TUNE: two octaves at most) */
+    }
+    key_up(key); page_knob(1,1); assert(!tracks.lane);                     /* let go: the strip's own cards */
+    page_knob(0,-1); assert(t->p[P_LEVEL]==lv-1 && !tracks.lane);
     lv=t->p[P_LEVEL]; key_down(key); page_knob(0,2); assert(tracks.lane==2u); key_up(key);
     fm1_ms+=2000u; ui_draw(); assert(!tracks.out && !tracks.lane);         /* the strip gone: the lane forgotten */
     t=setup(); lv=t->p[P_LEVEL];                                           /* a synth: LEVEL, a key held or not */
     key_down(5); page_knob(0,-1); assert(t->p[P_LEVEL]==lv-1 && !tracks.lane); key_up(5);
-    puts("TRACKS: a drum key held, KNOB 1 its level; let go, the track's LEVEL passed");
+    puts("TRACKS: a drum key held, KNOB 1..4 its level, tune, decay, tone; let go, the track's passed");
 }
 int main(void)
 {

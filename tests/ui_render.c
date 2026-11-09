@@ -987,7 +987,8 @@ static void setup(int s)
             song.sel = 3; trk[3].p[P_MUTE] = 0;
             if (!drum_track(&trk[3])) set_engine_of(&trk[3], ENGI_DRUM);
             for (uint32_t l = 0; l < 8u; l++) trk[3].p[P_LN0 + l] = (int16_t)(127 - 11 * (int32_t)l);
-            tracks_knob_touch(0); tracks.lane = 2; ui.hot_col = 0; ui.hot_t = 40; ui.msg_t = 0;
+            drum_patch_of(3)->c[D9_SD][0] = -3; drum_patch_of(3)->c[D9_SD][1] = 10; drum_patch_of(3)->c[D9_SD][2] = -20;
+            tracks_knob_touch(1); tracks.lane = 2; tracks.sound = D9_SD; ui.hot_col = 1; ui.hot_t = 40; ui.msg_t = 0;
         }
         if (s >= S_TRACKS_KLEVEL && s <= S_TRACKS_KSTEPS) {
             uint32_t k = s == S_TRACKS_KLEVEL ? 0u : s == S_TRACKS_KPAN ? 1u : 3u;

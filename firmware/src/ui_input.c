@@ -641,28 +641,38 @@ static void tracks_steps(track_t *t, int32_t s)
     if (t->slen_next) ui_message("STEPS AT LOOP END");
 }
 /* TRACKS: KNOB 1 LEVEL, 2 PAN, 3 SWING, 4 STEPS (the strip comes in, ui_tracks.c) */
-/* TRACKS: the drum lane of the lowest drum key held on the selected drum track, + 1 (0: none, not a drum track) */
-static uint32_t tracks_held_lane(const track_t *t)
+/* TRACKS: the lowest drum key held on the selected drum track: its note + 1 (0: none, not a drum track) */
+static uint32_t tracks_held_drum(const track_t *t)
 {
     uint32_t held = fm1_in.notes & ~kb_layer;
     if (!drum_track(t) || midi_track_only(t)) return 0;
     for (uint32_t k = 0; k < 27u; k++) {
         uint32_t n;
         if (!((held >> k) & 1u) || (n = kb_map(t, k)) == KB_SILENT) continue;
-        return drum_lane(n) + 1u;
+        return n + 1u;
     }
     return 0;
+}
+/* a drum key held: KNOB 1 that drum's LEVEL (its lane, EDIT > LANES), KNOB 2..4 its TUNE DECAY TONE (EDIT > DRUM SOUND) */
+static void tracks_drum_knob(track_t *t, uint32_t note, uint32_t k, int32_t s)
+{
+    uint32_t sound = drum_sound_of(t, note) % drum_sound_count(t);
+    tracks.lane = (uint8_t)(drum_lane(note) + 1u);
+    tracks.sound = (uint8_t)sound;
+    if (k == 0u) { tracks_value(t, P_LN0 + tracks.lane - 1u, 0, s); return; }
+    fm1_irq_off();
+    int8_t *p = &drum_patch_of(song.sel)->c[sound][k - 1u];
+    *p = (int8_t)clamp(*p + s, k == 1u ? -24 : -64, k == 1u ? 24 : 63);
+    fm1_irq_on();
+    ui.force = 1;
 }
 static void tracks_knob(uint32_t k, int32_t s)
 {
     track_t *t = TSEL;
-    uint32_t lane = k == 0u ? tracks_held_lane(t) : 0u;
-    tracks.lane = (uint8_t)lane;                        /* (another knob, or no key: the strip's own cards) */
+    uint32_t note = tracks_held_drum(t);
     tracks_knob_touch(k);
-    if (lane) {                                         /* a drum key held + KNOB 1: that drum's level (EDIT > LANES) */
-        tracks_value(t, P_LN0 + lane - 1u, 0, s);
-        return;
-    }
+    if (note) { tracks_drum_knob(t, note - 1u, k, s); return; }
+    tracks.lane = 0;                                    /* (no key: the strip's own cards) */
     if (k >= 2u && chain_busy()) {                      /* (the song owns the timing, as on SEQ) */
         ui_message("STOP TO EDIT");
         return;

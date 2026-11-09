@@ -22,8 +22,9 @@ static struct {
     uint32_t knob_ms;                                   /* the last knob turn on TRACKS (| 1), 0 none */
     uint8_t out, knob;                                  /* the knobs out; the knob turned last */
     uint16_t clr;                                       /* OCT- held to clear the selected track: 1..1000 of the way */
-    uint8_t lane;                                       /* a drum key held while KNOB 1 turned: its lane + 1 (the strip's
-                                                         * LEVEL is that drum's, P_LN0..; 0: the track's) */
+    uint8_t lane, sound;                                /* a drum key held while a knob turned: its lane + 1 and its drum
+                                                         * (the strip is that drum's: LEVEL P_LN0.., TUNE DECAY TONE as
+                                                         * EDIT > DRUM SOUND; lane 0: the track's) */
 } tracks;
 
 static uint32_t fnv1(uint32_t h, uint32_t v);       /* ui_patterns.c */
@@ -96,18 +97,26 @@ static void tr_columns(void)
     const track_t *t = TSEL;
     int32_t level = clamp(t->p[P_LEVEL], 0, 127), pan = clamp(t->p[P_PAN], -64, 63), sw = track_swing(t), steps = (int32_t)tr_steps(t);
     uint32_t c, midi = midi_track_only(t);
+    if (tracks.lane) {                                  /* a drum key held: that drum's LEVEL (EDIT > LANES), TUNE DECAY
+                                                         * TONE (EDIT > DRUM SOUND) */
+        const int8_t *dc = drum_patch_of(song.sel)->c[tracks.sound % drum_sound_count(t)];
+        int32_t lv = clamp(t->p[P_LN0 + tracks.lane - 1u], 0, 127);
+        char v[12], lb[12];
+        const char *unit = "";
+        str_cpy(lb, drum_lane_name(t, tracks.lane - 1u), sizeof lb);
+        param_format(&TP[P_LN0 + tracks.lane - 1u], lv, v, &unit);
+        draw_column(0, lb, v, unit, T_ACCENT, lv * 1000 / 127, ICON_NONE);
+        fmt_int(v, dc[0]); draw_column(1, "TUNE", v, "ST", VAL(1u), (dc[0] + 24) * 1000 / 48, ICON_NONE);
+        fmt_int(v, dc[1] + 64); draw_column(2, "DECAY", v, "", VAL(2u), (dc[1] + 64) * 1000 / 127, ICON_NONE);
+        fmt_int(v, dc[2] + 64);
+        draw_column(3, drum_is909(t) ? drum_character(tracks.sound) : drum_issid(t) ? "SNAP" : tracks.sound == D9_SD ? "SNAPPY" : "TONE",
+                    v, "", VAL(3u), (dc[2] + 64) * 1000 / 127, ICON_NONE);
+        return;
+    }
     for (c = 0; c < 4u; c++) {
         char v[12];
         const char *unit = "";
         int32_t ratio;
-        if (c == 0u && tracks.lane) {                   /* a drum key held: that drum's level (EDIT > LANES) */
-            int32_t lv = clamp(t->p[P_LN0 + tracks.lane - 1u], 0, 127);
-            char lb[12];
-            str_cpy(lb, drum_lane_name(t, tracks.lane - 1u), sizeof lb);
-            param_format(&TP[P_LN0 + tracks.lane - 1u], lv, v, &unit);
-            draw_column(c, lb, v, unit, T_ACCENT, lv * 1000 / 127, ICON_NONE);
-            continue;
-        }
         if (c == 0u) { param_format(&TP[P_LEVEL], level, v, &unit); ratio = level * 1000 / 127; }
         else if (c == 1u) { param_format(&TP[P_PAN], pan, v, &unit); ratio = (pan + 64) * 1000 / 127; }
         else if (c == 2u) { fmt_int(v, sw); ratio = sw * 10; }
