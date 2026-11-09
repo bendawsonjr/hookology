@@ -8,15 +8,16 @@ _Static_assert(NPART == 6 && NROWS == 4 && NMIDI == 2 && NTRK == 8 && PROJ_TRK =
 static uint32_t held(const track_t *t) { uint32_t n = 0; for (uint32_t i = 0; i < NVOICE; i++) n += t->v[i].active; return n; }
 static track_t *six(void)
 {
-    ui_power_on(); project_new_blank(); assert(trk_n() == NROWS);
-    track_add(); track_add(); assert(trk_n() == 6u);
+    ui_power_on(); project_new_blank(); assert(trk_n() == NPART);
+    song.ntrk = NROWS; track_add(); track_add(); assert(trk_n() == 6u);
     events_block(CTL);
     return &trk[4];
 }
 static void defaults(void)
 {
     ui_power_on(); project_new_blank();
-    assert(trk_n() == 4u && song.ntrk == 4u);
+    assert(trk_n() == 6u && song.ntrk == 6u);       /* (Hookology: a new project has all six sound tracks) */
+    song.ntrk = NROWS;
     track_add(); assert(trk[4].eng_req == ENGI_FM6 && !midi_track_only(&trk[4]) && !trk_midi_slot(4));
     track_add(); assert(trk[5].eng_req == ENGI_PROPHET && !midi_track_only(&trk[5]));
     track_add(); assert(trk[6].eng_req == ENGI_MIDI && midi_track_only(&trk[6]) && trk_midi_slot(6));
@@ -53,7 +54,8 @@ static void saved(void)
     memcpy(cz, cz_patch_of(4), sizeof cz); memcpy(p5, p5_patch_of(u), sizeof p5);
     uint8_t ps = u->preset;
     assert(!project_save_as(0, "SIX"));
-    project_new_blank(); assert(trk_n() == NROWS);
+    project_new_blank(); assert(trk_n() == NPART);
+    song.ntrk = NROWS;                                  /* (the load below brings back six) */
     project_load(0); events_block(CTL);
     t = &trk[4]; u = &trk[5];
     assert(trk_n() == 6u);

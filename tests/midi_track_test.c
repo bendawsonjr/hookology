@@ -320,7 +320,8 @@ static void midi_only_tracks(void)
 {
     reset_midi(0);
     project_new_blank();
-    assert(trk_n() == NROWS);
+    assert(trk_n() == NPART);                           /* (Hookology: six to start with; four, to add the rest here) */
+    song.ntrk = NROWS;
     for (uint32_t k = NROWS; k < NTRK; k++) {
         track_add();
         assert(trk_n() == k + 1u && song.sel == k && trk[k].eng_req == trk_def_engine(k));
@@ -348,7 +349,8 @@ static void midi_only_tracks(void)
     song.sel = 6;
     assert(!project_save_as(0, "EIGHT"));
     assert(slot_magic(0) == BANKP_MAGIC);
-    project_new_blank(); assert(trk_n() == NROWS && bank_is(4, 0, 0, 0, TP[P_SLEN].def));
+    project_new_blank(); assert(trk_n() == NPART && bank_is(4, 0, 0, 0, TP[P_SLEN].def));
+    song.ntrk = NROWS;                                  /* (the load below brings back eight) */
     project_load(0);
     assert(trk_n() == NTRK && song.sel == 6);
     assert(bank_is(4, 0, 48, 16, 16) && bank_is(4, 3, 50, 64, 64) && bank_is(6, 2, 70, 5, 8) && bank_is(1, 1, 30, 7, 32));

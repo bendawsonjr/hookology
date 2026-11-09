@@ -924,11 +924,11 @@ static int test_track_count(void)
     memset(proj_bank_slot, 0, sizeof proj_bank_slot);
     project_new_blank();
     go_home(); frame();
-    ok = trk_n() == NROWS && song.sel == 0;
+    ok = trk_n() == NPART && song.sel == 0;           /* (Hookology: six) */
     for (i = 0; i < NROWS; i++)
         ok &= trk[i].eng_req == TRK_DEF[i][0] && trk[i].preset == find_preset(TRK_DEF[i][0], DEF[i]) &&
               seq_is_empty(&trk[i]);
-    bad += check("a new song: four tracks, It's a Prophet 5, FM6 SOLID BASS, CZ-1 SYNTH.LEAD 1, 808 KIT; T1 selected",
+    bad += check("a new song: six tracks, It's a Prophet 5, FM6 SOLID BASS, CZ-1 SYNTH.LEAD 1, 808 KIT; T1 selected",
                  ok && TRK_DEF[0][0] == ENGI_PROPHET && TRK_DEF[1][0] == ENGI_FM6 && TRK_DEF[2][0] == ENGI_CZ &&
                  TRK_DEF[3][0] == ENGI_DRUM);
     bad += check("  NEW SONG without a template: all four", template_tracks() == NROWS);
@@ -1043,7 +1043,7 @@ static int test_track_count(void)
     bad += check("  and silent", trk_quiet(&trk[3]));
     project_save(1);
     project_new_blank();
-    bad += check("a new song: four tracks again", trk_n() == NROWS);
+    bad += check("a new song: six tracks again", trk_n() == NPART);
     project_load(1);
     bad += check("a project keeps its count (3)", trk_n() == 3u && trk[2].step[3].note[0] == 63);
     project_load(0);
@@ -4652,23 +4652,23 @@ static int test_bughunt_ui2(void)
             }
         bad += check("STEP entry with CHRD: POLY the chord, MONO its root, as live recording writes", ok);
     }
-    {   /* 3. MIXER: the knob just turned is the control drawn in text (K1 the level's bar, K2 the pan, K3 nothing, K4
-         * "Mute") in the selected track's row (ui_pages.c pv_strip) */
-        uint32_t k, a[4][2], ok = 1;
+    {   /* 3. MIXER (vertical, Hookology): the knob just turned is the control drawn in text (K1 the fader, K2 the pan,
+         * K3 nothing, K4 MUTE) in the selected track's strip (ui_pages.c pv_strip) */
+        uint32_t k, a[4][3], ok = 1;
         for (k = 0; k < 4u; k++) {
-            int32_t Y, ly;
+            int32_t X, w;
             ui_power_on();
             settings.palette = 1; palette_set(1);
             go_page(GR_TRK); frame(); frame();
-            Y = st_row_y(song.sel);
-            ly = pv_mix_y(st_row_h()) + TY_TX->cap + 8;
+            X = pv_mix_x(song.sel); w = pv_mix_w();
             turn(EN_K1 + k, 1);                                       /* (K4 right: MUTE on) */
             ui.force = 1; frame();
-            a[k][0] = text_in(BOX_X + PV_MIX_BAR_X, Y + ly, BOX_X + PV_MIX_BAR_X + PV_MIX_BAR_W, Y + ly + 5);   /* the bar */
-            a[k][1] = text_in(BOX_X + 180, Y + ly - 8, BOX_X + 230, Y + ly + 16);   /* the pan, or Mute */
+            a[k][0] = text_in(X + pv_fad_x(w), PV_MIX_Y + PV_FAD_Y, X + pv_fad_x(w) + PV_FAD_W, PV_MIX_Y + PV_FAD_Y + PV_FAD_H);   /* the fader */
+            a[k][1] = text_in(X + 4, PV_MIX_Y + 59, X + w - 4, PV_MIX_Y + 75);   /* the pan */
+            a[k][2] = TSEL->p[P_MUTE] != 0;
         }
-        ok = a[0][0] && !a[0][1] && !a[1][0] && a[1][1] && !a[2][0] && !a[2][1] && !a[3][0] && a[3][1];
-        bad += check("MIXER: K1 lights the level's bar, K2 the pan, K4 Mute, K3 nothing", ok);
+        ok = a[0][0] && !a[0][1] && !a[1][0] && a[1][1] && !a[2][0] && !a[2][1] && !a[3][0] && a[3][2] && !a[2][2];
+        bad += check("MIXER: K1 lights the fader, K2 the pan, K4 MUTE, K3 nothing", ok);
     }
     {   /* 4. renaming the slot the music came from renames the music: the next SAVE prefills the new name */
         char pn[16];

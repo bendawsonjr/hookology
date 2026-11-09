@@ -1349,7 +1349,8 @@ static void project_new_blank(void)
     proj_cur = PROJ_NO_SLOT;
     proj_name[0] = 0;
     song.sel = 0;
-    song.ntrk = NROWS;                                  /* (the four parts to start with: Stage's sheet adds, removes) */
+    song.ntrk = NPART;                                  /* (Hookology: all six sound tracks to start with; Stage's sheet
+                                                         * adds, removes) */
     song.g[G_SLOT] = (int16_t)(project_free_slot() + 1u);
 }
 /* the music differs from its slot (none: it holds notes): a new song asks first. Packs the project (proj_wire_u) */
@@ -1389,7 +1390,7 @@ static void project_boot(void)
             project_load(settings_boot - 1u);
         return;
     }
-    song.ntrk = NROWS;                                  /* the power-on sounds: four tracks (theirs: the template's) */
+    song.ntrk = NPART;                                  /* the power-on sounds: six tracks (theirs: the template's) */
     if (template_used()) {
         if (bootguard.failed)
             ui_message("TEMPLATE SKIPPED");

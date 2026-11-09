@@ -97,6 +97,9 @@ static void new_create(void)
             track_remove(k);
         }
     }
+    if (trk_n() == NROWS && !template_used())       /* every role kept (Hookology): tracks 5 and 6 too, their power-on
+                                                     * sounds; fewer roles: the tracks chosen */
+        song.ntrk = NPART;
     if (song.sel >= trk_n())
         song.sel = 0;
     for (k = 0; k < NTRK; k++)
