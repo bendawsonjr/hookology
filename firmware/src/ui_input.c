@@ -1772,6 +1772,42 @@ static uint32_t layer_oct(uint32_t pressed, uint32_t oct);
 static int layer_allowed(void);
 static uint32_t ly_bit(uint32_t l);
 
+/* TRACKS: OCT- held clears the selected track, as its pattern dialog's Clear does (CF_CLEAR_TRK: the pattern playing,
+ * at the loop end while playing; EDIT held undoes). The first second nothing; through the next a bar fills in its
+ * lane (tracks.clr); full, cleared. Let go before: nothing (a tap: the octave down, as on Stage; a kit: nothing) */
+#define TRC_WAIT_MS 1000u
+#define TRC_HOLD_MS 1000u
+static struct { uint32_t t0; uint8_t done; } trc;
+static int tr_clear_page(void) { return ui.home && ui.home_pg == HP_TRACKS && !ui.menu && !ui.confirm && !ui.layer && !name_on(); }
+static int dq_defer(uint32_t cf, uint32_t k, uint32_t a, uint32_t b);
+static void dq_do(uint32_t cf, uint32_t k, uint32_t a, uint32_t b);
+static void tr_clear_poll(void)
+{
+    uint32_t down = (fm1_in.buttons >> panel.btn[B_OCTDN]) & 1u, el;
+    if (!trc.t0) { if (tracks.clr) { tracks.clr = 0; ui.force = 1; } return; }
+    el = fm1_ms - (trc.t0 & ~1u);
+    if (!down || !tr_clear_page()) {                    /* let go: before the second a tap (the octave) */
+        if (!trc.done && el < TRC_WAIT_MS && down == 0u && tr_clear_page() && !oct_hits()) {
+            int8_t *value = octave_control();
+            *value += *value > -3 ? -1 : 0;
+        }
+        trc.t0 = 0; tracks.clr = 0;
+        return;
+    }
+    if (trc.done || el < TRC_WAIT_MS) return;
+    el -= TRC_WAIT_MS;
+    tracks.knob_ms = 0;                                 /* (the strip away: the lane shows the bar) */
+    tracks.clr = (uint16_t)(el >= TRC_HOLD_MS ? 1000u : 1u + el * 999u / TRC_HOLD_MS);
+    if (el < TRC_HOLD_MS) return;
+    trc.done = 1;
+    tracks.clr = 0;
+    {
+        uint32_t k = song.sel % NTRK;
+        if (!dq_defer(CF_CLEAR_TRK, k, trk[k].pattern, 0))
+            dq_do(CF_CLEAR_TRK, k, trk[k].pattern, 0);
+    }
+}
+
 /* a page button let go (they act on release; a layer's own button: layer_gesture) */
 static void page_tap(uint32_t b)
 {
@@ -2317,7 +2353,7 @@ static void ui_input(void)
     if (seq_long) seq = BT_HOLD;
     uint32_t save = btn_hold(&ui.save_t0, B_SAVE, now, !ui.menu && !ui.confirm);
     uint32_t edit = btn_hold(&ui.edit_t0, B_EDIT, now, !ui.menu && !ui.confirm && !name_on() && !new_on() && !ui.ly);
-    key_hit_vel = !oct_hits() ? 0u : (uint8_t)((fm1_in.buttons >> panel.btn[B_OCTDN]) & 1u ? HIT_GHOST :
+    key_hit_vel = !oct_hits() ? 0u : (uint8_t)((fm1_in.buttons >> panel.btn[B_OCTDN]) & 1u && !tr_clear_page() ? HIT_GHOST :
                                                (fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u ? HIT_HARD : 0u);
     uint32_t octup = btn_hold(&ui.oct_t0, B_OCTUP, now, page_sheet() != 0u && !oct_hits());   /* held: the page's sheet */
     uint32_t oct;
@@ -2648,9 +2684,16 @@ static void ui_input(void)
             }
             if (oct_nav())                              /* off Stage: Esc / Enter, on release (below) */
                 break;
+            if (b == B_OCTDN && tr_clear_page() && (fm1_in.buttons & both) != both) {
+                trc.t0 = fm1_ms | 1u;                   /* TRACKS: OCT- tapped the octave (a kit: nothing), held a
+                                                         * second then another the track cleared (tr_clear_poll) */
+                trc.done = 0;
+                break;
+            }
             if (oct_hits())
                 break;
             if ((fm1_in.buttons & both) == both) {
+                trc.t0 = 0; tracks.clr = 0;             /* (both: the octave back to 0, no clear) */
                 *octave_control() = 0;
                 ui.oct_t0 |= 2u;                        /* (OCT+ then neither a tap nor a sheet) */
                 oct_deferred = 0;
@@ -2678,6 +2721,7 @@ static void ui_input(void)
     if(bulk.on && !slot_kind() && !ui.home && cur_page()->graph==GR_ROLL && (oct&2u)){
         notes_bulk_sheet_open();oct=0;
     } else if((bulk.on||ui.note_move||ui.note_copy)&&(oct&1u)){bulk_clear();oct=0;}
+    tr_clear_poll();                                    /* TRACKS: OCT- held clears the track */
     {                                                   /* SECTIONS' BUILD: OCT- held a second clears the song */
         static uint32_t t0;
         static uint8_t done;

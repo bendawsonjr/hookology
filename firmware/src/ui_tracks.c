@@ -21,6 +21,7 @@ static struct {
     uint32_t col[NTRK], grid[NTRK], cmp;                /* what each part drew */
     uint32_t knob_ms;                                   /* the last knob turn on TRACKS (| 1), 0 none */
     uint8_t out, knob;                                  /* the knobs out; the knob turned last */
+    uint16_t clr;                                       /* OCT- held to clear the selected track: 1..1000 of the way */
 } tracks;
 
 static uint32_t fnv1(uint32_t h, uint32_t v);       /* ui_patterns.c */
@@ -40,13 +41,15 @@ static void tr_row(uint32_t k)
     sound_name(t, nm);
     if (!nm[0]) str_cpy(nm, ENGINES[eng_idx(t->eng_req)]->name, sizeof nm);
     if (t->slen_next) { str_cpy(nx, "NEXT ", sizeof nx); fmt_int(nx + 5, t->slen_next); }   /* (a length waiting) */
-    sig = str_hash(1u + sel * 2u + mute * 4u + arm * 8u + t->slen_next * 16u, nm) + ux.gen * 977u + ux.pal * 31u + lv * 50021u;
+    uint32_t clr = sel ? tracks.clr : 0u;               /* (OCT- held: the lane fills red, HOLD TO CLEAR) */
+    if (clr) str_cpy(nm, "HOLD TO CLEAR", sizeof nm);
+    sig = str_hash(1u + sel * 2u + mute * 4u + arm * 8u + t->slen_next * 16u, nm) + ux.gen * 977u + ux.pal * 31u + lv * 50021u + clr * 7919u;
     st_lay_t l = st_layout(st_bars(t), TR_STEP_W, TR_STEP_H);
     int32_t sy = TR_STEP_Y + (TR_STEP_H - l.h) / 2;     /* (the steps centred in their place) */
     g = steps_hash(t) + len * 613u + ph * 104729u;
     sig += len * 7u;                                    /* (another length: another layout, the lane again) */
     if (!ui.force && sig == tracks.col[k]) {
-        if (g != tracks.grid[k]) {                      /* the steps or the playhead: the steps alone */
+        if (g != tracks.grid[k] && !clr) {             /* the steps or the playhead: the steps alone */
             tracks.grid[k] = g;
             for (uint32_t band = 0; band < (uint32_t)l.h; band += CV_MAX / (uint32_t)l.w) {
                 cv_begin_band((uint32_t)l.w, (uint32_t)l.h, bg, band);
@@ -71,9 +74,14 @@ static void tr_row(uint32_t k)
         cv_rrect(6, 6, 28, h - 12, 6, tc, bg);
         cv_text_c(20, ty_y(h / 2, TY_TX), TY_TX, d, T_INK, tc);
         if (arm) cv_disc(32, 8, 9, T_REC, 0);
-        cv_free_text(TR_TX, ty_y(14, TY_TX), TY_TX, nm, mute ? T_DIM : T_TEXT, bg, BOX_W - TR_TX - 8 - nw);
+        cv_free_text(TR_TX, ty_y(14, TY_TX), TY_TX, nm, clr ? T_REC : mute ? T_DIM : T_TEXT, bg, BOX_W - TR_TX - 8 - nw);
         if (nx[0]) cv_text_r(BOX_W - 8, ty_y(14, TY_LB), TY_LB, nx, T_ACCENT, bg);
-        stage_steps(t, ph, tc, bg, TR_TX, sy, &l);
+        if (clr) {                                      /* OCT- held: a red bar fills where the steps are */
+            cv_rrect(TR_TX, TR_STEP_Y + TR_STEP_H / 2 - 4, TR_STEP_W, 8, 4, ux_mix(bg, T_REC, 25), bg);
+            cv_rrect(TR_TX, TR_STEP_Y + TR_STEP_H / 2 - 4, 8 + (int32_t)clr * (TR_STEP_W - 8) / 1000, 8, 4, T_REC, bg);
+        } else {
+            stage_steps(t, ph, tc, bg, TR_TX, sy, &l);
+        }
         cv_blit_band(BOX_X, (uint32_t)y);
     }
 }

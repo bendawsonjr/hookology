@@ -91,9 +91,13 @@ static void keys(void)
     ui.home = 1; ui.home_pg = HP_TRACKS; assert(oct_hits());
     song.octave = 2; assert(drum_keys(t, 7) == base); song.octave = 0;
     int8_t oct = *octave_control();
+    fm1_in.buttons |= 1u << panel.btn[B_OCTDN]; ui_input(); assert(!key_hit_vel);   /* TRACKS: OCT- held clears */
+    fm1_in.buttons &= ~(1u << panel.btn[B_OCTDN]); ui_input(); assert(*octave_control() == oct);
+    ui.home_pg = HP_STAGE; assert(oct_hits());                                       /* Stage: the ghost hits */
     fm1_in.buttons |= 1u << panel.btn[B_OCTDN]; ui_input(); assert(key_hit_vel == HIT_GHOST);
     key_down(7); assert(t->v[0].active && t->v[0].vel == HIT_GHOST); key_up(7);
     fm1_in.buttons &= ~(1u << panel.btn[B_OCTDN]); ui_input(); assert(!key_hit_vel && *octave_control() == oct);
+    ui.home_pg = HP_TRACKS;
     fm1_in.buttons |= 1u << panel.btn[B_OCTUP]; ui_input(); assert(key_hit_vel == HIT_HARD);
     fm1_in.buttons &= ~(1u << panel.btn[B_OCTUP]); ui_input(); assert(!key_hit_vel && *octave_control() == oct);
     /* a recording keeps the level */

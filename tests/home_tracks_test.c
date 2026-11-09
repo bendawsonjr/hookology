@@ -82,9 +82,31 @@ static void stored(void)
     t=TSEL; assert(t->p[P_SSWING]==33 && t->p[P_PAN]==-20 && t->p[P_LEVEL]==90 && t->p[P_SLEN]==24 && !t->slen_next);
     puts("TRACKS: per-track values saved with the project passed");
 }
+/* OCT- held on TRACKS: a second nothing, the next the lane fills, then the playing pattern cleared (EDIT held undoes);
+ * let go early nothing; a tap the octave down; playing, at the loop end */
+static void hold_clear(void)
+{
+    track_t *t=setup(); int8_t oct;
+    t->step[3]=(step_t){.time=ST_NOTE,.n=1,.note={60}};
+    oct=*octave_control();
+    press(B_OCTDN); assert(*octave_control()==oct-1 && t->step[3].n==1);        /* a tap: the octave */
+    *octave_control()=oct;
+    btn_down(B_OCTDN); frame(); frames(900u); assert(!tracks.clr && t->step[3].n==1);
+    frames(500u); assert(tracks.clr>0 && tracks.clr<1000 && t->step[3].n==1);
+    btn_up(B_OCTDN); frame(); assert(!tracks.clr && t->step[3].n==1 && *octave_control()==oct);   /* let go: nothing */
+    btn_down(B_OCTDN); frame(); frames(2100u); assert(!t->step[3].n && msg_is("TRACK 1 CLEARED"));
+    btn_up(B_OCTDN); frame(); assert(*octave_control()==oct);
+    hold(B_EDIT); assert(t->step[3].n==1);                                           /* undo */
+    song.playing=1; seq_advance(beat_samples()); assert(t->seq_idx);
+    btn_down(B_OCTDN); frame(); frames(2100u); btn_up(B_OCTDN); frame();
+    assert(t->step[3].n==1 && msg_is("CLEAR AT LOOP END"));
+    loop_end(t); frame(); frame(); assert(!t->step[3].n);
+    seq_stop();
+    puts("TRACKS: OCT- held clears the track (a tap the octave, let go early nothing, undo, at the loop end) passed");
+}
 int main(void)
 {
-    landing(); knobs(); at_loop_end(); one_length(); pages(); stored();
+    landing(); knobs(); at_loop_end(); one_length(); pages(); stored(); hold_clear();
     puts("TRACKS tests passed");
     return 0;
 }

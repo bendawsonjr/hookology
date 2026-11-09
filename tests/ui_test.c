@@ -153,7 +153,7 @@ static void ui_power_on(void)
     memset(&song, 0, sizeof song);
     memset(&chain, 0, sizeof chain);
     chain_defaults(&chain_config);
-    pattern_init(); sec_reset(); scs.build = 0; tracks.knob_ms = 0; tracks.out = 0;
+    pattern_init(); sec_reset(); scs.build = 0; tracks.knob_ms = 0; tracks.out = 0; tracks.clr = 0; trc.t0 = 0;
     memset(&ui, 0, sizeof ui);
     memset(&boot_work, 0, sizeof boot_work);
     memset(&step_history, 0, sizeof step_history);
