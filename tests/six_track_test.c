@@ -113,9 +113,37 @@ static void screens(void)
     }
     puts("SIX: every HOME page draws on both pages of tracks passed");
 }
+/* a template keeps all six sound tracks (TPLM): track 5 a CZ tone, track 6 FM6 with its functions and a level; a template
+ * of before (TPLL) brings tracks 1..4 and leaves 5 and 6 their power-on sounds */
+static void templates(void)
+{
+    six(); persist_old = tmpl_old = 0;
+    undo_depth++; set_engine_of(&trk[4], ENGI_CZ); set_engine_of(&trk[5], ENGI_FM6); undo_depth--;
+    cz_patch_of(4)->raw[128] = 'Q';
+    trk[5].p[P_LEVEL] = 57; fm6_fn[5][0] = (uint8_t)(FM6_FNDEF[0] ? 0 : 1);
+    uint8_t fn = fm6_fn[5][0];
+    trk[1].p[P_LEVEL] = 61;
+    template_save(); assert(template_used() && tmpl.ntrk == 6u);
+    project_new_blank();                                /* power-on sounds */
+    assert(trk[4].eng_req == ENGI_FM6 && trk[5].eng_req == ENGI_PROPHET);
+    { static tmpl_t saved; saved = tmpl; memset(&tmpl, 0, sizeof tmpl);
+      assert(tmpl_blob_valid((const uint8_t *)&saved, sizeof saved) && tmpl_take((const uint8_t *)&saved, sizeof saved)); }
+    template_load();
+    assert(trk_n() == 6u && trk[4].eng_req == ENGI_CZ && cz_patch_of(4)->raw[128] == 'Q');
+    assert(trk[5].eng_req == ENGI_FM6 && trk[5].p[P_LEVEL] == 57 && fm6_fn[5][0] == fn && trk[1].p[P_LEVEL] == 61);
+    /* TPLL: tracks 1..4 back, 5 and 6 power-on */
+    { static tmpl4_t t4; tmpl4_capture(&t4); memset(&tmpl, 0, sizeof tmpl);
+      assert(tmpl_take((const uint8_t *)&t4, sizeof t4) && template_used());
+      assert(tmpl.t[4].engine == TMPL_NO_TRK && tmpl.t[5].engine == TMPL_NO_TRK); }
+    template_load();
+    assert(trk_n() == 6u && trk[1].p[P_LEVEL] == 61 && trk[4].eng_req == ENGI_FM6 && trk[5].eng_req == ENGI_PROPHET);
+    { static tmpl_t bad; template_save(); bad = tmpl; bad.t[0].engine = TMPL_NO_TRK;   /* tracks 1..4 always hold one */
+      assert(!tmpl_blob_valid((const uint8_t *)&bad, sizeof bad)); }
+    puts("SIX: a template keeps tracks 5 and 6 (TPLM); one of before brings 1..4, power-on 5 and 6 passed");
+}
 int main(void)
 {
-    defaults(); sounding(); every_sound(); saved(); automation(); older(); screens();
+    defaults(); sounding(); every_sound(); saved(); automation(); older(); screens(); templates();
     puts("Six-track tests passed");
     return 0;
 }

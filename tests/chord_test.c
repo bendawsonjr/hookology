@@ -461,15 +461,16 @@ static int strum_storage(void)
         proj_scratch.t[0].p[P_E3]==23 && proj_scratch.motion.event[0].param==P_E3 &&
         proj_scratch.t[0].p[P_FXTONE]==-20 && proj_scratch.g[G_MFXTONE]==17);
     persist_old=tmpl_old=0; template_save();
-    static uint8_t blob[sizeof(tmpl_t)]; memcpy(blob,&tmpl,sizeof tmpl);
+    static tmpl4_t t4; tmpl4_capture(&t4);              /* (a TPLL template, the layout before six tracks) */
+    static uint8_t blob[sizeof(tmpl4_t)]; memcpy(blob,&t4,sizeof t4);
     src=dst=2*PROJ_GLOBALS+2;
     for(uint32_t k=0;k<NROWS;k++) {
         uint32_t head=2+114*2;
         memmove(blob+dst,blob+src,head);dst+=head;src+=head+4;
         memmove(blob+dst,blob+src,16);dst+=16;src+=16;
     }
-    memmove(blob+dst,blob+src,sizeof tmpl-src);
-    uint32_t len=sizeof tmpl-(src-dst);
+    memmove(blob+dst,blob+src,sizeof t4-src);
+    uint32_t len=sizeof t4-(src-dst);
     memcpy(blob+len-8,&len,4);
     ok=tmpl_take(blob,len);
     bad+=check("pre-strum template imports with OFF and original native/engine/FX data",

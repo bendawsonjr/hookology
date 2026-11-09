@@ -9,7 +9,7 @@
  * loads), glo (CLK TUNE MIDI ROUT as last used, GLO_KEPT: restored at power-on, a project's own win), drumch
  * (GLO > SYSTEM DRUM: 0 channel 10, 1..16, 17 OFF), lights (the menu's LIGHTS: 0 MID, else OFF..FULL + 1); every
  * field 0 = the default, so spare words can take new ones. spare[1] holds tagged A4 concert pitch (0 = 440 Hz).
- * A saved template (project.c tmpl_t) follows the record.
+ * A saved template (project.c tmpl_t; TPLM, six tracks) follows the record.
  * palette: UI_PAL_TAG + index (any other id: the default).
  * favorites.factory[15][28]: tagged AUTOSAVE OFF; zero/unknown keeps autosave ON.
  * bold: no longer used (one font weight); kept as it was saved, unless it holds the HOLD setting (panel.c). */

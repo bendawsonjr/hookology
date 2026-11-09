@@ -130,6 +130,20 @@ static int check(const char *what, int ok)
 }
 
 /* main.c melodee_init */
+/* a TPLL template (four tracks, every native patch) of the tracks as they are: what template_save wrote before TPLM */
+static void tmpl4_capture(tmpl4_t *o)
+{
+    memset(o, 0, sizeof *o);
+    memcpy(o->g, tmpl.g, sizeof o->g); memcpy(o->master, tmpl.master, sizeof o->master);
+    o->sel = tmpl.sel; o->ntrk = tmpl.ntrk;
+    for (uint32_t k = 0; k < PROJ_TRK; k++) {
+        o->t[k].engine = trk[k].eng_req; o->t[k].preset = trk[k].preset;
+        for (uint32_t i = 0; i < P_COUNT; i++) o->t[k].p[i] = motion_base_value(&trk[k], i);
+        o->cz[k] = *cz_patch_of(k); o->p5[k] = *p5_patch_of(&trk[k]); o->drum[k] = *drum_patch_of(k);
+        fm6_pack(fm6_patch_of(k), o->fm6[k]); memcpy(o->fm6_fn[k], fm6_fn[k], FM6_NFN);
+    }
+    o->size = sizeof *o; o->magic = TMPL4_MAGIC;
+}
 static void ui_power_on(void)
 {
     uint32_t i;
