@@ -153,7 +153,7 @@ static void ui_power_on(void)
     memset(&song, 0, sizeof song);
     memset(&chain, 0, sizeof chain);
     chain_defaults(&chain_config);
-    pattern_init(); sec_reset(); scs.build = 0; tracks.knob_ms = 0; tracks.out = 0; tracks.clr = 0; trc.t0 = 0;
+    pattern_init(); sec_reset(); scs.build = 0; tracks.knob_ms = 0; tracks.out = 0; tracks.clr = 0; trc.t0 = 0; page_patterns_on = page_song_on = 1;   /* (their tests: hidden in the build, ui.c) */
     memset(&ui, 0, sizeof ui);
     memset(&boot_work, 0, sizeof boot_work);
     memset(&step_history, 0, sizeof step_history);
@@ -653,7 +653,7 @@ static int test_midi(void)
         bad += check("MIDI accepts a fresh note after overflow recovery", mn_get(0, 61) == 1u && gated_notes(&trk[0]));
     }
     {
-        const page_t *pg = &PAGES[page_first(FAM_GLO) + 1u];
+        const page_t *pg = &PAGES[page_first(FAM_GLO) + 2u];   /* (TEMPO, GLOBAL, SYSTEM) */
         int16_t *vp;
         const param_desc_t *d = page_desc(pg, 2, &vp);
         char v[8];
@@ -662,7 +662,7 @@ static int test_midi(void)
         bad += check("GLO > SYSTEM K3: ROUT CH1-4 / SEL", str_eq(pg->title, "SYSTEM") && vp == &song.g[G_ROUTE] && str_eq(v, "SEL"));
         param_format(d, 4, v, &u);
         bad += check("GLO > SYSTEM K3: all four ranges exposed", d->max == 4 && str_eq(v, "13-16"));
-        pg=&PAGES[page_first(FAM_GLO)];d=page_desc(pg,1,&vp);
+        pg=&PAGES[page_first(FAM_GLO) + 1u];d=page_desc(pg,1,&vp);
         bad+=check("GLO > GLOBAL K2: device shared BUDGET",d && str_eq(d->label,"BUDGET") && vp==&settings_budget && pg->id[1]==G_BUDGET);
     }
     return bad;
@@ -2819,12 +2819,13 @@ static int test_product_ux(void)
     int16_t len = TSEL->p[P_SLEN], send = TSEL->p[P_RESERVED36];
     turn(EN_K3, 1);
     bad += check("MIXER K3 is inert, never changes sequence length", TSEL->p[P_SLEN] == len && TSEL->p[P_RESERVED36] == send);
-    press(B_GLO); ok = cur_page()->fam == FAM_GLO && str_eq(cur_page()->title, "GLOBAL");
+    press(B_GLO); ok = cur_page()->fam == FAM_GLO && str_eq(cur_page()->title, "TEMPO");   /* (Hookology: TEMPO first) */
+    press(B_GLO); ok &= str_eq(cur_page()->title, "GLOBAL");
     press(B_GLO); ok &= str_eq(cur_page()->title, "SYSTEM");
     press(B_GLO); ok &= str_eq(cur_page()->title, "WEIGHTS");
     press(B_GLO); ok &= str_eq(cur_page()->title, "WEIGHTS 2");
     press(B_GLO); ok &= cur_page()->graph == GR_TRK;
-    bad += check("GLO cycles MIXER > GLOBAL > SYSTEM > WEIGHTS > WEIGHTS 2 > MIXER", ok);
+    bad += check("GLO cycles MIXER > TEMPO > GLOBAL > SYSTEM > WEIGHTS > WEIGHTS 2 > MIXER", ok);
     go_home(); hold(B_SEQ);
     bad += check("long SEQ goes directly to PATTERNS (the song under it) with no tap on release", cur_page()->graph == GR_PATGRID);
     turn(EN_SELECT, 1);
@@ -3618,9 +3619,11 @@ static int test_tempo_select(void)
     turn(EN_SELECT, 1);
     ok &= str_eq(cur_page()->title, "WEIGHTS 2");
     turn(EN_SELECT, 1);
+    ok &= str_eq(cur_page()->title, "TEMPO");
+    turn(EN_SELECT, 1);
     ok &= str_eq(cur_page()->title, "GLOBAL");
-    turn(EN_SELECT, -1);
-    bad += check("SELECT on GLO: GLOBAL -> SYSTEM -> WEIGHTS -> WEIGHTS 2 -> GLOBAL (wraps), back the other way; the BPM untouched",
+    turn(EN_SELECT, -1); turn(EN_SELECT, -1);
+    bad += check("SELECT on GLO: GLOBAL -> SYSTEM -> WEIGHTS -> WEIGHTS 2 -> TEMPO -> GLOBAL (wraps), back the other way; the BPM untouched",
                  ok && str_eq(cur_page()->title, "WEIGHTS 2") && song.g[G_BPM] == 120);
     go_title("NOTES");
     cursor_set(4);
@@ -3634,7 +3637,7 @@ static int test_tempo_select(void)
     turn(EN_K1, 4);
     turn(EN_K2, 10);
     turn(EN_K3, 6);
-    ok = song.g[G_BPM] == 124 && song.g[G_SWING] == 10 && cur_page()->fam == FAM_SEQ;
+    ok = song.g[G_BPM] == 124 && song.g[G_SWING] == 10 && cur_page()->fam == FAM_GLO;
     for (uint32_t k=0;k<NTRK;k++) ok &= trk[k].p[P_RECQ]==6;
     memset(proj_slot, 0, sizeof proj_slot);
     memset(proj_bank_slot, 0, sizeof proj_bank_slot);
@@ -3644,7 +3647,7 @@ static int test_tempo_select(void)
     trk[0].p[P_RECQ]=0;
     project_load(2);
     for (uint32_t k=0;k<NTRK;k++) ok &= trk[k].p[P_RECQ]==6;
-    bad += check("SEQ > TEMPO: BPM, SWG and project-wide recording QNT survive save/load", ok && song.g[G_BPM] == 124 &&
+    bad += check("GLO > TEMPO: BPM, SWG and project-wide recording QNT survive save/load", ok && song.g[G_BPM] == 124 &&
                  song.g[G_SWING] == 10);
     memset(proj_slot, 0, sizeof proj_slot);
     memset(proj_bank_slot, 0, sizeof proj_bank_slot);

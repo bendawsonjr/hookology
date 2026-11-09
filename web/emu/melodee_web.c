@@ -33,6 +33,8 @@ EXPORT(web_boot) void web_boot(uint32_t master)       /* main.c melodee_init, as
     fm6_init();
     cz_init();
     ui_power_on();
+    page_patterns_on = HOOKOLOGY_PATTERNS_PAGE;        /* (the tests' power-on shows them; the FM-1 does not) */
+    page_song_on = HOOKOLOGY_SONG_PAGE;
     song.master_q12 = (master * master) >> 8;
     settings.palette = UI_DEFAULT_INDEX;
     palette_set(settings.palette);

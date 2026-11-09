@@ -2632,8 +2632,10 @@ static void ui_input(void)
     }
     if (lytap)                                          /* a layer's button acts on release (held: the layer) */
         layer_tap(lytap);
-    if (seq == BT_HOLD) {                               /* SEQ held: PATTERNS, the song under it (SONG: SELECT) */
-        for (k = 0; k < NPAGES; k++) if (PAGES[k].graph == GR_PATGRID) break;
+    if (seq == BT_HOLD) {                               /* SEQ held: PATTERNS, the song under it (SONG: SELECT); PATTERNS
+                                                         * hidden (Hookology): SECTIONS */
+        uint32_t g = page_patterns_on ? GR_PATGRID : GR_SECTIONS;
+        for (k = 0; k < NPAGES; k++) if (PAGES[k].graph == g) break;
         ui.home = 0; ui.page = (uint8_t)k; ui.fam_last[FAM_SEQ] = ui.page; page_entered();
     } else if (seq == BT_TAP) {
         open_family(FAM_SEQ);

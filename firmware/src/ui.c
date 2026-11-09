@@ -292,8 +292,20 @@ static int native_page(uint32_t i, uint32_t fam)       /* page i: one of fam's n
     return 0;
 }
 
+/* Hookology hides SEQ's PATTERNS and SONG (2026-11-09); the code stays: a build with HOOKOLOGY_PATTERNS_PAGE=1 or
+ * HOOKOLOGY_SONG_PAGE=1 brings either back as it was (SEQ held then opens PATTERNS again). The song itself, its
+ * playback and SECTIONS' list of it are unchanged */
+#ifndef HOOKOLOGY_PATTERNS_PAGE
+#define HOOKOLOGY_PATTERNS_PAGE 0
+#endif
+#ifndef HOOKOLOGY_SONG_PAGE
+#define HOOKOLOGY_SONG_PAGE 0
+#endif
+static uint8_t page_patterns_on = HOOKOLOGY_PATTERNS_PAGE, page_song_on = HOOKOLOGY_SONG_PAGE;
 static int page_visible(uint32_t i)
 {
+    if (PAGES[i].graph == GR_PATGRID && !page_patterns_on) return 0;
+    if (PAGES[i].graph == GR_SONG && !page_song_on) return 0;
     if (PAGES[i].graph == GR_HERA && (TSEL->p[P_CHRD] != CHRD_HERA || chord_kit(TSEL))) return 0;
     if (midi_track_only(TSEL)) {
         if (trk_midi_slot(song.sel) && PAGES[i].graph == GR_BROWSE) return 0;   /* (tracks 5..8: no other sound) */

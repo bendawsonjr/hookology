@@ -175,8 +175,29 @@ static void song_list(void)
     press(B_PLAY); units_block(0);
     puts("SECTIONS: the song list's knobs, '*', undo and PLAY passed");
 }
+/* the build's SEQ (Hookology): PATTERNS and SONG hidden, SEQ held opens SECTIONS, TEMPO on GLO after MIXER */
+static void seq_pages(void)
+{
+    uint32_t seen = 0, i;
+    ui_power_on(); page_patterns_on = HOOKOLOGY_PATTERNS_PAGE; page_song_on = HOOKOLOGY_SONG_PAGE;
+    go_home(); press(B_SEQ);
+    for (i = 0; i < 12u; i++) {
+        uint32_t g = cur_page()->graph;
+        assert(cur_page()->fam == FAM_SEQ && g != GR_PATGRID && g != GR_SONG && !str_eq(cur_page()->title, "TEMPO"));
+        if (g == GR_SECTIONS) seen |= 1u;
+        press(B_SEQ);
+    }
+    assert(seen == 1u);
+    go_home(); hold(B_SEQ); assert(!ui.home && cur_page()->graph == GR_SECTIONS);
+    go_home(); press(B_GLO); assert(cur_page()->graph == GR_TRK);
+    press(B_GLO); assert(str_eq(cur_page()->title, "TEMPO"));
+    press(B_GLO); assert(str_eq(cur_page()->title, "GLOBAL"));
+    page_patterns_on = page_song_on = 1;
+    puts("SEQ: PATTERNS and SONG hidden, SEQ held opens SECTIONS, TEMPO after MIXER on GLO passed");
+}
 int main(void)
 {
+    seq_pages();
     keys_and_copy();
     switch_at_loop_end();
     song_rec();
