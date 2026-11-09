@@ -846,6 +846,16 @@ static void jam_take(void)
         chain_config.row[i].repeat = jam.rep[i];
     }
     chain_config.count = jam.n;
+    for (i = 0; i < jam.n; i++) {                       /* the jam counts track 1's loops; a repeat is the row's lead's
+                                                         * (song_chain.c chain_lead): as many of those, nearest, 1..16 */
+        uint32_t lead = chain_lead(i), b0 = chain_patterns[i][0], t0, tl, r;
+        if (lead >= NTRK || !lead || b0 >= NPAT) continue;
+        t0 = (uint32_t)chain_loop_samples(0, b0);
+        tl = (uint32_t)chain_loop_samples(lead, chain_patterns[i][lead]);
+        if (!tl || tl <= t0) continue;
+        r = (chain_config.row[i].repeat * t0 + tl / 2u) / tl;
+        chain_config.row[i].repeat = (uint8_t)(r < 1u ? 1u : r > 16u ? 16u : r);
+    }
     ui.song_row = 0;
     ui.act = 0;
     song_edit_cancel(); song_edit_end();

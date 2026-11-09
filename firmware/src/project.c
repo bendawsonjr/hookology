@@ -1556,6 +1556,7 @@ static uint32_t chain_prepare_from(uint32_t start)
     for (uint32_t k = 0; k < NTRK; k++) { pattern_commit(&trk[k]); trk[k].pattern_next = 0xff; }
     chain.config = chain_config;
     chain.start = (uint8_t)start;
+    chain_leads();                                      /* (each row's lead before the seek counts its length) */
     for (uint32_t k = 0; k < NTRK; k++) {
         chain.seek_samples[k] = 0;
         for (uint32_t row = chain_origin(start, k); row < start; row++) chain.seek_samples[k] += chain_row_samples(row);

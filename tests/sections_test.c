@@ -83,14 +83,14 @@ static void song_rec(void)
     units_block(loop / 2u);
     press(B_REC); units_block(0);
     assert(song.playing && secs.rec && !scs.build && msg_is("SONG REC: NEXT LOOP"));
-    units_block(loop / 2u);                             /* logged from here: A four times */
+    units_block(loop / 2u);                             /* logged from here: A four of track 1's loops, two of A's */
     units_block(loop); units_block(loop); units_block(loop);
     tap_key(SEC_KEY[1]); frame();
     units_block(loop / 2u); units_block(loop / 2u);      /* B from track 1's loop end */
     units_block(loop / 2u);
     press(B_REC);                                       /* finished: the song, the loop plays on */
     assert(!secs.rec && song.playing && chain_config.count == 2);
-    assert(sec_row(0) == 0 && chain_config.row[0].repeat == 4 && sec_row(1) == 1 && chain_config.row[1].repeat == 1);
+    assert(sec_row(0) == 0 && chain_config.row[0].repeat == 2 && sec_row(1) == 1 && chain_config.row[1].repeat == 1);
     press(B_PLAY); units_block(0); frame();
     transport_req = 1; units_block(0); units_block(loop / 2u);   /* the loop playing (PLAY here: the song) */
     press(B_REC); units_block(0);                       /* over a song: asked first */
@@ -99,7 +99,7 @@ static void song_rec(void)
     assert(secs.rec && song.playing);
     units_block(loop / 2u); units_block(loop); units_block(loop);
     press(B_PLAY); units_block(0); frame();             /* STOP finishes it too */
-    assert(!secs.rec && chain_config.count == 1 && sec_row(0) == 1 && chain_config.row[0].repeat == 3);   /* (B still the loop: three loop starts) */
+    assert(!secs.rec && chain_config.count == 1 && sec_row(0) == 1 && chain_config.row[0].repeat == 2);   /* (B still the loop: three of track 1's, B's two) */
     song_edit_history(0);                               /* SONG's undo brings back the song before */
     assert(chain_config.count == 2 && sec_row(1) == 1);
     puts("SECTIONS: SONG REC from played sections, its question, STOP and undo passed");
@@ -144,6 +144,27 @@ static void build(void)
     press(B_REC); frame(); go_page(GR_SONG); frame();   /* leaving the page ends it */
     assert(!scs.build);
     puts("SECTIONS: BUILD adds, repeats, deletes, merges, clears, undoes and ends passed");
+}
+/* a song entry's repeat is the whole section: its longest track's loop (track 2's four steps here, track 1's two) */
+static void whole_section(void)
+{
+    uint32_t loop1;
+    setup();
+    sec_hold_key(1); tap_key(SEC_KEY[0]); frame();     /* B a copy of A; A the loop */
+    loop1 = 2u * tick();
+    press(B_REC); frame(); tap_key(SEC_KEY[0]); frame(); tap_key(SEC_KEY[0]); frame(); tap_key(SEC_KEY[1]); frame();
+    press(B_REC); frame();
+    assert(chain_config.count == 2 && chain_config.row[0].repeat == 2);
+    press(B_PLAY); units_block(0); frame();
+    assert(chain.running && chain.row == 0 && chain.lead[0] == 1u);
+    {                                                   /* A x2: four of track 1's loops (eight steps), then B */
+        uint32_t q = tick() / 4u, i, at = 0;
+        for (i = 0; i < 40u && !at; i++) { units_block(q); frame(); if (chain.row == 1u) at = i + 1u; }
+        assert(at == 32u && trk[0].pattern == 1u);
+        (void)loop1;
+    }
+    press(B_PLAY); units_block(0);
+    puts("SECTIONS: a song entry's repeat is the whole section (its longest track) passed");
 }
 static void song_list(void)
 {
@@ -202,6 +223,7 @@ int main(void)
     switch_at_loop_end();
     song_rec();
     build();
+    whole_section();
     song_list();
     puts("SECTIONS tests passed");
     return 0;

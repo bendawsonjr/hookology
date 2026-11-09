@@ -15,6 +15,7 @@ static struct {
     uint8_t slot, rec, start, seek_chase, fx_event;
     uint32_t carry, rest_pos, seek_phase[NTRK];
     uint64_t seek_samples[NTRK], start_units;     /* start_units: from the song's top to chain.start */
+    uint8_t lead[CHAIN_ROWS];                     /* each row's lead track (chain_leads): its loop is one repeat */
 } chain;
 
 static void seq_release(track_t *t);
@@ -100,14 +101,53 @@ static uint32_t chain_block_end(uint32_t row, uint32_t track)
     while (row + 1u < chain_config.count && chain_patterns[row+1u][track] == CHAIN_HOLD) row++;
     return row + 1u;
 }
+/* one loop of track k's pattern bank: its steps at its division, swing's odd step */
+static uint64_t chain_loop_samples(uint32_t k, uint32_t bank)
+{
+    uint32_t len = (uint32_t)pattern_timing(k, bank, 0);
+    uint32_t period = seq_div_samples((uint32_t)pattern_timing(k, bank, 1));
+    int32_t swing = clamp(pattern_timing(k, bank, 2) + song.g[G_SWING], 0, SWING_MAX);
+    return (uint64_t)len * period + (len & 1u) * (uint32_t)(swing * (int32_t)period / 250);
+}
+/* track k's bank holds a note, a hit or a recorded note's step (ui_patterns.c pattern_used, here for the builds
+ * without the UI) */
+static int chain_bank_used(uint32_t k, uint32_t bank)
+{
+    pattern_t p;
+    uint32_t i;
+    pattern_read(k, bank, &p);
+    for (i = 0; i < NSTEP; i++)
+        if ((p.step[i].time == ST_NOTE && (p.step[i].n || p.step[i].hit)) || (p.step[i].flags & SF_RECORDED))
+            return 1;
+    return 0;
+}
+/* row r's lead (Hookology): a whole section's row (every track in use on one of A..H), of its tracks with something in
+ * it, the one whose loop is longest (the first of equals), so one repeat is the whole section, not track 1's bar;
+ * other rows, and none with notes: track 1 (0xFF: a rest or a continuation on track 1, the four-beat clock). Foreground (pattern_read) */
+static uint32_t chain_lead(uint32_t r)
+{
+    uint32_t k, n = trk_n(), lead = 0xFFu, b0 = chain_patterns[r][0];
+    uint64_t best = 0;
+    for (k = 0; k < n; k++)                             /* only a whole section (SECTIONS' A..H on every track, its own
+                                                         * sounds); SONG's mixed rows keep track 1's clock */
+        if (b0 >= 8u || chain_patterns[r][k] != b0 || chain_config.sound[r][k])
+            return b0 < NPAT ? 0u : 0xFFu;
+    for (k = 0; k < n; k++) {
+        uint32_t bank = chain_patterns[r][k];
+        uint64_t len;
+        if (bank >= NPAT || !chain_bank_used(k, bank)) continue;
+        len = chain_loop_samples(k, bank);
+        if (len > best) { best = len; lead = k; }
+    }
+    if (lead == 0xFFu) lead = chain_patterns[r][0] < NPAT ? 0u : 0xFFu;
+    return lead;
+}
+static void chain_leads(void) { for (uint32_t r = 0; r < chain_config.count; r++) chain.lead[r] = (uint8_t)chain_lead(r); }
 static uint64_t chain_row_samples(uint32_t row)
 {
-    uint32_t bank = chain_patterns[row][0];
-    if (bank >= NPAT) return (uint64_t)16u * seq_div_samples(2u) * chain_config.row[row].repeat;
-    uint32_t len = (uint32_t)pattern_timing(0, bank, 0);
-    uint32_t period = seq_div_samples((uint32_t)pattern_timing(0, bank, 1));
-    int32_t swing = clamp(pattern_timing(0, bank, 2) + song.g[G_SWING], 0, SWING_MAX);
-    return ((uint64_t)len * period + (len & 1u) * (uint32_t)(swing * (int32_t)period / 250)) * chain_config.row[row].repeat;
+    uint32_t lead = chain.running || chain.armed ? chain.lead[row] : chain_lead(row);   /* (stopped: as it stands) */
+    if (lead >= NTRK) return (uint64_t)16u * seq_div_samples(2u) * chain_config.row[row].repeat;
+    return chain_loop_samples(lead, chain_patterns[row][lead]) * chain_config.row[row].repeat;
 }
 /* Long arrangements exceed 32-bit samples. The target has no 64-bit divide
  * runtime; the common short case still uses its native 32-bit operation. */
@@ -218,11 +258,12 @@ static void chain_fx_tick(void)
 }
 static void chain_tick(uint32_t n)
 {
-    const track_t *t = &trk[0];
+    uint32_t lead = chain.lead[chain.row];
+    const track_t *t = &trk[lead < NTRK ? lead : 0u];   /* (the row's lead: its loop end is the repeat's) */
     uint32_t length;
     if (!chain.running || t->seq_pos >= 0x7FFFFFFFu) return;
     uint32_t position;
-    int timed = chain_patterns[chain.row][0] >= NPAT;
+    int timed = lead >= NTRK;
     if (timed) {
         /* Rests and continuations retain the section's four-beat clock. */
         length = 16u * seq_div_samples(2u);
