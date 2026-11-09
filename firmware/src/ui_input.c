@@ -630,7 +630,7 @@ static void tracks_steps(track_t *t, int32_t s)
 {
     char v[8];
     int32_t len = t->p[P_SLEN], from = t->slen_next ? t->slen_next : len;
-    int32_t to = steps_land(from, clamp(from + accel(EN_K3, s, NSTEP - 1), 1, NSTEP));
+    int32_t to = steps_land(from, clamp(from + accel(EN_K4, s, NSTEP - 1), 1, NSTEP));
     if (to == from) return;
     fm1_irq_off();
     if (song.playing) t->slen_next = (uint8_t)(to == len ? 0 : to);
@@ -640,16 +640,18 @@ static void tracks_steps(track_t *t, int32_t s)
     ui_say("STEPS ", v);
     if (t->slen_next) ui_message("STEPS AT LOOP END");
 }
+/* TRACKS: KNOB 1 LEVEL, 2 PAN, 3 SWING, 4 STEPS (the strip comes in, ui_tracks.c) */
 static void tracks_knob(uint32_t k, int32_t s)
 {
     track_t *t = TSEL;
-    if (k != 1u && k != 3u && chain_busy()) {           /* (the song owns the timing, as on SEQ) */
+    tracks_knob_touch(k);
+    if (k >= 2u && chain_busy()) {                      /* (the song owns the timing, as on SEQ) */
         ui_message("STOP TO EDIT");
         return;
     }
-    if (k == 0u) tracks_value(t, P_SSWING, k, s);
-    else if (k == 2u) tracks_steps(t, s);
-    else if (!midi_track_only(t)) tracks_value(t, k == 1u ? P_LEVEL : P_PAN, k, s);
+    if (k == 2u) tracks_value(t, P_SSWING, k, s);
+    else if (k == 3u) tracks_steps(t, s);
+    else if (!midi_track_only(t)) tracks_value(t, k == 0u ? P_LEVEL : P_PAN, k, s);
 }
 
 /* REC latches recording; SEQ's pattern shortcuts arm only one pass. During

@@ -36,6 +36,8 @@ EXPORT(web_boot) void web_boot(uint32_t master)       /* main.c melodee_init, as
     song.master_q12 = (master * master) >> 8;
     settings.palette = UI_DEFAULT_INDEX;
     palette_set(settings.palette);
+    ui.home = 1;
+    ui.home_pg = HP_TRACKS;                           /* (main.c melodee_init: the FM-1 starts on TRACKS) */
     ui.force = 1;
     screen_clear();
 }
