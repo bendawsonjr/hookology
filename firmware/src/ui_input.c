@@ -1808,6 +1808,47 @@ static void tr_clear_poll(void)
     }
 }
 
+/* OCT- held a second on a note page deletes (Hookology; EDIT tapped there opens EDIT's pages): NOTES the note picked
+ * (several picked: all of them), the DRUM grid the cursor's step, DRUM HIT the hit. EDIT held undoes */
+#define NOTE_DEL_MS 1000u
+static int note_del_page(void)
+{
+    return !ui.home && !ui.menu && !ui.confirm && !ui.layer && !name_on() && !pop.on &&
+           (cur_page()->scope == SC_DRUMHIT || cur_page()->graph == GR_ROLL);
+}
+static void step_delete_edit(void);
+static void note_del(void)
+{
+    if (cur_page()->scope == SC_DRUMHIT) { drum_hit_delete(); return; }
+    if (chain_busy()) { ui_message("STOP TO EDIT"); return; }
+    if (step_modifier_context()) { step_delete_edit(); return; }   /* NOTES: the note with its ties */
+    if (song.seq_mode && cur_page()->graph == GR_ROLL) {   /* the DRUM grid: the step */
+        if (live_rec_sel() && notes_have_recording(TSEL)) { ui_message("STOP RECORDING"); return; }
+        fm1_irq_off();
+        if (drum_track(TSEL))
+            step_clear(&TSEL->step[ui.cursor]);
+        else
+            step_delete(TSEL, ui.cursor);
+        fm1_irq_on();
+        cursor_set(ui.cursor + 1);
+        ui_message("STEP CLEARED");
+    }
+}
+static void note_del_poll(void)
+{
+    static uint32_t t0;
+    static uint8_t done;
+    uint32_t held = ((fm1_in.buttons >> panel.btn[B_OCTDN]) & 1u) && !((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u) &&
+                    !((fm1_in.buttons >> panel.btn[B_EDIT]) & 1u) && !ui.step_mods;
+    if (!held || !note_del_page()) { t0 = done = 0; return; }
+    if (!t0) { t0 = fm1_ms | 1u; return; }
+    if (done || fm1_ms - (t0 & ~1u) < NOTE_DEL_MS) return;
+    done = 1;
+    oct_eat |= 1u;                                      /* (its release: no back) */
+    note_del();
+    ui.force = 1;
+}
+
 /* a page button let go (they act on release; a layer's own button: layer_gesture) */
 static void page_tap(uint32_t b)
 {
@@ -1825,23 +1866,8 @@ static void page_tap(uint32_t b)
         smap_open();
         return;
     }
-    if(b==B_EDIT && !ui.home && cur_page()->scope==SC_DRUMHIT){drum_hit_delete();return;}
     if (b == B_GLO) {
         open_global();                                  /* MIXER -> GLOBAL -> SYSTEM -> MIXER */
-        return;
-    }
-    if (b == B_EDIT && song.seq_mode && !ui.home && cur_page()->graph == GR_ROLL) {   /* the DRUM grid: EDIT clears
-                                                         * the step (synth STEP: a step modifier, ui_input) */
-        if (chain_busy()) { ui_message("STOP TO EDIT"); return; }
-        if (live_rec_sel() && notes_have_recording(TSEL)) { ui_message("STOP RECORDING"); return; }
-        fm1_irq_off();
-        if (drum_track(TSEL))
-            step_clear(&TSEL->step[ui.cursor]);
-        else
-            step_delete(TSEL, ui.cursor);
-        fm1_irq_on();
-        cursor_set(ui.cursor + 1);
-        ui_message("STEP CLEARED");
         return;
     }
     if (b == B_EDIT && !ui.home && (cur_page()->graph == GR_USER || cur_page()->graph == GR_SLOTS)) {
@@ -2722,6 +2748,7 @@ static void ui_input(void)
         notes_bulk_sheet_open();oct=0;
     } else if((bulk.on||ui.note_move||ui.note_copy)&&(oct&1u)){bulk_clear();oct=0;}
     tr_clear_poll();                                    /* TRACKS: OCT- held clears the track */
+    note_del_poll();                                    /* NOTES, the DRUM grid, DRUM HIT: OCT- held deletes */
     {                                                   /* SECTIONS' BUILD: OCT- held a second clears the song */
         static uint32_t t0;
         static uint8_t done;
@@ -2893,10 +2920,8 @@ static void ui_input(void)
                 b = panel_btn_of(k);
                 if (b != B_EDIT)
                     open_family(b == B_ENV ? FAM_ENV : FAM_SCL);
-                else if (chain_busy())
-                    ui_message("STOP TO EDIT");
                 else
-                    step_delete_edit();                 /* EDIT tapped: the note with its ties */
+                    page_tap(B_EDIT);                   /* EDIT tapped: its pages (OCT- held deletes, note_del) */
             }
             ui.step_used &= (uint16_t)~bit;
         }

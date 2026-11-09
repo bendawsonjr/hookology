@@ -264,6 +264,7 @@ static void hold(uint32_t label)                  /* held 0.8 s, then let go */
     frame();
 }
 static void press(uint32_t label);
+static void del_hold(void);                       /* (below: OCT- held a second, a note page's delete) */
 static void edit_redo(void)                       /* EDIT held + OCT+: redo a load */
 {
     fm1_in.buttons |= 1u << panel.btn[B_EDIT];
@@ -1309,8 +1310,8 @@ static int test_grid(void)
     turn(EN_K4, 1);
     ok &= t->step[2].hit == 1u << DV_CLAP && t->step[2].acc == 1u << DV_CLAP;
     bad += check("KNOB 1 STEP, 2 LANE, 3 HIT on / off, 4 ACC (an accent adds the hit)", ok);
-    press(B_EDIT);
-    bad += check("EDIT: the cursor step cleared, on to the next", t->step[2].time == ST_REST && !t->step[2].hit && ui.cursor == 3u &&
+    del_hold();
+    bad += check("OCT- held: the cursor step cleared, on to the next", t->step[2].time == ST_REST && !t->step[2].hit && ui.cursor == 3u &&
                  grid_on());
     /* pages: LEN 32, the page keys */
     t->p[P_SLEN] = 32;
@@ -2980,6 +2981,8 @@ static void btn_up(uint32_t label) { fm1_in.buttons &= ~(1u << panel.btn[label])
 static void key_down(uint32_t k) { fm1_in.notes |= 1u << k; host_notes |= 1u << k; keyboard_block(); }
 static void key_up(uint32_t k) { fm1_in.notes &= ~(1u << k); keyboard_block(); }
 static void frames(uint32_t ms) { uint32_t i; for (i = 0; i < ms / 16u; i++) frame(); }
+/* a note page's delete (Hookology): OCT- held a second (EDIT tapped opens EDIT's pages) */
+static void del_hold(void) { fm1_ms += 320u; btn_down(B_OCTDN); frame(); frames(1100u); btn_up(B_OCTDN); frame(); }
 static uint32_t gates(void)                        /* voices of every track with their key down */
 {
     uint32_t p, i, n = 0;
@@ -3058,7 +3061,14 @@ static int test_layer(void)
     btn_down(B_EDIT); frame();
     ok = step_on(&TSEL->step[0]) && ui.cursor == 0;
     btn_up(B_EDIT); frame();
-    bad += check("EDIT on STEP clears the step when let go (not on press)", ok && !step_on(&TSEL->step[0]) && ui.cursor == 1);
+    bad += check("EDIT on NOTES opens EDIT's pages when let go, the note kept (Hookology)",
+                 ok && step_on(&TSEL->step[0]) && !ui.home && cur_page()->fam == FAM_EDIT);
+    ui_power_on();
+    go_page(GR_ROLL); my_steps(TSEL); ui.cursor = 0; frame();
+    btn_down(B_OCTDN); frame(); frames(600u); ok = step_on(&TSEL->step[0]);
+    btn_up(B_OCTDN); frame(); ok &= step_on(&TSEL->step[0]) && ui.home;   /* a tap: back */
+    go_page(GR_ROLL); ui.cursor = 0; frame(); del_hold();
+    bad += check("OCT- held a second on NOTES deletes the note, a tap goes back", ok && !step_on(&TSEL->step[0]) && cur_page()->graph == GR_ROLL);
     ui_power_on(); hold(B_HOME);
     ok = ui.menu == 1; hold(B_HOME); ok &= !ui.menu;
     go_home(); hold(B_SEQ); ok &= cur_page()->graph == GR_PATGRID;

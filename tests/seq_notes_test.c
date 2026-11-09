@@ -27,7 +27,7 @@ static int selection_and_delete(void)
     bad += check("zoom and QNT preserve selection and original events",
                  ui.note_zoom==4 && notes_span()==1 && notes_selected(t)==2 && !memcmp(unchanged,recording,sizeof unchanged));
     t->p[P_RECQ]=0;
-    press(B_EDIT);
+    del_hold();
     bad += check("EDIT removes only the selected hit and preserves neighbouring event bytes",
                  !recording[2].vel && !memcmp(&saved[0],&recording[0],sizeof saved[0]) &&
                  !memcmp(&saved[1],&recording[1],sizeof saved[1]) && !memcmp(&saved[3],&recording[3],sizeof saved[3]) &&
@@ -57,7 +57,7 @@ static int deletion_history(void)
     for(uint32_t i=0;i<10;i++){seq_advance(180);input_on(t,60,70+i);seq_advance(60);input_off(t,60);}
     seq_stop(); song.rec=0; recorded_note_t saved[10];memcpy(saved,recording,sizeof saved);
     go_page(GR_ROLL);cursor_set(0);frame();
-    for(uint32_t i=0;i<10;i++)press(B_EDIT);
+    for(uint32_t i=0;i<10;i++)del_hold();
     int ok=1;for(uint32_t i=0;i<10;i++)ok&=!recording[i].vel;
     int bad=check("same-pitch deletions each become an edit even when the overview is unchanged",ok&&!step_on(&t->step[0]));
     for(uint32_t i=0;i<8;i++) {step_history_apply(0);frame();}
@@ -68,7 +68,7 @@ static int deletion_history(void)
     ok=1;for(uint32_t i=0;i<10;i++)ok&=!recording[i].vel;
     bad+=check("eight deletions redo without resurrecting the oldest two",ok&&!step_history_apply(1));
     step_history_apply(0);frame();step_history_apply(0);frame();
-    press(B_EDIT);
+    del_hold();
     bad+=check("a new one-hit deletion drops the old redo branch",!step_history_apply(1));
     recorded_note_t before_take[RECORD_MAX];memcpy(before_take,recording,sizeof before_take);
     song.rec=1;seq_start();seq_advance(0);seq_advance(180);input_on(t,60,120);seq_advance(60);input_off(t,60);seq_stop();song.rec=0;
@@ -85,16 +85,16 @@ static int loop_drums_and_playback(void)
     go_page(GR_ROLL);cursor_set(15);frame();
     int bad=check("late-loop events select in their final step although the overview is step zero",
                   notes_selected(t)==0&&recording_view(t,&recording[0])==0);
-    press(B_EDIT);bad+=check("late-loop deletion clears its step-zero overview",!recording[0].vel&&!step_on(&t->step[0]));
+    del_hold();bad+=check("late-loop deletion clears its step-zero overview",!recording[0].vel&&!step_on(&t->step[0]));
     hold(B_EDIT);bad+=check("late-loop undo restores the event and overview",!memcmp(&saved,&recording[0],sizeof saved)&&step_on(&t->step[0]));
-    cursor_set(1);frame();press(B_EDIT);bad+=check("empty interval deletion leaves neighbouring notes and manual history alone",!memcmp(&saved,&recording[0],sizeof saved)&&!step_history.pending&&!step_history.pos);
+    cursor_set(1);frame();del_hold();bad+=check("empty interval deletion leaves neighbouring notes and manual history alone",!memcmp(&saved,&recording[0],sizeof saved)&&!step_history.pending&&!step_history.pos);
     turn(EN_PRESET,100);bad+=check("zoom clamps at one step",ui.note_zoom==4);
     turn(EN_PRESET,-100);bad+=check("zoom clamps at sixteen steps",ui.note_zoom==0);
 
     raw_begin();t=&trk[0];set_engine_of(t,ENGI_DRUM);t->engine=t->eng_req;
     seq_advance(600);input_on(t,36,100);input_on(t,38,115);seq_advance(300);input_off(t,36);input_off(t,38);
     seq_advance(900);input_on(t,36,90);seq_advance(300);input_off(t,36);seq_stop();song.rec=0;
-    go_page(GR_ROLL);cursor_set(0);frame();notes_cycle(2); frame();press(B_EDIT);
+    go_page(GR_ROLL);cursor_set(0);frame();notes_cycle(2); frame();del_hold();
     bad+=check("drum deletion preserves repeated kicks and other lane hits",
                !recording[2].vel&&recording[0].vel&&recording[1].vel&&(t->step[0].hit&(1u<<drum_lane(36)))&&(t->step[0].hit&(1u<<drum_lane(38))));
     hold(B_EDIT);bad+=check("drum deletion undoes without opening the EDIT layer",recording[2].vel==90&&!ui.ly&&cur_page()->graph==GR_ROLL);
@@ -103,11 +103,11 @@ static int loop_drums_and_playback(void)
     seq_advance(100);input_on(t,60,90);seq_advance(100);input_off(t,60);seq_stop();song.rec=0;
     go_page(GR_ROLL);cursor_set(0);frame();
     t->p[P_RECQ]=3;raw_replay();
-    int ok=recording_refs[0][60]==2&&gate_note(t,60);press(B_EDIT);
+    int ok=recording_refs[0][60]==2&&gate_note(t,60);del_hold();
     ok&=recording_refs[0][60]==1&&gate_note(t,60)&&!recording[0].vel&&recording[1].vel;
     seq_advance(100);ok&=!gate_note(t,60)&&!recording_refs[0][60];
     bad+=check("sounding-event deletion preserves overlapping same-pitch ownership and its final release",ok);
-    seq_stop();song.rec=1;seq_start();seq_advance(0);frame();recorded_note_t before=recording[1];press(B_EDIT);
+    seq_stop();song.rec=1;seq_start();seq_advance(0);frame();recorded_note_t before=recording[1];del_hold();
     bad+=check("a live EDIT tap without audio passage does not delete a selected hit on release",!memcmp(&before,&recording[1],sizeof before)&&!seq_erase_active(t));
     seq_stop();song.rec=0;
     return bad;
@@ -136,7 +136,7 @@ static int timing_geometry_and_context(void)
     pattern_switch(t,7);frame();bad+=check("switching banks clears stale hit selection",notes_selected(t)==RECORD_MAX);
     pattern_switch(t,0);frame();bad+=check("returning to the recorded bank selects its first original hit",notes_selected(t)==saved);
     track_select(1);frame();bad+=check("switching tracks cannot select another track's recording",notes_selected(TSEL)==RECORD_MAX);
-    track_select(0);frame();notes_cycle(1); frame();press(B_EDIT);
+    track_select(0);frame();notes_cycle(1); frame();del_hold();
     bad+=check("event deletion rebuilds the surviving overview's pitch and accent",t->step[1].time==ST_REST&&t->step[0].note[0]==61&&!(t->step[0].flags&SF_ACCENT));
     return bad;
 }
@@ -165,7 +165,7 @@ static int control_clashes(void)
     fm1_in.buttons|=1u<<panel.btn[B_EDIT];host_pressed|=1u<<panel.btn[B_EDIT];frame();
     host_enc[panel.enc[EN_K1]]+=panel.dir[EN_K1];fm1_in.buttons&=~(1u<<panel.btn[B_EDIT]);frame();
     bad+=check("release-frame selection consumes EDIT without deleting a note",notes_selected(t)==1&&!memcmp(saved,recording,sizeof saved));
-    t=clash_setup();press(B_EDIT);
+    t=clash_setup();del_hold();
     fm1_in.buttons|=1u<<panel.btn[B_EDIT];host_pressed|=1u<<panel.btn[B_EDIT];frame();
     hold(B_EDIT);fm1_in.buttons&=~(1u<<panel.btn[B_EDIT]);frame();
     bad+=check("EDIT hold undo cannot delete the restored hit on release",recording[0].vel==100&&recording_active(t,0));
@@ -175,7 +175,7 @@ static int control_clashes(void)
     seq_advance(300);input_off(&trk[1],65);frame();stable&=ui.note_pick==selection;
     bad+=check("recording and releasing notes on another track preserves the selected hit",stable);
     seq_stop();song.rec=0;
-    t=clash_setup();press(B_EDIT);
+    t=clash_setup();del_hold();
     song.rec=2;seq_start();seq_advance(0);seq_advance(600);input_on(&trk[1],65,100);
     recorded_note_t replacement=recording[0];
     /* An ISR may reuse a freed slot after the frame's sync but before end. */
@@ -192,7 +192,7 @@ static int control_clashes(void)
     press(B_PLAY);fm1_in.buttons&=~(1u<<panel.btn[B_EDIT]);frame();
     bad+=check("PLAY with EDIT held requests transport without deleting a note on release",transport_req==1&&!memcmp(saved,recording,sizeof saved));
     transport_req=0;
-    t=clash_setup();memcpy(saved,recording,sizeof saved);chain.running=1;press(B_EDIT);
+    t=clash_setup();memcpy(saved,recording,sizeof saved);chain.running=1;del_hold();
     bad+=check("song-chain protection also blocks individual note deletion",!memcmp(saved,recording,sizeof saved)&&msg_is("STOP TO EDIT"));
     chain.running=0;
     for(uint32_t layer=LAYER_GLO;layer<LAYER_SCL;layer++) {
@@ -246,7 +246,7 @@ static int manual_chord_controls(void)
     step_note_resize(t,0,3);go_page(GR_ROLL);cursor_set(0);frame();
     turn(EN_K1,1);turn(EN_K2,2);
     int bad=check("manual chords select and transpose one pitch at a time",ui.note_slot==1&&t->step[0].note[0]==60&&t->step[0].note[1]==66&&t->step[0].note[2]==67);
-    press(B_EDIT);bad+=check("DELETE removes the highlighted chord pitch and retains other pitches and tails",t->step[0].n==2&&t->step[0].note[0]==60&&t->step[0].note[1]==67&&step_note_length(t,0)==3);
+    del_hold();bad+=check("DELETE removes the highlighted chord pitch and retains other pitches and tails",t->step[0].n==2&&t->step[0].note[0]==60&&t->step[0].note[1]==67&&step_note_length(t,0)==3);
     hold(B_EDIT);bad+=check("chord deletion undo restores the selected pitch and its focus",ui.note_slot==1&&t->step[0].n==3&&t->step[0].note[1]==66);
     turn(EN_K4,-10);bad+=check("manual velocity edits control playback even after an accent",t->step[0].vel==117&&!(t->step[0].flags&SF_ACCENT));
     fm1_in.buttons|=1u<<panel.btn[B_ENV];host_pressed|=1u<<panel.btn[B_ENV];frame();turn(EN_K4,1);fm1_in.buttons&=~(1u<<panel.btn[B_ENV]);frame();
@@ -280,7 +280,7 @@ static int drum_recording_layout(void)
     go_page(GR_ROLL);frame();seq_advance(600);input_on(t,36,100);seq_advance(100);input_off(t,36);frame();
     int bad=check("the first recorded drum hit keeps live lane-key mapping and the grid",grid_on()&&song.grid==1u);
     seq_advance(500);input_on(t,38,100);seq_advance(100);input_off(t,38);frame();
-    recorded_note_t first=recording[0];press(B_EDIT);
+    recorded_note_t first=recording[0];del_hold();
     bad+=check("a live drum EDIT tap consumes release without deleting the overview",recording_active(t,0)&&!memcmp(&first,&recording[0],sizeof first)&&!seq_erase_active(t));
     seq_stop();song.rec=0;frame();
     bad+=check("stopping drum recording reveals precise note editing in the same page",!grid_on()&&!song.grid&&cur_page()->graph==GR_ROLL&&notes_selected(t)<RECORD_MAX);
@@ -455,7 +455,7 @@ static void delete_range(uint32_t first,uint32_t last)
     bulk.on=1;bulk.track=song.sel;bulk.generation=TSEL->pattern_gen;
     bulk.engine=(uint8_t)library_engine();bulk.pattern=TSEL->pattern;
     bulk.anchor=(uint16_t)first;bulk.end=(uint16_t)last;
-    press(B_EDIT);
+    del_hold();
 }
 static int bulk_and_pattern_clears(void)
 {
@@ -481,7 +481,7 @@ static int bulk_and_pattern_clears(void)
     bulk.on=2;bulk.track=song.sel;bulk.generation=recording_generation;
     bulk.engine=(uint8_t)library_engine();bulk.pattern=TSEL->pattern;
     memset(bulk.notes,0,sizeof bulk.notes);bulk.notes[0]=1u<<3;
-    cursor_set(1);frame();press(B_EDIT);
+    cursor_set(1);frame();del_hold();
     bad+=check("exact selection after a move deletes selected events rather than the cursor's neighbour",!recording[3].vel&&recording[2].vel);
 
     raw_begin();t=TSEL;
@@ -550,7 +550,7 @@ static int swung_notes_editing(void)
                   recorded_step(&recording[3])==2&&notes_selected(t)==3&&notes_rank(t,3,&count)==1&&count==1);
     cursor_set(2);frame();
     bad+=check("..and the even step holds only its own note",notes_selected(t)==2&&notes_rank(t,2,&count)==1&&count==1);
-    cursor_set(3);frame();press(B_EDIT);
+    cursor_set(3);frame();del_hold();
     bad+=check("swung EDIT on the odd step deletes its note only",!recording[3].vel&&!step_on(&t->step[3])&&
                !memcmp(&saved[2],&recording[2],sizeof saved[2])&&step_on(&t->step[2]));
     hold(B_EDIT);bad+=check("swung delete undo restores the note and its focus",!memcmp(saved,recording,sizeof saved)&&ui.cursor==3&&notes_selected(t)==3);

@@ -71,7 +71,7 @@ static int test_note_edits(void)
     bad += check("several SCL-held moves are one undo", step_note_length(t, 14) == 3 && t->step[14].n == 3 && ui.cursor == 14);
     history_key(B_OCTUP);
     bad += check("move redo preserves all note data", step_note_length(t, 1) == 3 && t->step[1].probability == 50);
-    cursor_set(2); press(B_EDIT);
+    cursor_set(2); del_hold();
     bad += check("EDIT on a chord tail removes one pitch and preserves its neighbours and ties",
                  t->step[1].n == 2 && t->step[1].note[0] == 64 && t->step[2].time == ST_TIE && t->step[3].time == ST_TIE && t->step[4].note[0] == 72);
     hold(B_EDIT);
@@ -253,7 +253,7 @@ static int test_step_modifiers(void)
     hold(B_EDIT);
     bad += check("one SCL-held movement gesture is one undo", step_note_length(t, 4) == 4 && ui.cursor == 4);
     history_key(B_OCTUP);
-    cursor_set(7); frame(); press(B_EDIT);
+    cursor_set(7); frame(); del_hold();
     bad += check("EDIT deletes a selected note and all ties, advances from its onset", !step_on(&t->step[6]) && t->step[7].time == ST_REST && ui.cursor == 7 && cur_page()->graph == GR_ROLL);
     fm1_in.buttons |= 1u << panel.btn[B_EDIT]; host_pressed |= 1u << panel.btn[B_EDIT]; frame();
     press(B_OCTDN); fm1_in.buttons &= ~(1u << panel.btn[B_EDIT]); frame();
