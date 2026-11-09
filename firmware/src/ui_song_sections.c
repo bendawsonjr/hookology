@@ -5,9 +5,12 @@
  *   the white keys F3 .. F4 are A .. H: a tap plays that section (playing: every track at track 1's loop end;
  *   stopped: at once); held a second, what plays now is copied into it (over a section with notes: the question
  *   first) and it plays next;
- *   REC records the song: from the next loop of track 1 every section played, and how many times, is logged (the
- *   jam, seq.c); REC again or STOP makes it the song (over a song: the question before it starts);
- *   KNOB 1 the song entry, 2 its section, 3 its repeats, 4 the song's length; PLAY plays the song from the entry
+ *   REC stopped is BUILD: a section key tapped adds that section after the entry picked (the entry's own section, or
+ *   the next one's: a repeat more), OCT- deletes the entry picked (the same section either side: one entry), OCT-
+ *   held clears the song (the question first); REC again, PLAY or leaving the page ends it;
+ *   REC playing records the song: from the next loop of track 1 every section played, and how many times, is logged
+ *   (the jam, seq.c); REC again or STOP makes it the song (over a song: the question before it starts);
+ *   KNOB 1 the song entry, 2 its section, 3 its repeats, 4 the song's length; PLAY plays the song from the top
  *   (no song: the loop); EDIT held undoes the song edits, as on SONG.
  * The song is SONG's own (64 rows): an entry where every track plays one section shows its letter, else '*'; SONG
  * stays for rests, single tracks, presets and punch FX. Included by ui_draw.c, after ui_patterns.c */
@@ -16,6 +19,7 @@
 static const uint8_t SEC_KEY[SEC_N] = {0, 2, 4, 6, 7, 9, 11, 12};   /* F3 .. F4, the first eight white keys */
 static struct {
     uint8_t key, did;                                   /* the section key held (+1), its hold already acted */
+    uint8_t build;                                      /* BUILD: the section keys add to the song */
     uint32_t ms;                                        /* when it went down */
     uint32_t sig;                                       /* what the music mask was computed from */
     uint8_t used[SEC_N];                                /* section b: the tracks in use whose pattern b has notes */
@@ -129,18 +133,30 @@ static void sec_rec_finish(void)
     else jam_take();                                    /* (SONG's undo: EDIT held) */
     ui.force = 1;
 }
-/* REC on SECTIONS: start (over a song: the question), or finish */
+static int sec_build_on(void) { return scs.build != 0; }
+static void sec_build_set(uint32_t on)
+{
+    scs.build = (uint8_t)on;
+    if (on && ui.song_row > chain_config.count) ui.song_row = chain_config.count;
+    if (on && ui.song_row == chain_config.count && ui.song_row) ui.song_row--;   /* (adding after the last entry) */
+    ui_message(on ? "BUILD" : "BUILD DONE");
+    ui.force = 1;
+}
+/* REC on SECTIONS: BUILD stopped (on, off); playing, SONG REC: start (over a song: the question), or finish */
 static void sec_rec_tap(void)
 {
     if (secs.rec) sec_rec_finish();
+    else if (scs.build) sec_build_set(0);
     else if (chain.running || chain.armed) ui_message("STOP SONG FIRST");
+    else if (!song.playing && !seq_counting()) sec_build_set(1);
     else if (chain_config.count) confirm_open(CF_SEC_SONG, 0);
     else sec_rec_start();
 }
-/* every frame: STOP finishes a song recording; the song playing ends it unfinished */
+/* every frame: STOP finishes a song recording; the song playing ends it unfinished; BUILD ends off the page, playing */
 static void sec_poll(void)
 {
     if (secs.rec && !song.playing && !seq_counting() && transport_req != 1u) sec_rec_finish();
+    if (scs.build && (!sections_page() || song.playing || seq_counting() || chain_busy())) { scs.build = 0; ui.force = 1; }
 }
 
 /* ---------------------------------------------------- the song list --- */
@@ -208,11 +224,69 @@ static void sections_edit(uint32_t slot, int32_t steps)
     }
     ui.force = 1;
 }
-/* PLAY on SECTIONS: the song from the entry; no song, the loop */
+/* ------------------------------------------------------------ BUILD --- */
+/* section b tapped in BUILD: after the entry picked, a new entry (or a repeat more of the entry picked or the next,
+ * already b); the entry it went to picked. One undo step */
+static void sec_build_add(uint32_t b)
+{
+    uint32_t n = chain_config.count, r = ui.song_row < n ? ui.song_row : n ? n - 1u : 0u, at, k;
+    char m[16] = "A ADDED";
+    if (b >= SEC_N) return;
+    sec_sync();
+    if (!scs.used[b]) { str_cpy(m, "A IS EMPTY", 16); m[0] = (char)('A' + b); ui_message(m); return; }
+    at = n ? r + 1u : 0u;                               /* (the new entry's place) */
+    if (n && sec_row(r) == b) at = r;                   /* the entry picked is b: a repeat more */
+    else if (at < n && sec_row(at) == b) ;              /* the next is b: a repeat more there */
+    else at = CHAIN_ROWS;
+    if (at < n && chain_config.row[at].repeat < 16u) {
+        if (!song_edit_begin()) return;
+        chain_config.row[at].repeat++;
+        ui.song_row = (uint8_t)at;
+        song_edit_end();
+        m[1] = ' '; m[2] = 'x'; fmt_int(m + 3, chain_config.row[at].repeat);
+        m[0] = (char)('A' + b); ui_message(m);
+        return;
+    }
+    at = n ? r + 1u : 0u;
+    if (n >= CHAIN_ROWS) { ui_message("SONG FULL"); return; }
+    if (!song_edit_begin()) return;
+    song_materialize(at);                               /* (the entry after keeps its own patterns) */
+    song_edit_shift(chain_config.row + at + 1u, chain_config.row + at, (n - at) * sizeof(chain_row_t));
+    song_edit_shift(chain_config.fx + at + 1u, chain_config.fx + at, (n - at) * sizeof chain_config.fx[0]);
+    song_edit_shift(chain_config.sound + at + 1u, chain_config.sound + at, (n - at) * NTRK);
+    song_edit_shift(chain_patterns + at + 1u, chain_patterns + at, (n - at) * NTRK);
+    chain_config.count++;
+    chain_config.row[at] = (chain_row_t){(uint8_t)b, 1};
+    memset(chain_config.fx[at], 0, sizeof chain_config.fx[0]);
+    for (k = 0; k < NTRK; k++) { chain_patterns[at][k] = (uint8_t)b; chain_config.sound[at][k] = 0; }
+    ui.song_row = (uint8_t)at;
+    song_edit_end();
+    m[0] = (char)('A' + b); ui_message(m);
+}
+/* OCT- in BUILD: the entry picked deleted (the same section either side: one entry, up to 16 repeats); the entry
+ * before it picked, so a tap puts a section in its place */
+static void sec_build_delete(void)
+{
+    uint32_t r = ui.song_row, a, b;
+    if (r >= chain_config.count) { ui_message("PICK AN ENTRY"); return; }
+    if (!song_edit_begin()) return;
+    song_rows_remove(r, 1);
+    if (r && r < chain_config.count && (a = sec_row(r - 1u)) < SEC_N && a == sec_row(r) &&
+        (b = chain_config.row[r - 1u].repeat + chain_config.row[r].repeat) <= 16u) {
+        chain_config.row[r - 1u].repeat = (uint8_t)b;
+        song_rows_remove(r, 1);
+    }
+    ui.song_row = (uint8_t)(r ? r - 1u : 0u);
+    song_edit_end();
+    ui_message("ENTRY DELETED");
+}
+
+/* PLAY on SECTIONS: the song from its first entry (SONG plays from a row); no song, the loop */
 static void sections_play(void)
 {
+    if (scs.build) { scs.build = 0; ui.force = 1; }
     if (song.playing || seq_counting() || chain_busy()) transport_req = 2;
-    else if (chain_config.count) chain_play_ui();
+    else if (chain_config.count) { ui.song_row = 0; chain_play_ui(); }
     else transport_req = 1;
 }
 
@@ -224,7 +298,10 @@ static void sections_keys(uint32_t notes)
     if (fm1_ms - seen > 100u) scs.key = scs.did = 0;   /* (frames skipped: a dialog, the menu; no stale tap after) */
     seen = fm1_ms;
     if (scs.key && (!sections_keys_on() || !(fm1_in.notes & (1u << SEC_KEY[scs.key - 1u])))) {
-        if (!scs.did && sections_keys_on()) sec_play(scs.key - 1u);   /* (released before the hold: a tap) */
+        if (!scs.did && sections_keys_on()) {           /* (released before the hold: a tap) */
+            if (scs.build) sec_build_add(scs.key - 1u);
+            else sec_play(scs.key - 1u);
+        }
         scs.key = scs.did = 0;
     }
     if (!sections_keys_on()) return;
@@ -232,7 +309,7 @@ static void sections_keys(uint32_t notes)
         if (notes & (1u << SEC_KEY[b])) { scs.key = (uint8_t)(b + 1u); scs.did = 0; scs.ms = fm1_ms; }
     if (scs.key && !scs.did && fm1_ms - scs.ms >= SEC_HOLD_MS) {
         scs.did = 1;
-        sec_hold(scs.key - 1u);
+        if (!scs.build) sec_hold(scs.key - 1u);         /* (BUILD: a hold adds nothing, copies nothing) */
     }
 }
 /* bright the section playing (and the key held), breathing the one waiting, dim the others with notes */
@@ -323,7 +400,7 @@ static void sc_song(void)
 }
 static void sc_foot(void)
 {
-    uint32_t h = fnv1(fnv1(2166136261u, secs.rec + 2u * (jam.n + 1u)), ux.gen * 977u + ux.pal * 31u + 7u * !chain_config.count);
+    uint32_t h = fnv1(fnv1(2166136261u, secs.rec + 2u * (jam.n + 1u)), ux.gen * 977u + ux.pal * 31u + 7u * !chain_config.count + 5u * scs.build);
     char t[32];
     if (!ui.force && h == scs.foot) return;
     scs.foot = h;
@@ -331,12 +408,14 @@ static void sc_foot(void)
         str_cpy(t, "Recording \xB7 ", 32);
         fmt_int(t + str_len(t), jam.n);
         str_cpy(t + str_len(t), jam.n == 1u ? " entry" : " entries", 9);
+    } else if (scs.build) {
+        str_cpy(t, "Tap: add  OCT-: delete", 32);
     } else {
-        str_cpy(t, "Hold: copy  REC: song", 32);
+        str_cpy(t, "Hold: copy  REC: build", 32);
     }
     cv_begin(240, 28, T_BG);
     cv_rect(8, 0, 224, 1, T_LINE);
-    cv_text_c(120, ty_y(15, TY_LB), TY_LB, t, secs.rec ? T_REC : T_MID, T_BG);
+    cv_text_c(120, ty_y(15, TY_LB), TY_LB, t, secs.rec || scs.build ? T_REC : T_MID, T_BG);
     cv_blit(0, SC_FOOT_Y);
 }
 static void sections_draw(void)

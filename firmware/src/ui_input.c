@@ -460,7 +460,7 @@ static void ui_leds(void)
         led_put(nl, panel.btn[layer_btn()], ((fm1_ms / 250u) & 1u) == 0u);
     led_put(nl, panel.btn[B_PLAY], rolling && !counting); /* steady transport state, independent of audio block rate; */
     led_put(nw, panel.btn[B_PLAY], counting);           /* counting in: waiting */
-    led_put(nl, panel.btn[B_REC], recording_now);
+    led_put(nl, panel.btn[B_REC], recording_now || scs.build);   /* (SECTIONS' BUILD: lit) */
     led_put(nw, panel.btn[B_REC], armed && !recording_now);
     k = oct_leds();
     led_put(nl, panel.btn[B_OCTDN], (int)(k & 1u));
@@ -2676,12 +2676,29 @@ static void ui_input(void)
     if(bulk.on && !slot_kind() && !ui.home && cur_page()->graph==GR_ROLL && (oct&2u)){
         notes_bulk_sheet_open();oct=0;
     } else if((bulk.on||ui.note_move||ui.note_copy)&&(oct&1u)){bulk_clear();oct=0;}
+    {                                                   /* SECTIONS' BUILD: OCT- held a second clears the song */
+        static uint32_t t0;
+        static uint8_t done;
+        uint32_t dn = ((fm1_in.buttons >> panel.btn[B_OCTDN]) & 1u) && !((fm1_in.buttons >> panel.btn[B_EDIT]) & 1u);
+        if (!dn || !scs.build || !sections_page()) t0 = done = 0;
+        else if (!t0) t0 = fm1_ms | 1u;
+        else if (!done && !ui.confirm && fm1_ms - t0 >= SEC_HOLD_MS) {
+            done = 1;
+            oct_eat |= 1u;                              /* (its release no delete) */
+            if (chain_config.count) confirm_open(CF_CLEAR_SONG, 0);
+            else ui_message("SONG EMPTY");
+        }
+    }
     if (!ui.home && cur_page()->graph == GR_SONG && !ui.layer && (oct & 2u)) {
         if (se.pending) song_apply_destination();
         else if (se.range) song_range_sheet_open();
         else song_cell_sheet_open();
     } else if (!ui.home && cur_page()->graph == GR_SONG && (oct & 1u) && (se.pending || se.range)) {
         song_edit_cancel();
+    } else if (scs.build && sections_page() && !ui.layer && (oct & 1u)) {   /* SECTIONS' BUILD: OCT- deletes the entry */
+        sec_build_delete();
+    } else if (scs.build && sections_page() && !ui.layer && (oct & 2u)) {
+        /* (OCT+ does nothing in BUILD) */
     } else if (list_on() && (oct & 2u)) {                      /* a list page: OCT+ the row's list, OCT- Stage */
         list_enter();
     } else if (list_on() && (oct & 1u)) {

@@ -79,26 +79,71 @@ static void song_rec(void)
     setup();
     sec_hold_key(1); tap_key(SEC_KEY[0]); frame();
     uint32_t loop = 2u * tick();
+    press(B_PLAY); units_block(0);                      /* playing: REC is SONG REC, from track 1's next loop */
+    units_block(loop / 2u);
     press(B_REC); units_block(0);
-    assert(song.playing && secs.rec && msg_is("SONG REC"));
-    units_block(loop); units_block(loop);               /* A twice */
+    assert(song.playing && secs.rec && !scs.build && msg_is("SONG REC: NEXT LOOP"));
+    units_block(loop / 2u);                             /* logged from here: A four times */
+    units_block(loop); units_block(loop); units_block(loop);
     tap_key(SEC_KEY[1]); frame();
     units_block(loop / 2u); units_block(loop / 2u);      /* B from track 1's loop end */
     units_block(loop / 2u);
     press(B_REC);                                       /* finished: the song, the loop plays on */
     assert(!secs.rec && song.playing && chain_config.count == 2);
-    assert(sec_row(0) == 0 && chain_config.row[0].repeat == 3 && sec_row(1) == 1 && chain_config.row[1].repeat == 1);
+    assert(sec_row(0) == 0 && chain_config.row[0].repeat == 4 && sec_row(1) == 1 && chain_config.row[1].repeat == 1);
     press(B_PLAY); units_block(0); frame();
+    transport_req = 1; units_block(0); units_block(loop / 2u);   /* the loop playing (PLAY here: the song) */
     press(B_REC); units_block(0);                       /* over a song: asked first */
-    assert(ui.confirm == CF_SEC_SONG && !song.playing);
+    assert(ui.confirm == CF_SEC_SONG && song.playing && !secs.rec);
     press(B_OCTUP); units_block(0);
     assert(secs.rec && song.playing);
-    units_block(loop);
+    units_block(loop / 2u); units_block(loop); units_block(loop);
     press(B_PLAY); units_block(0); frame();             /* STOP finishes it too */
-    assert(!secs.rec && chain_config.count == 1 && sec_row(0) == 1 && chain_config.row[0].repeat == 2);   /* (B still the loop) */
+    assert(!secs.rec && chain_config.count == 1 && sec_row(0) == 1 && chain_config.row[0].repeat == 3);   /* (B still the loop: three loop starts) */
     song_edit_history(0);                               /* SONG's undo brings back the song before */
     assert(chain_config.count == 2 && sec_row(1) == 1);
     puts("SECTIONS: SONG REC from played sections, its question, STOP and undo passed");
+}
+/* BUILD: REC stopped; taps add after the entry picked, the same section a repeat more; OCT- deletes and merges;
+ * OCT- held clears; a hold copies nothing; undo; PLAY and REC end it */
+static void build(void)
+{
+    setup();
+    sec_hold_key(1); sec_hold_key(2); tap_key(SEC_KEY[0]); frame();   /* B and C copies of A; A the loop */
+    press(B_REC); frame();
+    assert(scs.build && !secs.rec && !song.playing && msg_is("BUILD") && sections_keys_on());
+    tap_key(SEC_KEY[0]); frame(); tap_key(SEC_KEY[0]); frame();
+    assert(chain_config.count == 1 && sec_row(0) == 0 && chain_config.row[0].repeat == 2 && msg_is("A x2"));
+    tap_key(SEC_KEY[1]); frame(); tap_key(SEC_KEY[2]); frame(); tap_key(SEC_KEY[1]); frame();
+    assert(chain_config.count == 4 && sec_row(1) == 1 && sec_row(2) == 2 && sec_row(3) == 1 && ui.song_row == 3);
+    assert(trk[0].pattern == 0);                        /* (taps never switched the loop) */
+    tap_key(SEC_KEY[5]); frame();                       /* F empty: not added */
+    assert(chain_config.count == 4 && msg_is("F IS EMPTY"));
+    turn(EN_K1, -3); tap_key(SEC_KEY[2]); frame();     /* after A: C, a new entry */
+    assert(chain_config.count == 5 && sec_row(1) == 2 && ui.song_row == 1);   /* A2 C B C B */
+    tap_key(SEC_KEY[1]); frame();                       /* after C, B already next: a repeat more there */
+    assert(chain_config.count == 5 && sec_row(2) == 1 && chain_config.row[2].repeat == 2 && ui.song_row == 2);
+    turn(EN_K1, 1); press(B_OCTDN); frame();            /* C deleted: B2 and B one entry, B x3; B picked */
+    assert(chain_config.count == 3 && sec_row(2) == 1 && chain_config.row[2].repeat == 3 && ui.song_row == 2);
+    assert(msg_is("ENTRY DELETED") && cur_page()->graph == GR_SECTIONS);
+    hold(B_EDIT);                                       /* undo: C back */
+    assert(chain_config.count == 5 && sec_row(3) == 2 && sec_row(4) == 1);
+    sec_hold_key(3);                                    /* a hold: no copy, no question */
+    assert(!ui.confirm && pattern_empty(0, 3) && chain_config.count == 5);
+    btn_down(B_OCTDN); frame(); frames(1100u); btn_up(B_OCTDN); frame();   /* held: clear, asked */
+    assert(ui.confirm == CF_CLEAR_SONG && chain_config.count == 5);
+    press(B_OCTUP); frame();
+    assert(!ui.confirm && chain_config.count == 0 && scs.build);
+    tap_key(SEC_KEY[2]); frame();
+    assert(chain_config.count == 1 && sec_row(0) == 2);
+    press(B_REC); frame();
+    assert(!scs.build && msg_is("BUILD DONE"));
+    press(B_REC); frame(); press(B_PLAY); units_block(0); frame();   /* PLAY ends it: the song plays */
+    assert(!scs.build && chain.running);
+    press(B_PLAY); units_block(0); frame();
+    press(B_REC); frame(); go_page(GR_SONG); frame();   /* leaving the page ends it */
+    assert(!scs.build);
+    puts("SECTIONS: BUILD adds, repeats, deletes, merges, clears, undoes and ends passed");
 }
 static void song_list(void)
 {
@@ -118,7 +163,7 @@ static void song_list(void)
     chain_patterns[1][1] = 5;                           /* an entry SONG changed on one track: '*' */
     assert(sec_row(1) == SEC_NONE);
     chain_patterns[1][1] = 1;
-    turn(EN_K1, -2); press(B_PLAY); units_block(0);     /* PLAY: the song from the entry */
+    turn(EN_K1, -1); press(B_PLAY); units_block(0);     /* PLAY: the song from the top, whatever the entry */
     assert(chain.running && chain.row == 0);
     tap_key(SEC_KEY[2]); frame();
     assert(msg_is("STOP SONG TO SWITCH"));
@@ -135,6 +180,7 @@ int main(void)
     keys_and_copy();
     switch_at_loop_end();
     song_rec();
+    build();
     song_list();
     puts("SECTIONS tests passed");
     return 0;

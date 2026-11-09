@@ -153,7 +153,7 @@ static void ui_power_on(void)
     memset(&song, 0, sizeof song);
     memset(&chain, 0, sizeof chain);
     chain_defaults(&chain_config);
-    pattern_init(); sec_reset();
+    pattern_init(); sec_reset(); scs.build = 0;
     memset(&ui, 0, sizeof ui);
     memset(&boot_work, 0, sizeof boot_work);
     memset(&step_history, 0, sizeof step_history);
@@ -2802,11 +2802,11 @@ static int test_product_ux(void)
         press(B_REC);
         if (PAGES[i].graph == GR_SONG)
             ok &= song.rec == 0 && !transport_req && msg_is("[SEQ] TO RECORD");
-        else if (PAGES[i].graph == GR_SECTIONS)        /* SECTIONS: REC records the song (Hookology) */
-            ok &= song.rec == 0 && transport_req == 1 && secs.rec && msg_is("SONG REC");
+        else if (PAGES[i].graph == GR_SECTIONS)        /* SECTIONS: REC stopped is BUILD (Hookology) */
+            ok &= song.rec == 0 && transport_req == 0 && !secs.rec && scs.build && msg_is("BUILD");
         else ok &= song.rec == 1 && transport_req == 0 && ui.page == i && !ui.home;
     }
-    bad += check("REC stays on every page, SONG stopped asks for pattern recording, SECTIONS records the song", ok);
+    bad += check("REC stays on every page, SONG stopped asks for pattern recording, SECTIONS builds the song", ok);
     ui_power_on(); hold(B_HOME); press(B_REC);
     bad += check("REC in the MENU does nothing (the menu stays, no arm, no transport start)",
                  ui.menu == 1 && song.rec == 0 && !transport_req);
