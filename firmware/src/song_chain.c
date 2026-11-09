@@ -22,7 +22,7 @@ static void seq_release(track_t *t);
 static void seq_stop(void);
 static uint32_t div_samples(uint32_t div);
 static uint32_t step_samples(const track_t *t, uint32_t period, uint32_t idx);
-#include "sections.c"                                   /* SECTIONS: A..H, track 1's loop end (Hookology) */
+#include "sections.c"                                   /* SECTIONS: A..H, the section's loop end (Hookology) */
 
 static void chain_defaults(chain_config_t *c)
 {

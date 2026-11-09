@@ -1358,7 +1358,7 @@ static void seq_advance_part(uint32_t n)
 {
     uint32_t i, beat = seq_beat_samples(), nt = trk_n();
     if (nt < NPART) nt = NPART;                       /* unused MIDI slots have no clock state to maintain */
-    sec_tick(n);                                      /* SECTIONS: a queued section at track 1's loop end */
+    sec_tick(n);                                      /* SECTIONS: a queued section at the section's loop end */
     chain_tick(n);
     for (i = 0; i < nt; i++)
         seq_tick(&trk[i], n);

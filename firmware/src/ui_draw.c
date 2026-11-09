@@ -267,7 +267,7 @@ static void ble_head_text(char text[24])
 }
 #endif
 /* HOME's TRACKS (Hookology): in the BPM's place, the section playing (sections.c): its letter in the track's colour, red
- * while a take or SONG REC records into it (SONG REC: a dot too), the section waiting for track 1's loop end beside it
+ * while a take or SONG REC records into it (SONG REC: a dot too), the section waiting for the section's loop end beside it
  * dashed; '*' when the tracks play no one section. The tempo again while SELECT turns it (bpm_t) */
 static uint32_t sec_queued(void);                       /* ui_song_sections.c */
 static int head_badge_on(void) { return ui.home && ui.home_pg == HP_TRACKS && !ui.bpm_t; }

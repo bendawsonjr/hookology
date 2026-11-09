@@ -1,22 +1,24 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Hookology contributors */
 /* SECTIONS (Hookology, after SLOOP's sections by isod89; no SLOOP code): section A..H is pattern 1..8 on every
- * track in use. A section played while the transport runs waits for track 1's loop end, then every track starts its
+ * track in use. A section played while the transport runs waits for the section's loop end (its lead: the longest track
+ * with notes, as a song's whole-section row, chain_lead), then every track starts its
  * section's pattern from step 0 together (as SONG's rows do, chain_tick); stopped, it is the loop at once. The UI
  * (ui_song_sections.c) copies a loop into a section and turns played sections into the song (the jam log, seq.c).
  * Included by song_chain.c, after the chain's state */
 #define SEC_N 8u                                        /* sections A..H: patterns 1..8 (a MIDI-only track has 8) */
 #define SEC_NONE 0xFFu
 static struct {
-    volatile uint8_t next;                              /* queued for track 1's loop end (SEC_NONE: nothing) */
+    volatile uint8_t next;                              /* queued for the lead's loop end (SEC_NONE: nothing) */
+    volatile uint8_t lead;                              /* the track whose loop end the switch waits for (sec_queue) */
     uint8_t rec;                                        /* SONG REC: the jam is being logged for the song */
-    uint32_t carry;                                     /* samples past track 1's loop end, this block (seq_tick) */
-} secs = {SEC_NONE, 0, 0};
+    uint32_t carry;                                     /* samples past the section's loop end, this block (seq_tick) */
+} secs = {SEC_NONE, 0, 0, 0};
 
 static void pattern_switch(track_t *t, uint32_t bank);
 
 /* power-on, a project loaded: nothing queued, no SONG REC (its jam belongs to the project before) */
-static void sec_reset(void) { secs.next = SEC_NONE; secs.rec = 0; secs.carry = 0; }
+static void sec_reset(void) { secs.next = SEC_NONE; secs.lead = 0; secs.rec = 0; secs.carry = 0; }
 /* the section every track in use plays (SEC_NONE: they differ, or past H) */
 static uint32_t sec_playing(void)
 {
@@ -26,11 +28,27 @@ static uint32_t sec_playing(void)
         if (trk[k].pattern != b) return SEC_NONE;
     return b;
 }
-/* ISR, before the tracks advance: track 1 crossing its loop end with a section queued starts every track in use on
+/* foreground, as a section is queued: the lead of what plays now. A whole section (every track in use on one of A..H):
+ * of its tracks with notes (used: a bit per track), the one whose loop is longest now (the first of equals); otherwise
+ * track 1. The ISR reads the lead's own steps live, so a length changed while waiting still counts */
+static uint32_t sec_lead(uint32_t used)
+{
+    uint32_t k, n = trk_n(), lead = 0;
+    uint64_t best = 0;
+    if (sec_playing() >= SEC_N) return 0;
+    for (k = 0; k < n; k++) {
+        uint64_t len;
+        if (!(used >> k & 1u)) continue;
+        len = (uint64_t)(uint32_t)trk[k].p[P_SLEN] * seq_div_samples((uint32_t)trk[k].p[P_SDIV]);
+        if (len > best) { best = len; lead = k; }
+    }
+    return lead;
+}
+/* ISR, before the tracks advance: the lead crossing its loop end with a section queued starts every track in use on
  * it from step 0, the samples past the end carried (seq_tick's start reads secs.carry) */
 static void sec_tick(uint32_t n)
 {
-    track_t *t = &trk[0];
+    track_t *t = &trk[secs.lead < trk_n() ? secs.lead : 0u];
     uint32_t b = secs.next, k, nt, length;
     secs.carry = 0;
     if (b >= SEC_N || chain.running || chain.armed || !song.playing) return;

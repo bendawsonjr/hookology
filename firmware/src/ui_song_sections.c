@@ -2,7 +2,7 @@
  * Copyright (C) 2026 Hookology contributors */
 /* SEQ > SECTIONS (Hookology): build the song from whole sections, after SLOOP's sections by isod89 (no SLOOP code).
  * Section A..H is pattern 1..8 on every track in use (sections.c). On this page, with SEQ not held:
- *   the white keys F3 .. F4 are A .. H: a tap plays that section (playing: every track at track 1's loop end;
+ *   the white keys F3 .. F4 are A .. H: a tap plays that section (playing: every track at the section's loop end;
  *   stopped: at once); held a second, what plays now is copied into it (over a section with notes: the question
  *   first) and it plays next;
  *   REC stopped is BUILD: a section key tapped adds that section after the entry picked (the entry's own section, or
@@ -61,7 +61,7 @@ static uint32_t sec_queued(void)
         if (trk[k].pattern_next != b) return SEC_NONE;
     return b < SEC_N ? b : SEC_NONE;
 }
-/* section b plays: playing, every track at track 1's loop end; stopped, at once */
+/* section b plays: playing, every track at the section's loop end (sec_lead); stopped, at once */
 static void sec_play(uint32_t b)
 {
     uint32_t k, n = trk_n(), f;
@@ -73,6 +73,8 @@ static void sec_play(uint32_t b)
     f = motion_guard();
     if (song.playing) {
         for (k = 0; k < NTRK; k++) trk[k].pattern_next = 0xFFu;
+        sec_sync();
+        secs.lead = (uint8_t)sec_lead(sec_playing() < SEC_N ? scs.used[sec_playing()] : 0u);
         secs.next = (uint8_t)b;
     } else {
         secs.next = SEC_NONE;
@@ -349,7 +351,7 @@ static void sc_tile(uint32_t b, uint32_t p, uint32_t q)
     cv_rrect(0, 0, SC_TILE_W, SC_TILE_H, 6, held && !on ? T_TEXT : fill == T_BG ? T_LINE : fill, T_BG);
     if (fill == T_BG || (held && !on))
         cv_rrect(1, 1, SC_TILE_W - 2, SC_TILE_H - 2, 5, fill, held && !on ? T_TEXT : T_LINE);
-    if (b == q && !on)                                  /* waiting for track 1's loop end: dashed */
+    if (b == q && !on)                                  /* waiting for the section's loop end: dashed */
         cv_dashed(0, 0, SC_TILE_W, SC_TILE_H, 6, T_THEME);
     cv_text_c(SC_TILE_W / 2, ty_y(19, TY_TX), TY_TX, l, ink, fill);
     for (k = 0; k < n; k++) {                           /* a dot a track: filled, its pattern b holds notes */

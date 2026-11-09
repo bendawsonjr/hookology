@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Hookology contributors */
-/* SEQ > SECTIONS: the section keys (play, copy, the question), the switch at track 1's loop end with every track from
- * step 0, SONG REC from played sections, the song list's knobs and undo, PLAY there */
+/* SEQ > SECTIONS: the section keys (play, copy, the question), the switch at the section's loop end (its longest track) with
+ * every track from step 0, SONG REC from played sections, the song list's knobs and undo, PLAY there */
 #define UI_TEST_NO_MAIN 1
 #include "ui_test.c"
 #include <assert.h>
@@ -64,15 +64,31 @@ static void switch_at_loop_end(void)
     ui.bpm_t = 40; assert(!head_badge_on()); ui.bpm_t = 0;
     ui.home_pg = HP_STAGE; assert(!head_badge_on());
     go_page(GR_SECTIONS);
+    assert(secs.lead == 1);                             /* the lead: track 2, A's longest loop */
     units_block(tick() / 2u);
     assert(trk[0].pattern == 0 && trk[1].pattern == 0);
-    units_block(tick() / 2u + 3u);                       /* track 1's loop end: both from step 0, 3 units in */
+    units_block(tick() / 2u + 3u);                       /* track 1's loop end: no switch, track 2 half through */
+    assert(trk[0].pattern == 0 && trk[1].pattern == 0 && secs.next == 1);
+    units_block(tick()); units_block(tick());           /* track 2's loop end: every track from step 0, 3 units in */
     assert(trk[0].pattern == 1 && trk[1].pattern == 1 && trk[2].pattern == 1);
     assert(trk[0].seq_idx == 0 && trk[1].seq_idx == 0 && trk[0].seq_pos == trk[1].seq_pos && trk[0].seq_pos == 3u);
     assert(secs.next == SEC_NONE);
     tap_key(SEC_KEY[0]); frame(); press(B_PLAY); units_block(0);
     assert(!song.playing && secs.next == SEC_NONE && trk[0].pattern == 1);
-    puts("SECTIONS: a played section waits for track 1's loop end, every track from step 0, STOP drops it passed");
+    puts("SECTIONS: a played section waits for the longest track's loop end, every track from step 0, STOP drops it passed");
+}
+/* the lead skips a longer track with no notes: track 1's loop end then */
+static void empty_lead(void)
+{
+    setup();
+    sec_hold_key(1); tap_key(SEC_KEY[0]); frame();
+    memset(trk[1].step, 0, sizeof trk[1].step); trk[1].p[P_SLEN] = 16; pattern_commit(&trk[1]); scs.sig = 0;
+    transport_req = 1; units_block(0); units_block(tick());
+    tap_key(SEC_KEY[1]); frame();
+    assert(secs.next == 1 && secs.lead == 0);
+    units_block(tick() / 2u); units_block(tick() / 2u + 3u);
+    assert(trk[0].pattern == 1 && trk[1].pattern == 1 && secs.next == SEC_NONE);
+    puts("SECTIONS: an empty longer track does not hold the switch passed");
 }
 static void song_rec(void)
 {
@@ -83,14 +99,17 @@ static void song_rec(void)
     units_block(loop / 2u);
     press(B_REC); units_block(0);
     assert(song.playing && secs.rec && !scs.build && msg_is("SONG REC: NEXT LOOP"));
-    units_block(loop / 2u);                             /* logged from here: A four of track 1's loops, two of A's */
+    units_block(loop / 2u);                             /* logged from here */
     units_block(loop); units_block(loop); units_block(loop);
     tap_key(SEC_KEY[1]); frame();
-    units_block(loop / 2u); units_block(loop / 2u);      /* B from track 1's loop end */
+    units_block(loop / 2u); units_block(loop / 2u);      /* B waits for A's loop end (track 2's, two of track 1's) */
+    assert(secs.next == 1 && trk[0].pattern == 0);
+    units_block(loop / 2u); units_block(loop / 2u);
+    assert(trk[0].pattern == 1);
     units_block(loop / 2u);
     press(B_REC);                                       /* finished: the song, the loop plays on */
     assert(!secs.rec && song.playing && chain_config.count == 2);
-    assert(sec_row(0) == 0 && chain_config.row[0].repeat == 2 && sec_row(1) == 1 && chain_config.row[1].repeat == 1);
+    assert(sec_row(0) == 0 && chain_config.row[0].repeat == 3 && sec_row(1) == 1 && chain_config.row[1].repeat == 1);   /* (A to its third end, B's tap waiting for it) */
     press(B_PLAY); units_block(0); frame();
     transport_req = 1; units_block(0); units_block(loop / 2u);   /* the loop playing (PLAY here: the song) */
     press(B_REC); units_block(0);                       /* over a song: asked first */
@@ -221,6 +240,7 @@ int main(void)
     seq_pages();
     keys_and_copy();
     switch_at_loop_end();
+    empty_lead();
     song_rec();
     build();
     whole_section();
