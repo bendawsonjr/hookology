@@ -22,6 +22,8 @@ static struct {
     uint32_t knob_ms;                                   /* the last knob turn on TRACKS (| 1), 0 none */
     uint8_t out, knob;                                  /* the knobs out; the knob turned last */
     uint16_t clr;                                       /* OCT- held to clear the selected track: 1..1000 of the way */
+    uint8_t lane;                                       /* a drum key held while KNOB 1 turned: its lane + 1 (the strip's
+                                                         * LEVEL is that drum's, P_LN0..; 0: the track's) */
 } tracks;
 
 static uint32_t fnv1(uint32_t h, uint32_t v);       /* ui_patterns.c */
@@ -98,6 +100,14 @@ static void tr_columns(void)
         char v[12];
         const char *unit = "";
         int32_t ratio;
+        if (c == 0u && tracks.lane) {                   /* a drum key held: that drum's level (EDIT > LANES) */
+            int32_t lv = clamp(t->p[P_LN0 + tracks.lane - 1u], 0, 127);
+            char lb[12];
+            str_cpy(lb, drum_lane_name(t, tracks.lane - 1u), sizeof lb);
+            param_format(&TP[P_LN0 + tracks.lane - 1u], lv, v, &unit);
+            draw_column(c, lb, v, unit, T_ACCENT, lv * 1000 / 127, ICON_NONE);
+            continue;
+        }
         if (c == 0u) { param_format(&TP[P_LEVEL], level, v, &unit); ratio = level * 1000 / 127; }
         else if (c == 1u) { param_format(&TP[P_PAN], pan, v, &unit); ratio = (pan + 64) * 1000 / 127; }
         else if (c == 2u) { fmt_int(v, sw); ratio = sw * 10; }
@@ -107,10 +117,42 @@ static void tr_columns(void)
 }
 /* under the strip: the setting of the knob turned for every track of the group, a bar each (PAN a mark from the
  * middle), its value at the right; the selected track outlined */
+/* .. a drum key held: the kit's eight drum levels in two columns, the held one outlined */
+static void tr_lanes(void)
+{
+    const track_t *t = TSEL;
+    uint32_t l, sig = fnv1(2166136261u, tracks.lane + 16u * song.sel + 4096u * (uint32_t)t->p[P_E0]);
+    int32_t rh = TR_CMP_H / 4;
+    uint16_t tc = T_TRK(song.sel);
+    for (l = 0; l < 8u; l++) sig = fnv1(sig, (uint32_t)t->p[P_LN0 + l]);
+    sig = fnv1(sig, ux.gen * 977u + ux.pal * 31u + 1u);
+    if (!ui.force && sig == tracks.cmp) return;
+    tracks.cmp = sig;
+    for (uint32_t band = 0; band < (uint32_t)TR_CMP_H; band += CV_MAX / 240u) {
+        cv_begin_band(240u, (uint32_t)TR_CMP_H, T_BG, band);
+        for (l = 0; l < 8u; l++) {
+            int32_t x = BOX_X + (int32_t)(l / 4u) * (BOX_W / 2), y = (int32_t)(l % 4u) * rh, w = BOX_W / 2 - 2;
+            int32_t v = clamp(t->p[P_LN0 + l], 0, 127), bx = x + 34, bw = w - 34 - 54;
+            uint16_t bg = ux_mix(T_BG, tc, l + 1u == tracks.lane ? 24 : 11);
+            char val[12];
+            const char *unit = "";
+            param_format(&TP[P_LN0 + l], v, val, &unit);      /* (as the card above and EDIT > LANES: %) */
+            if (unit[0] && str_len(val) + str_len(unit) < sizeof val) str_cpy(val + str_len(val), unit, sizeof val - str_len(val));
+            if (l + 1u == tracks.lane) { cv_rrect(x, y + 1, w, rh - 2, 5, tc, T_BG); cv_rrect(x + 2, y + 3, w - 4, rh - 6, 3, bg, tc); }
+            else cv_rrect(x, y + 1, w, rh - 2, 5, bg, T_BG);
+            cv_text(x + 6, ty_y(y + rh / 2, TY_LB), TY_LB, drum_lane_abbr(t, l), T_TEXT);
+            cv_rect(bx, y + rh / 2 - 3, bw, 6, ux_mix(bg, tc, 22));
+            cv_rect(bx, y + rh / 2 - 3, v * bw / 127, 6, tc);
+            cv_text_r(x + w - 6, ty_y(y + rh / 2, TY_LB), TY_LB, val, T_TEXT, bg);
+        }
+        cv_blit_band(0, TR_CMP_Y);
+    }
+}
 static void tr_compare(void)
 {
     uint32_t k, c = tracks.knob, first = trk_group(), sig = 2166136261u;
     int32_t rh = TR_CMP_H / NROWS;
+    if (tracks.lane) { tr_lanes(); return; }
     for (k = first; k < first + NROWS && k < trk_n(); k++) {
         const track_t *t = &trk[k];
         sig = fnv1(fnv1(sig, (uint32_t)(t->p[P_LEVEL] + 256 * (t->p[P_PAN] + 64))), (uint32_t)track_swing(t) + 256u * tr_steps(t) + 65536u * t->p[P_MUTE]);
@@ -160,6 +202,7 @@ static void tr_knobs(void)
         lcd_fill(0, Y_LABEL, 240, ST_BAND_Y - Y_LABEL, T_BG);
     } else if (!out && tracks.out) {
         tracks.out = 0;
+        tracks.lane = 0;
         memset(tracks.col, 0, sizeof tracks.col);
         memset(ui.col, 0, sizeof ui.col);
         lcd_fill(0, Y_LABEL, 240, ST_BAND_Y - Y_LABEL, T_BG);

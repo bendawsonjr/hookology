@@ -104,9 +104,28 @@ static void hold_clear(void)
     seq_stop();
     puts("TRACKS: OCT- held clears the track (a tap the octave, let go early nothing, undo, at the loop end) passed");
 }
+/* a drum key held on TRACKS: KNOB 1 that drum's level (EDIT > LANES), the strip names it, the kit's eight under it;
+ * let go: the track's LEVEL again; a synth track: LEVEL with a key held too */
+static void drum_levels(void)
+{
+    track_t *t=setup(); uint32_t key=99, k;
+    undo_depth++; set_engine_of(t,ENGI_DRUM); undo_depth--;
+    for(k=0;k<27u && key==99;k++){uint32_t n=kb_map(t,k); if(n!=KB_SILENT && drum_lane(n)==1u) key=k;}   /* a SNARE key */
+    assert(key<27u);
+    int16_t lv=t->p[P_LEVEL], sn=t->p[P_LN0+1], kick=t->p[P_LN0];
+    key_down(key); page_knob(0,-5); ui.force=1; ui_draw();
+    assert(t->p[P_LN0+1]<sn && t->p[P_LEVEL]==lv && t->p[P_LN0]==kick && tracks.lane==2u && tracks.out);
+    page_knob(1,1); assert(!tracks.lane);                                  /* another knob: the strip's own cards */
+    key_up(key); page_knob(0,-1); assert(t->p[P_LEVEL]==lv-1 && !tracks.lane);
+    lv=t->p[P_LEVEL]; key_down(key); page_knob(0,2); assert(tracks.lane==2u); key_up(key);
+    fm1_ms+=2000u; ui_draw(); assert(!tracks.out && !tracks.lane);         /* the strip gone: the lane forgotten */
+    t=setup(); lv=t->p[P_LEVEL];                                           /* a synth: LEVEL, a key held or not */
+    key_down(5); page_knob(0,-1); assert(t->p[P_LEVEL]==lv-1 && !tracks.lane); key_up(5);
+    puts("TRACKS: a drum key held, KNOB 1 its level; let go, the track's LEVEL passed");
+}
 int main(void)
 {
-    landing(); knobs(); at_loop_end(); one_length(); pages(); stored(); hold_clear();
+    landing(); knobs(); at_loop_end(); one_length(); pages(); stored(); hold_clear(); drum_levels();
     puts("TRACKS tests passed");
     return 0;
 }

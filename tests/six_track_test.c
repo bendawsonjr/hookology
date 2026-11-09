@@ -131,6 +131,11 @@ static void templates(void)
     template_load();
     assert(trk_n() == 6u && trk[4].eng_req == ENGI_CZ && cz_patch_of(4)->raw[128] == 'Q');
     assert(trk[5].eng_req == ENGI_FM6 && trk[5].p[P_LEVEL] == 57 && fm6_fn[5][0] == fn && trk[1].p[P_LEVEL] == 61);
+    /* NEW SONG from it, every role KEEP: the template's six tracks, 5 and 6 its sounds */
+    for (uint32_t k = 0; k < NROWS; k++) nw.role[k] = NR_KEEP;
+    nw.root = 0; nw.scale = 0; nw.bpm = 120; stop_transport();
+    new_create();
+    assert(trk_n() == 6u && trk[4].eng_req == ENGI_CZ && cz_patch_of(4)->raw[128] == 'Q' && trk[5].eng_req == ENGI_FM6);
     /* TPLL: tracks 1..4 back, 5 and 6 power-on */
     { static tmpl4_t t4; tmpl4_capture(&t4); memset(&tmpl, 0, sizeof tmpl);
       assert(tmpl_take((const uint8_t *)&t4, sizeof t4) && template_used());
