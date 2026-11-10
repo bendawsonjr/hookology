@@ -384,10 +384,119 @@ static void midi_only_tracks(void)
     assert(!project_save_as(2, "FULL") && !bank_too_full && slot_magic(2) == BANKP_MAGIC);
     puts("MIDI-only tracks 5..8: add, MIDI only, FBKP save/load, removal, edits past a project's room refused passed");
 }
+/* Hookology MIDI OUT ALL: every sound track's notes on its own channel, keys once, mute/solo, no echo of MIDI IN,
+ * clean releases; CH1-8 routing; the setting saved */
+static void midi_out_all_tracks(void)
+{
+    ui_power_on(); track_solo = 0;
+    mi_r = mi_w = mo_r = mo_w = 0; midi_in_overflow = 0;
+    memset(midi_sel_on, 0, sizeof midi_sel_on); memset(midi_owners, 0, sizeof midi_owners);
+    memset(midi_ch, 0, sizeof midi_ch); memset(&um, 0, sizeof um);
+    usb.config = 1; song.ntrk = NPART; song.g[G_ROUTE] = 0; events_block(0); mo_r = mo_w;
+    midi_out_all = 0;
+    trk_note_on(&trk[1], 60, 90); empty_midi();        /* KEYS: a sound track's note stays inside */
+    trk_note_off(&trk[1], 60); empty_midi();
+    song.sel = 0; go_home(); kb_note[0] = 60; kb_trk[0] = 0;
+    key_on(0, &trk[0]); assert(mo_w - mo_r == kb_chn[0]); /* .. its keys are sent, as Melodee */
+    key_off(0, &trk[0]); mo_r = mo_w; events_block(0); mo_r = mo_w;
+    midi_out_all = 1;
+    for (uint32_t tr = 0; tr < NPART; tr++) {          /* tracks 1..6, channels 1..6, the sound kept */
+        trk_note_on(&trk[tr], 50 + tr, 70 + tr); pop_midi(0x90u | tr, 50 + tr, 70 + tr);
+        trk_note_on(&trk[tr], 50 + tr, 0); pop_midi(0x80u | tr, 50 + tr, 0); empty_midi();
+    }
+    trk_note_on(&trk[0], 62, 99); pop_midi(0x90, 62, 99); assert(gates());
+    trk_note_on(&trk[0], 62, 80); pop_midi(0x80, 62, 0); pop_midi(0x90, 62, 80); /* a retrigger ends the strike first */
+    trk_note_off(&trk[0], 62); pop_midi(0x80, 62, 0);
+    trk_note_off(&trk[0], 62); empty_midi();            /* nothing held: no stray release */
+    /* the keys: once, through the track (a chord key's tones each once) */
+    key_on(0, &trk[0]);
+    uint32_t n = kb_chn[0]; assert(n && mo_w - mo_r == n);
+    for (uint32_t i = 0; i < n; i++) pop_midi(0x90, kb_chord[0][i], 100);
+    key_off(0, &trk[0]); assert(mo_w - mo_r == n); mo_r = mo_w; events_block(0); empty_midi();
+    /* a pattern: played, then released at stop; tracks 5 and 6 too */
+    for (uint32_t tr = 2; tr < NPART; tr += 3) {
+        track_t *t = &trk[tr];
+        t->p[P_SLEN] = 2; t->p[P_SDIV] = 0; t->p[P_SGATE] = 64;
+        step_clear(&t->step[0]); t->step[0].n = 1; t->step[0].note[0] = 48; t->step[0].time = ST_NOTE; t->step[0].vel = 77;
+        seq_start(); seq_advance(0); pop_midi(0x90u | tr, 48, 77);
+        seq_stop(); pop_midi(0x80u | tr, 48, 0); empty_midi();
+        step_clear(&t->step[0]);
+    }
+    /* mute and solo: silent, a held note released */
+    trk_note_on(&trk[1], 64, 88); pop_midi(0x91, 64, 88);
+    trk[1].p[P_MUTE] = 1; events_block(0); pop_midi(0x81, 64, 0);
+    trk_note_on(&trk[1], 65, 88); empty_midi();
+    trk[1].p[P_MUTE] = 0;
+    trk_note_on(&trk[1], 64, 88); pop_midi(0x91, 64, 88);
+    track_solo = 1; events_block(0); pop_midi(0x81, 64, 0);
+    trk_note_on(&trk[1], 65, 88); empty_midi(); track_solo = 0;
+    /* MIDI IN plays the track, never sent back */
+    midi_in_event(0x09u | 0x90u << 8 | 60u << 16 | 97u << 24); events_block(0); empty_midi(); assert(gates());
+    midi_in_event(0x08u | 0x80u << 8 | 60u << 16); events_block(0); empty_midi();
+    song.g[G_MIDI] = 1; trk[1].p[P_AMODE] = 0;     /* TRS in too */
+    trs(0x91, 61, 90); empty_midi(); trs(0x81, 61, 0); empty_midi();
+    song.g[G_MIDI] = 0;
+    trk_note_on(&trk[0], 67, 90); pop_midi(0x90, 67, 90); /* turned to KEYS while held: released */
+    midi_out_all = 0; events_block(0); pop_midi(0x80, 67, 0); empty_midi();
+    /* a busy song: six tracks of four-note chords on every step, the queue emptied only once an audio half
+     * (USB drains it at 2 kHz on the FM-1): every note-on sent, every one released */
+    midi_out_all = 1;
+    for (uint32_t tr = 0; tr < NPART; tr++) {
+        track_t *t = &trk[tr];
+        t->p[P_SLEN] = 16; t->p[P_SDIV] = 3; t->p[P_SGATE] = 127; t->p[P_AMODE] = 0; /* 1/32, legato */
+        for (uint32_t k = 0; k < 16; k++) {
+            step_clear(&t->step[k]); t->step[k].n = 4; t->step[k].time = ST_NOTE; t->step[k].vel = 100;
+            for (uint32_t i = 0; i < 4; i++) t->step[k].note[i] = (uint8_t)(40 + tr * 8 + i * 2 + (k & 1));
+        }
+    }
+    {
+        uint32_t on[NPART] = {0}, off[NPART] = {0}, held = 0;
+        int16_t bpm = song.g[G_BPM]; song.g[G_BPM] = 240;
+        seq_start(); seq_advance(0);
+        for (uint32_t b = 0; b < 2000; b++) {
+            while (mo_r != mo_w) {
+                uint32_t pkt = midi_out_q[mo_r++ % MQ], st = (pkt >> 8) & 255u, ch = st & 15u;
+                assert(ch < NPART);
+                if ((st & 0xF0u) == 0x90u) on[ch]++; else if ((st & 0xF0u) == 0x80u) off[ch]++;
+            }
+            seq_advance(HALF_FRAMES);
+        }
+        seq_stop();
+        while (mo_r != mo_w) {
+            uint32_t pkt = midi_out_q[mo_r++ % MQ], st = (pkt >> 8) & 255u;
+            if ((st & 0xF0u) == 0x80u) off[st & 15u]++;
+        }
+        uint32_t steps = (uint32_t)((uint64_t)2000 * HALF_FRAMES / seq_div_samples(3)); song.g[G_BPM] = bpm;
+        for (uint32_t tr = 0; tr < NPART; tr++) {
+            assert(on[tr] == off[tr]);
+            assert(on[tr] >= 4u * steps);               /* (no step's chord dropped) */
+            held += on[tr];
+        }
+        printf("busy song: %u notes over %u steps, none dropped\n", held, steps);
+        for (uint32_t tr = 0; tr < NPART; tr++) for (uint32_t k = 0; k < 16; k++) step_clear(&trk[tr].step[k]);
+    }
+    midi_out_all = 0;
+    /* ROUT CH1-8: channels 1..8 to tracks 1..8 (CH1-4 keeps 5..8 out) */
+    song.ntrk = NTRK;
+    assert(!midi_track(4) && !midi_track(7));
+    song.g[G_ROUTE] = 5;
+    for (uint32_t ch = 0; ch < NTRK; ch++) assert(midi_track(ch) == &trk[ch]);
+    assert(!midi_track(8) && !midi_track(9) && !midi_track(15));
+    song.g[G_ROUTE] = 2; assert(midi_track(4) == &trk[0] && !midi_track(0));
+    song.g[G_ROUTE] = 0; song.ntrk = NPART;
+    /* the menu's setting is saved with the device settings */
+    static persist_t pr;
+    GLO_SELECT |= MIDI_OUT_ALL; settings_export(&pr); midi_out_all = 0;
+    assert(settings_import(&pr, sizeof pr) && midi_out_all);
+    GLO_SELECT &= (uint8_t)~MIDI_OUT_ALL; settings_export(&pr);
+    assert(settings_import(&pr, sizeof pr) && !midi_out_all);
+    puts("MIDI OUT ALL: tracks 1..6 on channels 1..6, keys once, patterns, mute/solo, no MIDI IN echo, CH1-8, saved passed");
+}
 int main(void)
 {
     notes_and_panel(); routing(); cleanup(); silent_and_saved(); sequencing();
     usb_session_cleanup(); midi_only_tracks(); midi_track_navigation(); midi_only_step_entry();
+    midi_out_all_tracks();
     puts("MIDI TRACK TESTS PASSED");
     return 0;
 }

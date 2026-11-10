@@ -21,6 +21,8 @@ static void template_save(void);
 static void template_load(void);
 static uint32_t chain_prepare(void);
 static uint32_t chain_prepare_from(uint32_t start);
+static void song_cue_poll(int want);
+static void song_cue_drop(void);
 static int up_used(uint32_t k);              /* user presets: upreset.c */
 static int up_load(uint32_t k);
 static int up_favorite(uint32_t k);
@@ -116,6 +118,8 @@ static void glo_select_set(uint32_t v) { GLO_SELECT = (uint8_t)((GLO_SELECT & ~0
 #define TRACKS_HIDE 32u
 /* REC MODE (the menu): FREE in bit 6 of the same byte (free_take.c), GRID 0 */
 #define REC_MODE_FREE 64u
+/* MIDI OUT (the menu, Hookology): ALL in bit 7 of the same byte, KEYS 0; the audio ISR's copy is midi_out_all */
+#define MIDI_OUT_ALL 128u
 /* the four tracks Stage, MIXER, PATTERNS and SONG show: the selected one's (1..4, or the MIDI-only
  * 5..8); a row k of them is track trk_group() + k */
 static uint32_t trk_group(void) { return song.sel / NROWS * NROWS; }

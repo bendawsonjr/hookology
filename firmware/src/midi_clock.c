@@ -66,6 +66,7 @@ static void midi_clock_seek(void)
     midi_clock.pos = midi_clock.rendered = 0;
     midi_clock.have_pulse = 0;
     seq_seek_units = units;
+    if (!units) chain_cue_take();                       /* (a DAW's Continue from its top: as Start) */
     seq_start();
     beat_pos = units % MIDI_BEAT_UNITS;
     beat_n = (units / MIDI_BEAT_UNITS) & 3u;

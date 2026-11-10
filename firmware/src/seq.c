@@ -6,7 +6,8 @@
  * ends in trk_note_on / trk_note_off: engines never see where a note came from.
  * Four tracks, one transport: every track's pattern loops on its own LEN / DIV /
  * SWING / GATE (polymeter). The keys play the selected track; MIDI IN by GLO > SYSTEM ROUT (G_ROUTE):
- * CH1-4 (0), CH5-8 (2), CH9-12 (3), CH13-16 (4) map only their four channels to tracks 1..4;
+ * CH1-4 (0), CH5-8 (2), CH9-12 (3), CH13-16 (4) map only their four channels to tracks 1..4; CH1-8 (5, Hookology)
+ * channels 1..8 to tracks 1..8 (the channels MIDI OUT ALL sends them on);
  * SEL (1) maps every channel to the selected track. QNT MPC overrides note destinations: E..H -> tracks 1..4.
  * Their CC1 (mod wheel), CC11 (expression) and
  * channel aftertouch go to the same track's modulation matrix (mod.c; the selected track: the one selected then).
@@ -738,6 +739,8 @@ static void input_on(track_t *t, uint32_t note, uint32_t vel)
 
 static int midi_note_held(const track_t *t, uint32_t note);
 static int midi_local_held(const track_t *t, uint32_t note);
+/* MIDI OUT ALL: a note MIDI IN plays (or holds: a strum's later strings) is never sent back out (no loop through a DAW) */
+static int midi_from_input(const track_t *t, uint32_t note) { return midi_event_source || midi_note_held(t, note); }
 static void input_off(track_t *t, uint32_t note)
 {
     if (midi_note_held(t, note))
@@ -759,7 +762,7 @@ static void key_chord_tone(uint32_t k, track_t *t)
     kb_chn[k]++;
     if (held) return;
     input_on(t, x, vel);
-    if (!midi_track_only(t)) midi_out_event(0x09u | (0x90u | trk_midi_ch(trk_index(t))) << 8 | x << 16 | vel << 24);
+    if (!midi_out_on(t)) midi_out_event(0x09u | (0x90u | trk_midi_ch(trk_index(t))) << 8 | x << 16 | vel << 24);
 }
 
 static void key_on(uint32_t k, track_t *t)
@@ -784,7 +787,7 @@ static void key_off(uint32_t k, track_t *t)
         uint32_t x = kb_chord[k][i];
         if (midi_local_held(t, x)) continue;
         input_off(t, x);
-        if (!midi_track_only(t)) midi_out_event(0x08u | (0x80u | mc) << 8 | x << 16);
+        if (!midi_out_on(t)) midi_out_event(0x08u | (0x80u | mc) << 8 | x << 16);
     }
 }
 
@@ -957,6 +960,7 @@ static void seq_start(void)
     seq_erase_request = 0;
     seq_erase_transport++;
     memset(seq_erase_seen, 0, sizeof seq_erase_seen);
+    if (!chain.armed && chain_cued) { chain_cued = 0; song_sounds.mask = 0; }   /* the loop, not the cued song */
     if (!chain.armed && !song.playing) pattern_sound_begin();
     motion_begin();
     chain_start();
@@ -1106,7 +1110,7 @@ static void seq_stop(void)
         if ((takes >> i) & 1u) recording_quantize(&trk[i]);
         recording_undo_finish(&trk[i]);
         seq_release(&trk[i]);
-        if (midi_track_only(&trk[i])) midi_track_all_off(&trk[i]);
+        midi_track_all_off(&trk[i]);               /* (MIDI OUT ALL: a sound track's notes too) */
         trk[i].rh_n = 0;                           /* a recorded note held over the stop: as far as it got */
     }
     chain_stop();
@@ -1306,8 +1310,8 @@ static void seq_tick(track_t *t, uint32_t n)
 static track_t *midi_track(uint32_t ch)
 {
     uint32_t k, route = (uint32_t)song.g[G_ROUTE];
-    uint32_t first = route > 1u ? (route - 1u) * 4u : 0u;
-    if (route != 1u && (ch < first || ch - first >= 4u))
+    uint32_t first = route > 1u && route < 5u ? (route - 1u) * 4u : 0u, width = route == 5u ? 8u : 4u; /* 5: CH1-8 */
+    if (route != 1u && (ch < first || ch - first >= width))
         return 0;
     if (settings_drumch && ch + 1u == settings_drumch) {
         for (k = 0; k < trk_n(); k++)
@@ -1535,6 +1539,7 @@ static void events_block(uint32_t n)
                 else {
                     if (song.playing)
                         seq_advance(midi_clock_advance(time));
+                    if (status == 0xFAu) chain_cue_take();  /* SECTIONS: the DAW's Start plays the song */
                     midi_clock_transport(status, ms);
                     if (status == 0xFAu || status == 0xFBu) {
                         midi_clock.pulse_count = pulse_count;

@@ -755,12 +755,16 @@ static void trk_note_off_engine(track_t *t, uint32_t note)
 
 #include "midi_track.c"
 #include "midi_insert.c"
+static int midi_from_input(const track_t *t, uint32_t note);   /* seq.c */
 /* All ordinary notes go through the persistent per-track MIDI inserts. */
 static void trk_note_on(track_t *t, uint32_t note, uint32_t vel)
 {
     if (midi_track_only(t)) {
         if (vel) midi_track_note_on(t, note, vel); else midi_track_note_off(t, note);
-    } else if (vel) trk_note_on_raw(t, note, vel); else trk_note_off_raw(t, note);
+        return;
+    }
+    if (vel) trk_note_on_raw(t, note, vel); else { trk_note_off_raw(t, note); midi_track_note_off(t, note); }
+    if (vel && midi_out_on(t) && !midi_from_input(t, note)) midi_track_note_on(t, note, vel);
 }
 static void trk_note_off(track_t *t, uint32_t note)
 {

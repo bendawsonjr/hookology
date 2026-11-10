@@ -18,7 +18,12 @@ static struct {
 static void pattern_switch(track_t *t, uint32_t bank);
 
 /* power-on, a project loaded: nothing queued, no SONG REC (its jam belongs to the project before) */
-static void sec_reset(void) { secs.next = SEC_NONE; secs.lead = 0; secs.rec = 0; secs.carry = 0; }
+static void sec_reset(void)
+{
+    secs.next = SEC_NONE; secs.lead = 0; secs.rec = 0; secs.carry = 0;
+    if (chain_cued && !chain.running && !chain.armed) song_sounds.mask = 0;   /* (the song cued for a DAW: dropped) */
+    chain_cued = 0;
+}
 /* the section every track in use plays (SEC_NONE: they differ, or past H) */
 static uint32_t sec_playing(void)
 {

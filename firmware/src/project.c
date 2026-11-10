@@ -1644,8 +1644,8 @@ static int project_used(uint32_t slot)
     return proj_meta[slot % PROJ_SLOTS].used;
 }
 
-/* Main loop only: no flash access or copies when the ISR changes rows. */
-static uint32_t chain_prepare_from(uint32_t start)
+/* Main loop only: no flash access or copies when the ISR changes rows. chain_setup: all but arming (the cue's too) */
+static uint32_t chain_setup(uint32_t start)
 {
     if (transport_busy()) return 2;
     if (!chain_valid(&chain_config) || !chain_config.count || start >= chain_config.count) return 1;
@@ -1664,9 +1664,39 @@ static uint32_t chain_prepare_from(uint32_t start)
     }
     chain.start_units = 0;
     for (uint32_t row = 0; row < start; row++) chain.start_units += chain_row_samples(row);
+    motion_unguard(f);
+    return 0;
+}
+static uint32_t chain_prepare_from(uint32_t start)
+{
+    uint32_t f, rc;
+    song_cue_drop();                                    /* (PLAY: prepared again, armed now) */
+    if ((rc = chain_setup(start)) != 0) return rc;
+    f = motion_guard();
     RING_PUBLISH(); chain.armed = 1; transport_req = 1;
     motion_unguard(f);
     return 0;
+}
+/* the cue (song_chain.c chain_cued), every frame: wanted on SECTIONS with a song, following CLK USB/TRS, stopped.
+ * Prepared again each quarter second (edits to the song, the sounds as they are now); dropped otherwise */
+static void song_cue_drop(void)
+{
+    fm1_irq_off();
+    uint32_t had = chain_cued;
+    chain_cued = 0;
+    if (had && !song.playing && !chain.running && !chain.armed) song_sounds.mask = 0;
+    fm1_irq_on();
+}
+static void song_cue_poll(int want)
+{
+    static uint32_t at;
+    if (!want || !chain_config.count || !song.g[G_CLOCK]) { song_cue_drop(); return; }
+    if (transport_busy()) return;                       /* (the cue taken: the song plays) */
+    if (chain_cued && fm1_ms - at < 250u) return;
+    song_cue_drop();
+    if (chain_setup(0)) return;
+    at = fm1_ms;
+    RING_PUBLISH(); chain_cued = 1;
 }
 
 static uint32_t chain_prepare(void) { return chain_prepare_from(0); }

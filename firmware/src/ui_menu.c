@@ -23,7 +23,7 @@ enum { MI_COLOR, MI_FONT, MI_HOLD, MI_LIGHTS,
 #if MELODEE_BLE
        MI_BLE,
 #endif
-       MI_MIDI_KNOBS, MI_MIDI_MODE, MI_MIDI_LEARN,
+       MI_MIDI_OUT, MI_MIDI_KNOBS, MI_MIDI_MODE, MI_MIDI_LEARN,
        MI_CLICK, MI_CLICK_LEVEL, MI_COUNTIN, MI_REC_MODE, MI_PREVIEW, MI_ADD, MI_AUTOSAVE, MI_PICKER, MI_ACCEL, MI_HOME_SEL, MI_GLO_SEL, MI_TRACKS, MI_SCREEN, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
        MI_COUNT };
 static const char *const MI_NAME[MI_COUNT] = {"COLOR", "FONT", "HOLD", "LIGHTS",
@@ -36,7 +36,7 @@ static const char *const MI_NAME[MI_COUNT] = {"COLOR", "FONT", "HOLD", "LIGHTS",
 #if MELODEE_BLE
                                               "BLUETOOTH",
 #endif
-                                              "MIDI KNOBS", "MIDI MODE", "MIDI LEARN",
+                                              "MIDI OUT", "MIDI KNOBS", "MIDI MODE", "MIDI LEARN",
                                               "AUDIO CLICK", "CLICK LEVEL", "COUNT-IN", "REC MODE", "NOTE PREVIEW", "CHORD ENTRY",
                                               "AUTOSAVE", "PICKER POPUPS", "KNOB ACCEL", "HOME SELECT", "GLO SELECT", "UNUSED TRACKS", "SCREEN OFF", "CALIBRATION", "ABOUT", "SOUND DESIGNER", "BACK"};
 #if MELODEE_USB_AUDIO
@@ -329,6 +329,7 @@ static void draw_menu(void)
                 if (i == MI_GLO_SEL) value = HS_NAME[glo_select()];
                 if (i == MI_TRACKS) value = GLO_SELECT & TRACKS_HIDE ? "HIDE" : "SHOW";
                 if (i == MI_REC_MODE) value = GLO_SELECT & REC_MODE_FREE ? "FREE" : "GRID";
+                if (i == MI_MIDI_OUT) value = GLO_SELECT & MIDI_OUT_ALL ? "ALL" : "KEYS";
                 if (i == MI_SCREEN) value = (const char *const[]){"NEVER", "5 MIN", "15 MIN", "30 MIN", "60 MIN"}[scr_get()];
                 if (i == MI_LIGHTS) value = LIGHTS_NAME[settings_lights % LIGHTS_N];
 #if MELODEE_USB_AUDIO
@@ -528,6 +529,11 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
     }
     if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_REC_MODE) {
         GLO_SELECT = (uint8_t)(s > 0 ? GLO_SELECT | REC_MODE_FREE : s < 0 ? GLO_SELECT & ~REC_MODE_FREE : GLO_SELECT ^ REC_MODE_FREE);
+        ui.force = 1; ok = 0;
+    }
+    if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_MIDI_OUT) {   /* KNOB 1 right ALL, left KEYS; OCT+ toggles */
+        GLO_SELECT = (uint8_t)(s > 0 ? GLO_SELECT | MIDI_OUT_ALL : s < 0 ? GLO_SELECT & ~MIDI_OUT_ALL : GLO_SELECT ^ MIDI_OUT_ALL);
+        midi_out_all = (GLO_SELECT & MIDI_OUT_ALL) != 0u;
         ui.force = 1; ok = 0;
     }
     if ((s || ok) && ui.menu==1 && ui.menu_sel==MI_SCREEN) {

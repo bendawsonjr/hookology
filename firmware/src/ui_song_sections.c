@@ -159,6 +159,7 @@ static void sec_poll(void)
 {
     if (secs.rec && !song.playing && !seq_counting() && transport_req != 1u) sec_rec_finish();
     if (scs.build && (!sections_page() || song.playing || seq_counting() || chain_busy())) { scs.build = 0; ui.force = 1; }
+    song_cue_poll(sections_page() && !scs.build && !secs.rec);   /* a DAW's Start plays the song here (Hookology) */
 }
 
 /* ---------------------------------------------------- the song list --- */

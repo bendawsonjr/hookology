@@ -235,6 +235,36 @@ static void seq_pages(void)
     page_patterns_on = page_song_on = 1;
     puts("SEQ: PATTERNS and SONG hidden, SEQ held opens SECTIONS, TEMPO after MIXER on GLO passed");
 }
+/* a DAW's Start on SECTIONS (CLK USB): the song from its first entry, in time; elsewhere, or CLK INT: the loop */
+static void daw(uint32_t status) { midi_enqueue(0xFu | status << 8, 1u); units_block(0); }
+static void daw_start(void)
+{
+    setup();
+    sec_hold_key(1); tap_key(SEC_KEY[0]); frame();     /* B a copy of A */
+    press(B_REC); frame(); tap_key(SEC_KEY[0]); frame(); tap_key(SEC_KEY[1]); frame(); press(B_REC); frame();
+    assert(chain_config.count == 2 && !scs.build);
+    frames(300u); assert(!chain_cued);                 /* CLK INT: nothing cued */
+    song.g[G_CLOCK] = 1; frames(32u);
+    assert(chain_cued && !chain.armed && !song.playing && !transport_busy());
+    daw(0xFAu);
+    assert(song.playing && chain.running && chain.row == 0 && !chain_cued);
+    daw(0xFCu); frame();
+    assert(!song.playing && !chain.running && trk[0].pattern == 0);
+    frames(300u); assert(chain_cued);                  /* cued again for the next take */
+    daw(0xFCu); frames(32u); assert(chain_cued && !song.playing);   /* a Stop while stopped keeps it */
+    midi_enqueue(0x3u | 0xF2u << 8, 1u); daw(0xFBu); daw(0xF8u);   /* Continue from the top: as Start */
+    assert(song.playing && chain.running && chain.row == 0);
+    daw(0xFCu); frame();
+    go_page(GR_SONG); frames(32u); assert(!chain_cued);  /* another page: the loop */
+    daw(0xFAu); assert(song.playing && !chain.running);
+    daw(0xFCu); frame();
+    go_page(GR_SECTIONS); frames(300u); assert(chain_cued);
+    press(B_PLAY); units_block(0); frame();             /* PLAY there: the song, as before */
+    assert(song.playing && chain.running && !chain_cued);
+    press(B_PLAY); units_block(0); frame();
+    song.g[G_CLOCK] = 0; frames(32u); assert(!chain_cued && !song_sounds.mask);
+    puts("SECTIONS: a DAW's Start (or Continue from the top) plays the song; other pages and CLK INT the loop passed");
+}
 int main(void)
 {
     seq_pages();
@@ -245,6 +275,7 @@ int main(void)
     build();
     whole_section();
     song_list();
+    daw_start();
     puts("SECTIONS tests passed");
     return 0;
 }

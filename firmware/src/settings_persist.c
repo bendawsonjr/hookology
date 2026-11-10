@@ -106,6 +106,7 @@ static int settings_import(persist_t *p, int n)
         settings_midi_knobs = valid ? m[2] : MK_OFF;
         settings_midi_knob_mode = valid ? m[3] : MK_ABSOLUTE;
     }
+    midi_out_all = (p->favorites.factory[15][24] & 0x80u) != 0u;   /* MIDI OUT ALL (ui.c MIDI_OUT_ALL) */
     settings.magic = SETTINGS_MAGIC;
     settings.palette = palette_from_stored(p->palette);
     settings.lowcut = 0;

@@ -12,6 +12,14 @@ static struct {
 static uint32_t midi_track_channel(const track_t *t)
 { return (uint32_t)clamp(t->p[P_E0], 1, 16) - 1u; }
 
+/* MIDI OUT (the menu; Hookology; midi_out_all, midi_knobs.h): 0 KEYS, the panel keys only (as Melodee), 1 ALL, every
+ * note a sound track plays (patterns, takes, chords, strums, arps, the keys) also on its channel, track k on channel
+ * k + 1. Kept with the menu's other bits (ui.c MIDI_OUT_ALL); the audio ISR reads this copy */
+static int midi_out_on(const track_t *t)
+{ return midi_track_only(t) || (midi_out_all && t >= trk && t < &trk[NPART]); }
+static uint32_t midi_out_channel(const track_t *t)
+{ return midi_track_only(t) ? midi_track_channel(t) : (uint32_t)(t - trk); }
+
 static int midi_track_blocked(const track_t *t)
 {
     uint32_t tr = (uint32_t)(t - trk);
@@ -56,7 +64,7 @@ static void midi_track_all_off(track_t *t)
 static void midi_track_service(track_t *t)
 {
     uint32_t tr = (uint32_t)(t - trk);
-    if (!midi_track_only(t) || midi_track_blocked(t) || midi_output[tr].channel != midi_track_channel(t))
+    if (!midi_out_on(t) || midi_track_blocked(t) || midi_output[tr].channel != midi_out_channel(t))
         midi_track_all_off(t);
     else midi_track_flush(tr);
 }
@@ -76,7 +84,7 @@ static void midi_track_note_on(track_t *t, uint32_t note, uint32_t vel)
     midi_track_service(t);
     midi_track_note_off(t, note); /* retrigger: finish the previous strike */
     if (midi_track_pending(tr)) return;
-    uint32_t ch = midi_track_channel(t);
+    uint32_t ch = midi_out_channel(t);
     if (!midi_track_emit(0x09u | (0x90u | ch) << 8 | note << 16 | (vel & 127u) << 24)) return;
     midi_output[tr].channel = (uint8_t)ch;
     midi_output[tr].held[note >> 5] |= 1u << (note & 31u);

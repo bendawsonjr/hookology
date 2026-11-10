@@ -17,6 +17,14 @@ static struct {
     uint64_t seek_samples[NTRK], start_units;     /* start_units: from the song's top to chain.start */
     uint8_t lead[CHAIN_ROWS];                     /* each row's lead track (chain_leads): its loop is one repeat */
 } chain;
+/* Hookology: the song cued for an external Start (SECTIONS, a song, CLK USB/TRS, stopped; song_cue_poll in project.c):
+ * the main loop keeps chain.config, its leads and the song's sounds prepared as for PLAY but unarmed, so a DAW's Start
+ * (or Continue from its top) arms it in the ISR and the song starts on that downbeat, in time (chain_cue_take) */
+static volatile uint8_t chain_cued;
+static void chain_cue_take(void)
+{
+    if (chain_cued && !song.playing && !chain.running && !chain.armed) { chain_cued = 0; chain.armed = 1; }
+}
 
 static void seq_release(track_t *t);
 static void seq_stop(void);
@@ -229,7 +237,7 @@ static void chain_stop(void)
     uint32_t i;
     chain.armed = 0;
     punch_song_req = -1; punch_song_buffered = 0;
-    if (!chain.running) { song_sound_stop(); return; }
+    if (!chain.running) { if (!chain_cued) song_sound_stop(); return; }   /* (a cue's base is the sound as it is) */
     song_sound_stop();
     for (i = 0; i < NTRK; i++) {
         pattern_apply(&trk[i], chain.original[i]);
@@ -298,7 +306,7 @@ static void pattern_poll(void)
     if (!song_sounds.mask && !chain.armed && !pattern_sounds_any()) resource_release(RES_SONG_BASE);
     for (uint32_t k = 0; k < NTRK; k++) {
         uint32_t bank = sec_bank(k, trk[k].pattern_next);
-        if (chain.armed) bank = chain_bank(chain.start, k);
+        if (chain.armed || chain_cued) bank = chain_bank(chain.start, k);
         else if (chain.running) {
             uint32_t row = chain.row + 1u;
             bank = row < chain.config.count ? chain_bank(row, k) :
