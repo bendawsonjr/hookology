@@ -30,6 +30,8 @@ typedef struct {
     float coeff_cut, coeff_k, coeff_g[4], coeff_inv;
     uint32_t coeff_valid;
     p5_env_t filter, amp;
+    uint32_t light;                                     /* QUALITY LIGHT (Hookology): this block at half rate */
+    float up[3];                                        /* .. its last three half-rate samples (p5_samples_light) */
 } p5_voice_t;
 typedef struct {
     float f0,a0,f1,a1,cut,k,filter_gain,filter_velocity,amp_velocity,env_amount;
@@ -350,6 +352,82 @@ static inline __attribute__((always_inline)) uint32_t p5_wheel_inc(uint32_t base
     if(ratio==1.0f)return base;
     return (uint32_t)fm_minf((float)base*ratio,1932735232.0f);
 }
+#define P5_HALF_CUT 14.0231f                            /* an octave in cutoff steps: 127 ln 2 / ln(16000 / 30) */
+/* LIGHT's increments: twice the full rate's, capped below half-rate Nyquist as p5_inc caps the full rate */
+static inline __attribute__((always_inline)) uint32_t p5_half_inc(uint32_t x)
+{
+    return x > 966367616u ? 1932735232u : x << 1;
+}
+/* one oscillator sample: the mixer's input (softclipped) and the cutoff it asks for; sh 1: LIGHT (half rate) */
+static inline __attribute__((always_inline)) void p5_osc(p5_voice_t *restrict s,const uint8_t *restrict p,const p5_render_params_t *c,
+    float fe,float lfo,float wheel_pitch,uint32_t fixed_pw_a,uint32_t fixed_pw_b,uint32_t sh,float *xo,float *fco)
+{
+    float noise=(float)(noise32(&s->noise)>>8)*(1.0f/16777216.0f)-0.5f;
+    uint32_t db=p[P5_WHEEL_FREQ_B]?p5_wheel_inc(c->ib,wheel_pitch):c->ib;
+    if(sh)db=p5_half_inc(db);
+    float b=p5_wave(s->phase[1],db,(p[P5_WHEEL_PW_B]?p5_pw(c->pwm_b+lfo):fixed_pw_b),p[P5_SAW_B],p[P5_PULSE_B],p[P5_TRI_B],&s->triangle);
+    float bn=b*2.0f;
+    uint32_t da=p[P5_POLY_FREQ]?p5_inc(c->ia,fe*c->pa_env+bn*c->pa_b):c->ia;
+    if(p[P5_WHEEL_FREQ_A])da=p5_wheel_inc(da,wheel_pitch);
+    if(sh)da=p5_half_inc(da);
+    uint32_t pw=!(p[P5_POLY_PW] || p[P5_WHEEL_PW_A])?fixed_pw_a:p5_pw(c->pwm_a+(p[P5_POLY_PW]?fe*c->pw_env+b*c->pw_b:0.0f)+(p[P5_WHEEL_PW_A]?lfo:0.0f));
+    float unused=0.0f;
+    float a=p5_wave(s->phase[0],da,pw,p[P5_SAW_A],p[P5_PULSE_A],0,&unused)+s->sync_tail;
+    s->sync_tail=0.0f;
+    uint32_t nb=s->phase[1]+db,na=s->phase[0]+da;
+    if(p[P5_SYNC] && nb<s->phase[1] && db){
+        float frac=p5_sync_fraction(0u-s->phase[1],db),remain=1.0f-frac;
+        uint32_t at=s->phase[0]+(uint32_t)((float)da*frac);
+        float before=p5_wave(at,da,pw,p[P5_SAW_A],p[P5_PULSE_A],0,&unused);
+        float after=p5_wave(0,da,pw,p[P5_SAW_A],p[P5_PULSE_A],0,&unused);
+        float jump=(after-before)*0.5f;
+        a+=jump*remain*remain;s->sync_tail=-jump*frac*frac;
+        na=(uint32_t)((float)da*remain);
+    }
+    s->phase[0]=na;s->phase[1]=nb;
+    float x=a*c->la+b*c->lb+noise*c->ln;
+    float fc=c->cut+fe*c->filter_velocity*c->env_amount;
+    if(p[P5_POLY_FILTER])fc+=fe*c->pf_env+bn*c->pf_b;
+    if(p[P5_WHEEL_FILTER])fc+=lfo*112.0f;
+    *xo=p5_fast_softclip(x);
+    *fco=fc;
+}
+/* osc B moves the filter at audio rate (Poly-Mod FILTER from B): LIGHT then keeps every cutoff */
+static int p5_filter_audio_rate(const uint8_t *p,const p5_render_params_t *c) { return p[P5_POLY_FILTER] && c->pf_b!=0.0f; }
+#if P5_OVERSAMPLE == 1
+/* QUALITY LIGHT (Hookology): the oscillators and the filter at half the rate (an octave up in the cutoff's steps), back
+ * up to the full rate by the four-point half-band midpoint (-y0 + 9 y1 + 9 y2 - y3) / 16, about three samples late;
+ * the filter's coefficients every other half-rate sample (the envelope's cutoff held 90 us); the envelopes, velocity
+ * and the amplifier at the full rate as in p5_samples. FULL (p5_samples) is unchanged. About 58 % of a voice's work */
+static __attribute__((noinline,section(".audio_text"))) void p5_samples_light(p5_voice_t *restrict s,const uint8_t *restrict p,int32_t *restrict out,uint32_t n,const vmod_t *m,const p5_render_params_t *c)
+{
+    int32_t last=0;
+    uint32_t h=n>>1,hold=!p5_filter_audio_rate(p,c);
+    float inputs[CTL/2u],cuts[CTL/2u];
+    uint32_t fixed_pw_b=p5_pw(c->pwm_b),fixed_pw_a=p5_pw(c->pwm_a);
+    for(uint32_t j=0;j<h;j++){
+        uint32_t i=j<<1;
+        float fe=c->f0+(c->f1-c->f0)*((float)i*(1.0f/CTL));
+        p5_osc(s,p,c,fe,c->wheel[i],c->wheel_pitch[i],fixed_pw_a,fixed_pw_b,1u,&inputs[j],&cuts[j]);
+    }
+    float y0=s->up[0],y1=s->up[1],y2=s->up[2];
+    for(uint32_t j=0;j<h;j++){
+        uint32_t i=j<<1;
+        float y3=p5_filter_core(s,inputs[j],cuts[hold?j&~1u:j]+P5_HALF_CUT,c->k,c->filter_gain,!!p[P5_FILTER_REV]);
+        float v[2]={(9.0f*(y1+y2)-y0-y3)*(1.0f/16.0f),y2};
+        y0=y1;y1=y2;y2=y3;
+        for(uint32_t e=0;e<2u;e++,i++){
+            float time=(float)i*(1.0f/CTL);
+            float ae=c->a0+(c->a1-c->a0)*time;
+            float gain=ae*c->amp_velocity*(1.0f+(float)s->amp_drift/32768.0f);
+            float amp=((float)m->amp0+(float)(m->amp1-m->amp0)*time)*(1.0f/32768.0f);
+            last=dith_cutf(v[e]*gain*amp*(2.0f*VOICE_FS),i+(uint32_t)m->amp1);out[i]+=last;
+        }
+    }
+    s->up[0]=y0;s->up[1]=y1;s->up[2]=y2;
+    s->last_pcm=last;
+}
+#endif
 static __attribute__((section(".dsp_text"))) void p5_samples(p5_voice_t *restrict s,const uint8_t *restrict p,int32_t *restrict out,uint32_t n,const vmod_t *m,const p5_render_params_t *c)
 {
     int32_t last=0;
@@ -404,6 +482,17 @@ static __attribute__((section(".dsp_text"))) void p5_samples(p5_voice_t *restric
     s->last_pcm=last;
 }
 
+typedef void (*p5_kernel_t)(p5_voice_t *,const uint8_t *,int32_t *,uint32_t,const vmod_t *,const p5_render_params_t *);
+/* the voice's sample kernel: FULL (p5_samples, as it always was) or LIGHT */
+static inline __attribute__((always_inline)) p5_kernel_t p5_kernel(const p5_voice_t *s)
+{
+#if P5_OVERSAMPLE == 1
+    if(s->light)return p5_samples_light;
+#else
+    (void)s;
+#endif
+    return p5_samples;
+}
 typedef struct {
     p5_voice_t *voice;const uint8_t *patch;p5_render_params_t params;vmod_t modulation;uint32_t n;
 } p5_batch_t;
@@ -411,7 +500,7 @@ _Static_assert(sizeof(p5_batch_t)<=AUDIO_BATCH_BYTES,"Prophet batch descriptor")
 static void p5_batch_kernel(const void *data,int32_t *pcm)
 {
     const p5_batch_t *j=data;
-    void (*volatile run)(p5_voice_t *,const uint8_t *,int32_t *,uint32_t,const vmod_t *,const p5_render_params_t *)=p5_samples;
+    void (*volatile run)(p5_voice_t *,const uint8_t *,int32_t *,uint32_t,const vmod_t *,const p5_render_params_t *)=p5_kernel(j->voice);
     run(j->voice,j->patch,pcm,j->n,&j->modulation,&j->params);
 }
 
@@ -433,7 +522,7 @@ static void p5_worker_kernel(void *unused)
 {
     (void)unused;
     for(uint32_t i=0;i<p5_job.n;i++)p5_job.pcm[i]=0;
-    void (*volatile run)(p5_voice_t *,const uint8_t *,int32_t *,uint32_t,const vmod_t *,const p5_render_params_t *)=p5_samples;
+    void (*volatile run)(p5_voice_t *,const uint8_t *,int32_t *,uint32_t,const vmod_t *,const p5_render_params_t *)=p5_kernel(p5_job.voice);
     run(p5_job.voice,p5_job.patch,p5_job.pcm,p5_job.n,&p5_job.modulation,&p5_job.params);
 }
 static void p5_join(void)
@@ -536,11 +625,12 @@ static void p5_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
         base->pa_env,base->pa_b,base->pf_env,base->pf_b,base->pw_env,base->pw_b,
         base->pwm_a+width_mod,base->pwm_b+width_mod,base->la,base->lb,base->ln,
         ia,ib,part->wheel,part->wheel_pitch};
+    s->light=t->p[P_P5Q]==1 && !(n&1u) && P5_OVERSAMPLE==1;   /* QUALITY LIGHT: half rate (p5_samples_light) */
     if(audio_batch_active){
         const p5_batch_t job={s,p,c,*m,n};audio_batch_push(p5_batch_kernel,&job,sizeof job,out,n,AP_PROPHET);return;
     }
     /* An indirect call crosses the XIP/RAM distance beyond direct branch range. */
-    void (*volatile run)(p5_voice_t *,const uint8_t *,int32_t *,uint32_t,const vmod_t *,const p5_render_params_t *)=p5_samples;
+    void (*volatile run)(p5_voice_t *,const uint8_t *,int32_t *,uint32_t,const vmod_t *,const p5_render_params_t *)=p5_kernel(s);
 #if MELODEE_DUAL_CORE
     uint32_t next=(uint32_t)(v-t->v)+1u;
     while(next<NVOICE && !t->v[next].active)next++;
@@ -596,7 +686,10 @@ static void p5_preset_loaded(track_t *t,uint32_t pi)
 /* Serial hardware measurements justify three units per voice. The opt-in
  * paired path provisionally charges two: eight voices fill the same sixteen
  * units, so adding another track still steals voices. Validate on hardware. */
-static uint32_t p5_units(const track_t *t) { (void)t; return p5_poly()>5u?9u:12u; }   /* (voice.c voice_units: 225 us; CPU0 alone keeps five voices in budget 16) */
+/* voice.c voice_units: 225 us a voice; CPU0 alone keeps five voices in budget 16. QUALITY LIGHT counts as FULL on
+ * purpose (Hookology, beta27): counted cheaper (beta26: 6 units) the budget let more in than a six-track mix (the user's
+ * Bop) could take, a deadline missed; at FULL's count none, the other engines' units being on the low side */
+static uint32_t p5_units(const track_t *t) { (void)t; return p5_poly()>5u?9u:12u; }
 static const engine_t ENG_P5_TEST = {
     .name="PROPHET", .page_title={"FILTER/TUNE","PW/MIX"},
     .edit={{"CUT",F_INT,-63,63,0,0,0},{"RES",F_INT,-63,63,0,0,0},

@@ -136,8 +136,40 @@ static void overload(void)
     lead = held(&trk[0], 60); extra = held(&trk[0], 64);
     trk_note_off(&trk[0], 60); trk_note_off(&trk[0], 64);
     lead->env = 10000; extra->env = 10;
-    shed_voice(SHED_HELD);
+    shed_voice(SHED_TAIL);
     check("released voices shed the quieter tail first", extra->stage == 4u && lead->stage != 4u);
+
+    fresh();                                          /* (Hookology) the costliest engine's tail first */
+    host_preset(&trk[1], ENGI_DRUM, 0);
+    trk_note_on(&trk[0], 60, 100); trk_note_on(&trk[1], 36, 100);
+    lead = held(&trk[0], 60); extra = held(&trk[1], 36);
+    trk_note_off(&trk[0], 60); trk_note_off(&trk[1], 36);
+    lead->env = 10000; extra->env = 10;               /* the drum's tail the quieter */
+    {
+        int synth_costlier = voice_units(&trk[0]) > voice_units(&trk[1]);
+        shed_voice(SHED_TAIL);
+        check("an overload takes the costliest engine's tail before a cheaper, quieter one",
+              synth_costlier && lead->stage == 4u && extra->stage != 4u && shed_count == 1u);
+    }
+
+    fresh();
+    trk[0].p[P_VOICE] = V_POLY;
+    for (i = 0; i < 4u; i++) trk_note_on(&trk[0], 48u + 4u * i, 100);
+    for (i = 1; i < 4u; i++) trk_note_off(&trk[0], 48u + 4u * i);
+    shed_voice(SHED_TAIL2);
+    check("over 97 %: two tails go in one half, the held note stays",
+          shed_count == 2u && held(&trk[0], 48)->gate && held(&trk[0], 48)->stage != 4u);
+
+    fresh();                                          /* (Hookology) VOICES: the track's limit */
+    trk[0].p[P_VOICE] = V_POLY; trk[0].p[P_VMAX] = 2;
+    for (i = 0; i < 4u; i++) trk_note_on(&trk[0], 48u + 4u * i, 100);
+    for (i = mode = 0; i < NVOICE; i++) mode += trk[0].v[i].active && trk[0].v[i].stage != 4u;
+    check("VOICES 2: a four-note chord sounds on two voices, the lowest held and the newest",
+          mode <= 2u && held(&trk[0], 48) && held(&trk[0], 48)->gate && held(&trk[0], 60) && held(&trk[0], 60)->gate);
+    trk[0].p[P_VMAX] = 0;
+    trk_note_on(&trk[0], 72, 100); trk_note_on(&trk[0], 76, 100);
+    for (i = mode = 0; i < NVOICE; i++) mode += trk[0].v[i].active && trk[0].v[i].gate;
+    check("VOICES ALL: the engine's own count again", mode >= 4u);
 }
 static void dma(void)
 {
@@ -147,24 +179,30 @@ static void dma(void)
     fm1_alnk0_irq();
     check("an auxiliary interrupt does not render a DMA half", !host_acks && !audio_halves && !melodee_dbg.in_audio);
     host_pending = FM1_AUDIO_HALF;
-    host_us = 5000;
+    host_us = (HALF_FRAMES * 1000000u / FS) * 85u / 100u;   /* 85 %: over 80, under 90 */
     fm1_alnk0_irq();
-    check("one slow half records elapsed load but does not shed yet", host_acks == 1u && !shed_req && melodee_dbg.last_us == 5000u && !melodee_dbg.late);
+    check("one half between 80 and 90 % records its load but does not shed yet", host_acks == 1u && !shed_req && melodee_dbg.last_us == host_us && !melodee_dbg.late);
     fm1_alnk0_irq();
-    check("a second slow half in a row requests shedding", host_acks == 2u && shed_req);
+    check("a second slow half in a row requests shedding", host_acks == 2u && shed_req == SHED_TAIL);
     shed_req = 0;
     host_half_reads = 0; host_dma_advanced = 1; host_us = 100;
     fm1_alnk0_irq();
     check("DMA advancing during a render is counted once", host_acks == 3u && melodee_dbg.late == 1u && !melodee_dbg.in_audio && !shed_req);
+    fresh(); host_us = (HALF_FRAMES * 1000000u / FS) * 93u / 100u;
+    fm1_alnk0_irq();
+    check("one half over 90 % requests a tail at once (Hookology: a downbeat's jump)", shed_req == SHED_TAIL);
+    fresh(); host_us = 5000;
+    fm1_alnk0_irq();
+    check("one half over 97 % requests two tails", shed_req == SHED_TAIL2);
     fresh();
     expected = HALF_FRAMES * 1000000u / FS;            /* the half's deadline in us */
     host_us = expected * 90u / 100u; host_nest = expected * 30u / 100u;   /* the render 60 %, TIMER5 nested 30 % */
     fm1_alnk0_irq(); fm1_alnk0_irq();
     check("TIMER5 nested in the render counts toward the deadline", shed_req && melodee_dbg.last_us == host_us - host_nest);
     fresh();
-    host_us = 5000;
-    fm1_alnk0_irq(); host_us = 100; fm1_alnk0_irq(); host_us = 5000; fm1_alnk0_irq();
-    check("slow halves that are not consecutive do not shed", !shed_req);
+    host_us = (HALF_FRAMES * 1000000u / FS) * 85u / 100u;
+    fm1_alnk0_irq(); { uint32_t h = host_us; host_us = 100; fm1_alnk0_irq(); host_us = h; } fm1_alnk0_irq();
+    check("slow halves (80 to 90 %) that are not consecutive do not shed", !shed_req);
     fresh();
     host_us = 580;
     for (i = 0; i < 512u; i++) fm1_alnk0_irq();

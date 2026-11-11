@@ -14,8 +14,9 @@ typedef struct { const char *title; uint8_t pic, n; lrow_t row[16]; } list_t;
 static const list_t LISTS[] = {
     {"SCL", LP_SCALE, 6, {{"SCL", 0}, {"SCALES", 1}, {"SCL", 2}, {"MPC", 0}, {"SCL", 3}, {"SCL", 1}}},   /* (MPC: QNT MPC's
                                                                                                     * pad degree) */
-    {"VOICE", LP_NONE, 9, {{"VOICE", 0}, {"VOICE", 1}, {"VOICE", 2}, {"VOICE", 3}, {"VOICE 2", 0}, {"VOICE 2", 1},
-                           {"VOICE 2", 2}, {"VOICE 2", 3}, {"VOICE 3", 0}}},
+    {"VOICE", LP_NONE, 11, {{"VOICE", 0}, {"VOICE", 1}, {"VOICE", 2}, {"VOICE", 3}, {"VOICE 2", 0}, {"VOICE 2", 1},
+                           {"VOICE 2", 2}, {"VOICE 2", 3}, {"VOICE 3", 0}, {"VOICE 3", 1}, {"VOICE 3", 2}}},
+                                                        /* (VOICES, a Prophet's QUALITY: Hookology) */
     {"FM LFO", LP_NONE, 7, {{"FM LFO", 0}, {"FM LFO", 1}, {"FM LFO", 2}, {"FM LFO", 3}, {"FM LFO 2", 0}, {"FM LFO 2", 1},
                             {"FM LFO 2", 2}}},
     {"FM BEND", LP_NONE, 16, {{"FM BEND", 0}, {"FM BEND", 1}, {"FM BEND", 2}, {"FM BEND", 3}, {"FM PORTA", 0},
@@ -57,7 +58,11 @@ static int list_gone(uint32_t i)
     return 0;
 }
 /* list l's rows shown: all but MPC's degree while QNT is not MPC (the page it was on alone, Kerem 2026-10-11) */
-static int list_row_on(const lrow_t *rw) { return !str_eq(rw->page, "MPC") || TSEL->p[P_QUANT] == Q_MPC; }
+static int list_row_on(const lrow_t *rw)
+{
+    if (str_eq(rw->page, "VOICE 3") && rw->slot == 2u) return TSEL->eng_req == ENGI_PROPHET;   /* QUALITY: a Prophet's */
+    return !str_eq(rw->page, "MPC") || TSEL->p[P_QUANT] == Q_MPC;
+}
 static uint32_t list_n(const list_t *l)
 {
     uint32_t r, n = 0;

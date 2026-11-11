@@ -484,12 +484,12 @@ static int fm6_playing(const track_t *t, uint32_t i)
     return 0;
 }
 
-static uint32_t trk_nvoice(const track_t *t);
+static uint32_t trk_vlimit(const track_t *t);
 /* POLY: the voice for a key (chooseNote): free over key-up over the same note, the oldest key first */
 static uint32_t fm6_alloc(track_t *t, uint32_t note)
 {
     fm6_part_t *P = FM6P(t);
-    uint32_t np=trk_nvoice(t),k=P->pt.rr%np,best=k,i;
+    uint32_t np=trk_vlimit(t),k=P->pt.rr%np,best=k,i;
     int32_t bs = -1;
     for (i = 0; i < np; i++) {
         int32_t sc = (fm6_playing(t, k) ? 0 : 4) + (t->v[k].gate ? 0 : 2) + (P->v[k].played && t->v[k].note == note);

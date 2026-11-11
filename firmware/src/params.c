@@ -57,6 +57,8 @@ static const char *const N_STRUM[] = {"OFF", "1/8", "1/16", "1/32", "1/64", "1/1
 static const char *const N_STROKE[] = {"DOWN", "UP", "ALT"};
 static const char *const N_VOIC[] = {"CLOSE", "OPEN", "INV1", "INV2", "+OCT"};   /* VC_CLOSE .. VC_BASS */
 static const char *const N_VOICE[] = {"POLY", "MONO", "LEG", "UNI"};   /* V_POLY .. V_UNISON */
+static const char *const N_VMAX[] = {"ALL", "1", "2", "3", "4", "5", "6", "7", "8"};   /* P_VMAX: VOICES */
+static const char *const N_P5Q[] = {"FULL", "LIGHT"};   /* P_P5Q: a Prophet's QUALITY */
 static const char *const N_GLMODE[] = {"RATE", "TIME"};
 static const char *const N_PRIO[] = {"LAST", "LOW", "HIGH"};
 static const char *const N_ALLOC[] = {"ROT", "REUSE"};
@@ -245,8 +247,8 @@ static const param_desc_t TP[P_COUNT] = {
     [P_PAN] = PD("PAN", F_BIPCT, -64, 63, 0),
     [P_MUTE] = PE("MUTE", N_ONOFF, 0),
     [P_RESERVED45] = PD("", F_INT, 0, 127, 0),
-    [P_RESERVED46] = PD("", F_INT, 0, 127, 0),
-    [P_RESERVED47] = PD("", F_INT, 0, 127, 0),
+    [P_P5Q] = PE("QUALITY", N_P5Q, 0),   /* (Hookology: a Prophet at half rate, LIGHT) */
+    [P_VMAX] = PE("VOICES", N_VMAX, 0),   /* (Hookology: the track's voice limit, voice.c trk_vlimit) */
     [P_CHSET] = PD("SET", F_INT, 0, 99, 0),   /* shown 1..100 (param_format); 0, the old slot's value, is set 1 */
 #define MSLOT(k) [P_M##k##SRC] = PE("SRC" #k, N_MSRC, 0), [P_M##k##DST] = PE("DST" #k, N_MDST, 0), \
                  [P_M##k##AMT] = PD("AMT" #k, F_BIPCT, -64, 63, 0)
@@ -702,7 +704,8 @@ static const page_t PAGES[] = {
     {"LANES 2", FAM_EDIT, SC_TRACK, GR_NONE, {P_LN4, P_LN5, P_LN6, P_LN7}},
     {"VOICE", FAM_EDIT, SC_TRACK, GR_NONE, {P_VOICE, P_GLIDE, P_GLMODE, P_PRIO}},
     {"VOICE 2", FAM_EDIT, SC_TRACK, GR_NONE, {P_ALLOC, P_DETUNE, P_PAN, P_MUTE}},
-    {"VOICE 3", FAM_EDIT, SC_TRACK, GR_NONE, {P_SPRD, 0xFF, 0xFF, 0xFF}},
+    {"VOICE 3", FAM_EDIT, SC_TRACK, GR_NONE, {P_SPRD, P_VMAX, P_P5Q, 0xFF}},   /* VOICES: the track's limit; QUALITY:
+                                                                                 * a Prophet's */
     {"TEMPO", FAM_GLO, SC_GLOBAL, GR_NONE, {G_BPM, G_SWING, G_PROJECT_RECQ, 0xFF}},   /* project speed, swing and recording grid
                                                                                      * (Hookology: GLO's first; the mixer is HOME's) */
     {"GLOBAL", FAM_GLO, SC_GLOBAL, GR_NONE, {G_A4, G_BUDGET, G_CLOCK, G_TUNE}}, /* device reference/budget; CLK/TUNE kept */
@@ -935,5 +938,5 @@ static const param_desc_t *page_desc(const page_t *pg, uint32_t slot, int16_t **
 static int param_kept(uint32_t i)
 {
     return i == P_LEVEL || i == P_PAN || i == P_MUTE || (i >= P_AMODE && i <= P_SGATE) ||
-           i == P_CHRD || i == P_CHSET || i == P_VOIC || i == P_STRUM || i == P_STROKE || i == P_MPCDEG || i == P_RECQ || param_fx(i) || param_fx_send(i);
+           i == P_CHRD || i == P_CHSET || i == P_VMAX || i == P_P5Q || i == P_VOIC || i == P_STRUM || i == P_STROKE || i == P_MPCDEG || i == P_RECQ || param_fx(i) || param_fx_send(i);
 }

@@ -63,16 +63,18 @@ static void audio_block(int32_t *out, uint32_t n)       /* mix (mix.c), then Q15
     AP_END(AP_OUTPUT,output_start);
 }
 
-/* Overload: two halves in a row above 80 % (the render plus TIMER5 nested in it), fade the quietest
- * release tail over the next block, and one more each half while it lasts. Held notes are heard, so
- * they go only in an emergency: eight halves in a row above 97 %, with no tail left to take. Then keep
- * each part's lowest POLY note and MONO / LEGATO / UNISON lead, as the shared budget does. */
-enum { SHED_NONE, SHED_TAIL, SHED_HELD };
+/* Overload: two halves in a row above 80 % (the render plus TIMER5 nested in it), or one above 90 % (Hookology: a
+ * downbeat's jump), fade a release tail over the next block, and one more each half while it lasts; above 97 %, two.
+ * The tail is the costliest engine's (voice_units: a Prophet's before a drum's, whose tails free little), the quietest
+ * of those. Held notes are heard, so they go only in an emergency: eight halves in a row above 97 %, with no tail left
+ * to take. Then keep each part's lowest POLY note and MONO / LEGATO / UNISON lead, as the shared budget does. */
+enum { SHED_NONE, SHED_TAIL, SHED_TAIL2, SHED_HELD };
 static volatile uint8_t shed_req;                      /* SHED_*: the most a coming half may cut */
 static uint8_t shed_over;                              /* bit k: the half k halves ago was over 80 % */
 static uint8_t shed_hot;                               /* bit k: the half k halves ago was over 97 % */
 #define SHED_TICKS ((HALF_FRAMES * 1000000u / FS) * 80u / 100u * FM1_TICKS_PER_US)        /* 80 % of a half */
 #define SHED_HELD_TICKS ((HALF_FRAMES * 1000000u / FS) * 97u / 100u * FM1_TICKS_PER_US)   /* 97 % of a half */
+#define SHED_FAST_TICKS ((HALF_FRAMES * 1000000u / FS) * 90u / 100u * FM1_TICKS_PER_US)   /* 90 %: at once */
 static uint32_t shed_count;
 #if MELODEE_AUDIO_BENCH
 static uint32_t audio_bench_shed_requests;
@@ -86,8 +88,10 @@ static __attribute__((noinline)) uint32_t shed_check(uint32_t all)
     load_note(all / ((HALF_FRAMES * 1000000u / FS) * FM1_TICKS_PER_US / 100u));
     shed_over = (uint8_t)(shed_over << 1 | (all > SHED_TICKS));
     shed_hot = (uint8_t)(shed_hot << 1 | (all > SHED_HELD_TICKS));
-    if ((shed_over & 3u) == 3u && shed_req < SHED_TAIL)
+    if (((shed_over & 3u) == 3u || all > SHED_FAST_TICKS) && shed_req < SHED_TAIL)
         shed_req = SHED_TAIL;
+    if ((shed_hot & 1u) && shed_req < SHED_TAIL2)
+        shed_req = SHED_TAIL2;
     if (shed_hot == 0xFFu) {
         shed_req = SHED_HELD;
         shed_hot = 0;                                   /* the next one waits to hear what this frees */
@@ -95,22 +99,34 @@ static __attribute__((noinline)) uint32_t shed_check(uint32_t all)
     return (all - t5_nested_ticks) / FM1_TICKS_PER_US;
 }
 
-static void shed_voice(uint32_t level)
+/* the release tail to fade: the costliest engine's, the quietest of those (0: none) */
+static voice_t *shed_tail(void)
 {
-    uint32_t p, i;
+    uint32_t p, i, best_u = 0;
     voice_t *best = 0;
-    for (p = 0; p < NPART; p++)
+    for (p = 0; p < NPART; p++) {
+        uint32_t u = voice_units(&trk[p]);
         for (i = 0; i < NVOICE; i++) {
             voice_t *v = &trk[p].v[i];
-            if (v->active && !v->gate && v->stage != 4u && (!best || v->env < best->env))
+            if (v->active && !v->gate && v->stage != 4u && (!best || u > best_u || (u == best_u && v->env < best->env))) {
                 best = v;
+                best_u = u;
+            }
         }
-    if (best) {
+    }
+    return best;
+}
+static void shed_voice(uint32_t level)
+{
+    uint32_t p, i, k;
+    voice_t *best = 0;
+    for (k = level >= SHED_TAIL2 ? 2u : 1u; k && (best = shed_tail()) != 0; k--) {
         voice_kill(best);
         shed_count++;
         shed_part[voice_part(best) % NPART]++;
-        return;
     }
+    if (k < (level >= SHED_TAIL2 ? 2u : 1u))           /* (a tail taken: held notes wait) */
+        return;
     if (level < SHED_HELD)
         return;
     for (p = 0; p < NPART; p++) {

@@ -108,6 +108,14 @@ static uint32_t trk_nvoice(const track_t *t)
     return !c ? NPOLY : c < NVOICE ? c : NVOICE;
 }
 
+/* the voices a POLY note may take: trk_nvoice, at most the track's VOICES (P_VMAX, 0: ALL; Hookology). A note past it
+ * reuses one of these (voice_alloc: the oldest released, else the oldest held but the lowest) */
+static uint32_t trk_vlimit(const track_t *t)
+{
+    uint32_t n = trk_nvoice(t), lim = (uint32_t)t->p[P_VMAX];
+    return lim && lim < n ? lim : n;
+}
+
 /* the part's voice mode: P_VOICE, POLY for an engine of hits (engine_t.oneshot: DRUM) */
 static uint32_t trk_vmode(const track_t *t)
 {
@@ -373,7 +381,7 @@ static int voice_refused(track_t *t, uint32_t note)
 static voice_t *voice_alloc(track_t *t, uint32_t note)
 {
     const engine_t *e = ENGINES[t->engine];
-    uint32_t i, np = trk_nvoice(t), best = np, low = np, nfree = 0;
+    uint32_t i, np = trk_vlimit(t), best = np, low = np, nfree = 0;
     int32_t bd = 0x7FFFFFFF;
     if (e->alloc) {                                     /* the engine's own choice (FM6: Dexed's) */
         voice_t *v = &t->v[e->alloc(t, note) % np];

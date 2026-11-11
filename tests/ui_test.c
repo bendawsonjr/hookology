@@ -382,7 +382,8 @@ static int test_sound_loads(void)
     t->p[P_SCALE] = 2;
     t->p[P_TRANS] = 5;
     t->p[P_RESERVED45] = 1;
-    t->p[P_RESERVED46] = 4;
+    t->p[P_RESERVED33] = 4;
+    t->p[P_P5Q] = 1; t->p[P_VMAX] = 3;            /* (Hookology: QUALITY and VOICES are the track's) */
     t->p[P_SDIV] = 1;
     t->p[P_LEVEL] = 90;
     before = *t;
@@ -390,7 +391,8 @@ static int test_sound_loads(void)
     bad += check("PRESETS on HOME loads the sound: steps, LEN, DIV untouched", t->preset == (uint8_t)((before.preset + 1u) % ENGINES[3]->npresets) &&
                  !memcmp(t->step, before.step, sizeof t->step) && t->p[P_SLEN] == 32 && t->p[P_SDIV] == 1);
     bad += check("..ARP, SCL, the SLICER and the mix stay the track's", t->p[P_AMODE] == 2 && t->p[P_AOCT] == 3 && t->p[P_SCALE] == 2 &&
-                 t->p[P_TRANS] == 5 && !t->p[P_RESERVED45] && !t->p[P_RESERVED46] && t->p[P_LEVEL] == 90);
+                 t->p[P_TRANS] == 5 && !t->p[P_RESERVED45] && !t->p[P_RESERVED33] && t->p[P_LEVEL] == 90 &&
+                 t->p[P_P5Q] == 1 && t->p[P_VMAX] == 3);
     bad += check("..and no warning about the sequence", !msg_is("T1 SEQ REPLACED"));
     for (i = 0; i < ENGINES[3]->npresets; i++)
         if (str_eq(eng_preset(ENGINES[3], i)->name, "ARP BASS"))
@@ -2535,6 +2537,19 @@ static int test_popups(void)
         turn(EN_K2, 5); turn(EN_K1, 3);
         bad += check("LISTS: VOICE 1-3 one list; KNOB 2 to row 6 (VOICE 2's DETUNE), KNOB 1 edits it",
                      TSEL->p[P_DETUNE] == o + 3 && !page_visible(page_titled("VOICE 2")));
+        turn(EN_K2, 4); turn(EN_K1, 3);
+        bad += check("LISTS: VOICE's last row is VOICES (Hookology), KNOB 1 sets the track's limit", TSEL->p[P_VMAX] == 3);
+        {
+            const lrow_t q = {"VOICE 3", 2};
+            uint32_t e = TSEL->eng_req;
+            set_engine_of(TSEL, ENGI_CZ);
+            int other = !list_row_on(&q);
+            set_engine_of(TSEL, ENGI_PROPHET);
+            bad += check("LISTS: QUALITY (FULL / LIGHT) is a row on a Prophet track only", other && list_row_on(&q));
+            set_engine_of(TSEL, e);
+        }
+        TSEL->p[P_VMAX] = 0;
+        turn(EN_K2, -4);
         turn(EN_K2, -5);
         press(B_OCTUP);
         bad += check("LISTS: OCT+ on a list value (VOICE): its whole list", pop.on == POP_LIST);

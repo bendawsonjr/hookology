@@ -249,10 +249,14 @@ static int param_master_fx(uint32_t id){return id>=G_MFXTYPE && id<=G_MFX3CHAR;}
 /* P_CHSET took a retired slot: the stored layout, and so every older project, stays as it is. Old motion events may
  * still name the slot; they stay inert (param_retired) */
 #define P_CHSET P_RESERVED48                   /* HERA chord set - 1 (chord.c CH_HERA) */
+/* VOICES (Hookology): the track's voice limit, 0 ALL, 1..8 (voice.c trk_vlimit); took a retired slot as P_CHSET did */
+#define P_VMAX P_RESERVED47
+/* QUALITY (Hookology): a Prophet track's FULL (0) or LIGHT (1, half rate: eng_prophet_test.c p5_samples_light) */
+#define P_P5Q P_RESERVED46
 #define CHRD_HERA 12                           /* P_CHRD's chord.c CH_HERA: scale_map needs it before chord.c */
 static int param_retired(uint32_t id)
 { return (id>=P_RESERVED33 && id<=P_RESERVED36) || (id>=P_RESERVED45 && id<=P_RESERVED48); }
-static int param_reserved(uint32_t id) { return param_retired(id) && id != P_CHSET; }
+static int param_reserved(uint32_t id) { return param_retired(id) && id != P_CHSET && id != P_VMAX && id != P_P5Q; }
 static int global_reserved(uint32_t id)
 { return (id>=G_RESERVED4 && id<=G_RESERVED11) || (id>=G_RESERVED24 && id<=G_RESERVED26); }
 
