@@ -229,11 +229,10 @@ static void seq_pages(void)
     }
     assert(seen == 1u);
     go_home(); hold(B_SEQ); assert(!ui.home && cur_page()->graph == GR_SECTIONS);
-    go_home(); press(B_GLO); assert(cur_page()->graph == GR_TRK);
-    press(B_GLO); assert(str_eq(cur_page()->title, "TEMPO"));
+    go_home(); press(B_GLO); assert(str_eq(cur_page()->title, "TEMPO"));   /* (the mixer is HOME's) */
     press(B_GLO); assert(str_eq(cur_page()->title, "GLOBAL"));
     page_patterns_on = page_song_on = 1;
-    puts("SEQ: PATTERNS and SONG hidden, SEQ held opens SECTIONS, TEMPO after MIXER on GLO passed");
+    puts("SEQ: PATTERNS and SONG hidden, SEQ held opens SECTIONS, TEMPO first on GLO passed");
 }
 /* a DAW's Start on SECTIONS (CLK USB): the song from its first entry, in time; elsewhere, or CLK INT: the loop */
 static void daw(uint32_t status) { midi_enqueue(0xFu | status << 8, 1u); units_block(0); }
@@ -265,6 +264,42 @@ static void daw_start(void)
     song.g[G_CLOCK] = 0; frames(32u); assert(!chain_cued && !song_sounds.mask);
     puts("SECTIONS: a DAW's Start (or Continue from the top) plays the song; other pages and CLK INT the loop passed");
 }
+/* OCT+ on SECTIONS: SONG LOOP on / off (stopped: an edit; playing: at once); PLAY on HOME's MIXER plays the song */
+static void song_loop(void)
+{
+    uint32_t i, wrapped = 0, last = 0;
+    setup();
+    press(B_OCTUP); frame(); assert(!chain_config.rsv[CHAIN_LOOP] && msg_is("NO SONG YET"));
+    sec_hold_key(1); tap_key(SEC_KEY[0]); frame();     /* B a copy of A; the song A B */
+    press(B_REC); frame(); tap_key(SEC_KEY[0]); frame(); tap_key(SEC_KEY[1]); frame(); press(B_REC); frame();
+    assert(chain_config.count == 2 && !scs.build && !chain_config.rsv[CHAIN_LOOP]);
+    assert(!str_eq(song_edit_status(), "LOOP"));
+    press(B_OCTUP); frame();
+    assert(chain_config.rsv[CHAIN_LOOP] && msg_is("SONG LOOP ON") && str_eq(song_edit_status(), "LOOP"));
+    go_home(); ui.home_pg = HP_MIXER; frame();
+    press(B_PLAY); units_block(0); frame();             /* MIXER: the song, from its first entry */
+    assert(song.playing && chain.running && chain.row == 0 && str_eq(song_edit_status(), "SONG LOOP"));
+    for (i = 0; i < 40u; i++) {                         /* A B A B ..: past the end, round again */
+        units_block(tick()); frame();
+        if (last == 1u && chain.row == 0u) wrapped++;
+        last = chain.row;
+    }
+    assert(song.playing && chain.running && wrapped >= 2u);
+    go_page(GR_SECTIONS); frame();
+    press(B_OCTUP); frame();                            /* playing: off at once, the song ends at its end */
+    assert(!chain_config.rsv[CHAIN_LOOP] && !chain.config.rsv[CHAIN_LOOP] && msg_is("SONG LOOP OFF"));
+    for (i = 0; i < 40u && song.playing; i++) { units_block(tick()); frame(); }
+    assert(!song.playing && !chain.running);
+    go_home(); ui.home_pg = HP_MIXER; frame();
+    press(B_PLAY); units_block(0); frame();             /* LOOP off: PLAY on MIXER plays the loop, not the song */
+    assert(song.playing && !chain.running);
+    press(B_PLAY); units_block(0); frame();
+    chain_defaults(&chain_config); frame();             /* no song: PLAY on MIXER plays the loop */
+    press(B_PLAY); units_block(0); frame();
+    assert(song.playing && !chain.running);
+    press(B_PLAY); units_block(0); frame();
+    puts("SECTIONS: OCT+ SONG LOOP (stopped and playing), PLAY on MIXER plays the song with LOOP on passed");
+}
 int main(void)
 {
     seq_pages();
@@ -276,6 +311,7 @@ int main(void)
     whole_section();
     song_list();
     daw_start();
+    song_loop();
     puts("SECTIONS tests passed");
     return 0;
 }

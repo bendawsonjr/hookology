@@ -850,9 +850,32 @@ static uint16_t cv_over_px(uint16_t under, uint32_t v)       /* under: the canva
 }
 
 /* w x h nibbles, rows back to back, at canvas (x, y) */
+/* sideways text (cv_text_up): with cv_rot set, the text routines draw in the text's own space (x along the line, y
+ * down the line box, from 0, 0) and each pixel lands turned -90 degrees: text x up the canvas from cv_ry, text y right
+ * from cv_rx (the letters' feet face right; it reads from the bottom up). cv_oy is 0 then */
+static uint8_t cv_rot;
+static int32_t cv_rx, cv_ry;
+static void cv_rot_put(int32_t tx, int32_t ty, uint32_t v, const uint16_t *rv, uint16_t c)   /* rv 0: ink c */
+{
+    int32_t px = cv_rx + ty, py = cv_ry - tx;
+    uint16_t *row;
+    if (py < cv_cy0 || py >= cv_cy1 || (uint32_t)py < cv_top || (uint32_t)py >= cv_top + cv_rows || (uint32_t)px >= cv_w)
+        return;
+    row = cv_px + ((uint32_t)py - cv_top) * cv_w;
+    row[px] = cv_over ? cv_over_px(row[px], v) : rv ? rv[v] : c;
+}
 static void cv_alpha(int32_t x, int32_t y, uint32_t w, uint32_t h, const uint8_t *d, const uint16_t *rv)
 {
     uint32_t k = 0, gx, gy;
+    if (cv_rot) {
+        for (gy = 0; gy < h; gy++)
+            for (gx = 0; gx < w; gx++, k++) {
+                uint32_t v = (d[k >> 1] >> ((k & 1u) ? 0 : 4)) & 15u;
+                if (v) cv_rot_put(x + (int32_t)gx, y + (int32_t)gy, v, rv, 0);
+            }
+        GFX_HOOK_PIXELS(w * h);
+        return;
+    }
     y += cv_oy;
     for (gy = 0; gy < h; gy++) {
         int32_t py = y + (int32_t)gy;
@@ -930,7 +953,11 @@ static void cv_alpha_hc(int32_t x, int32_t y, uint32_t w, uint32_t h, const uint
                 run = (s >> 4) + 1u;
             }
             n = run < w - gx ? run : w - gx;
-            if (v && row) {
+            if (v && cv_rot) {
+                uint32_t k;
+                for (k = 0; k < n; k++)
+                    cv_rot_put(x + (int32_t)(gx + k), py - cv_oy, v, rv, 0);
+            } else if (v && row) {
                 int32_t px = x + (int32_t)gx;
                 uint32_t k;
                 for (k = 0; k < n; k++, px++)
@@ -963,6 +990,10 @@ static void cv_pix(int32_t x, int32_t y, uint32_t w, uint32_t h, uint32_t s, con
             for (j = 0; j < s; j++) {                    /* the run, s rows of n * s pixels */
                 int32_t py = y + (int32_t)(gy * s + j), px = x + (int32_t)(gx * s), e = px + (int32_t)(n * s);
                 uint16_t *row;
+                if (cv_rot) {
+                    for (; px < e; px++) cv_rot_put(px, py - cv_oy, 15u, 0, c);
+                    continue;
+                }
                 if (py < cv_cy0 || py >= cv_cy1 || (uint32_t)py < cv_top || (uint32_t)py >= cv_top+cv_rows)
                     continue;
                 row = cv_px + ((uint32_t)py-cv_top) * cv_w;
@@ -1115,6 +1146,11 @@ static int32_t cv_text_flags(int32_t x, int32_t y, const aafont_t *f, const char
         pen += g->adv;
         prev = c;
     }
+    if (x1 > x0 && cv_rot) {                         /* (sideways: the box as it lands) */
+        int32_t a = x0, b = x1;
+        x0 = cv_rx + y0; x1 = cv_rx + y1;
+        y0 = cv_ry - b + 1; y1 = cv_ry - a + 1;
+    }
     if (x1 > x0) {
         if (x0 < 0 || x1 > (int32_t)cv_w || y0 + cv_oy < cv_cy0 || y1 + cv_oy > cv_cy1)
             flags |= 2u;                             /* cut by the canvas */
@@ -1190,6 +1226,22 @@ static int32_t cv_free_text(int32_t x, int32_t y, const aafont_t *f, const char 
     char b[48];
     int cut = text_fit(b, sizeof b, s, f, maxw);
     return cv_text_flags(x, y, f, b, fg, bg, cut ? 9u : 8u);
+}
+
+/* free text (a name) sideways, turned -90 degrees: its line box's left edge at x, its start at the bottom (y the row
+ * under its first letter), reading up, at most maxh px long (cut: an ellipsis); the letters' feet face right */
+static void cv_text_up(int32_t x, int32_t y, const aafont_t *f, const char *s, uint16_t fg, uint16_t bg, int32_t maxh)
+{
+    char b[48];
+    int cut = text_fit(b, sizeof b, s, f, maxh);
+    int32_t oy = cv_oy;
+    cv_oy = 0;
+    cv_rot = 1;
+    cv_rx = x;
+    cv_ry = y - 1;
+    cv_text_flags(0, 0, f, b, fg, bg, cut ? 9u : 8u);
+    cv_rot = 0;
+    cv_oy = oy;
 }
 
 /* ---------------------------------------------------------- keycaps --- */

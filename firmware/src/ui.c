@@ -91,13 +91,34 @@ static void sound_name(const track_t *t, char *b);
 #define PREF_PIXEL 64u                         /* Settings > FONT: PIXEL (else RUBIK) */
 #define TY_PIXEL ty_pixel()
 static uint32_t ty_pixel(void) { return (PREF_BITS & PREF_PIXEL) != 0u || !RES_OK(); }   /* (gfx.c TY_*; Rubik: res.c) */
-enum { HP_STAGE, HP_VIEW, HP_TRACKS };   /* HOME's pages: Stage (ui_stage.c), the chord view (ui_view.c), TRACKS (ui_tracks.c) */
+enum { HP_STAGE, HP_VIEW, HP_TRACKS, HP_MIXER };   /* HOME's pages: Stage (ui_stage.c), the chord view (ui_view.c), TRACKS
+                                                     * (ui_tracks.c), MIXER (ui_pages.c mixer_draw); HOME turns them
+                                                     * TRACKS > MIXER > Stage > the chord view (home_next) */
+/* Stage hidden for now (Hookology, 2026-11-10: changes to come); the code stays, a build with HOOKOLOGY_STAGE_PAGE=1
+ * brings it back between MIXER and the chord view */
+#ifndef HOOKOLOGY_STAGE_PAGE
+#define HOOKOLOGY_STAGE_PAGE 0
+#endif
+static uint8_t home_stage_on = HOOKOLOGY_STAGE_PAGE;
+static uint32_t home_next(uint32_t pg)
+{
+    return pg == HP_TRACKS ? HP_MIXER : pg == HP_MIXER ? (home_stage_on ? HP_STAGE : HP_VIEW) : pg == HP_STAGE ? HP_VIEW
+                                                                                                           : HP_TRACKS;
+}
+static uint32_t home_prev(uint32_t pg)
+{
+    return pg == HP_TRACKS ? HP_VIEW : pg == HP_VIEW ? (home_stage_on ? HP_STAGE : HP_MIXER) : pg == HP_STAGE ? HP_MIXER
+                                                                                                             : HP_TRACKS;
+}
 /* HOME SELECT (the menu): what SELECT turns on HOME, kept in favorites.factory[15][25] (0, any other: BPM) */
-enum { HS_BPM, HS_MOD, HS_LEVEL, HS_SWING, HS_TRANS, HS_CHORD, HS_ARATE, HS_PATTERN, HS_OFF, HS_OCT, HS_CHSET, HS_N };
+/* PAGES (Hookology): HOME's pages, as SELECT turns the other sections' (HOME SELECT only: GLO SELECT skips it) */
+enum { HS_BPM, HS_MOD, HS_LEVEL, HS_SWING, HS_TRANS, HS_CHORD, HS_ARATE, HS_PATTERN, HS_OFF, HS_OCT, HS_CHSET, HS_PAGES,
+       HS_N };
 static const char *const HS_NAME[HS_N] = {"BPM", "MOD WHEEL", "LEVEL", "SWING", "TRANSPOSE", "CHORD", "ARP RATE", "PATTERN",
-                                          "OFF", "OCTAVE", "HERA SET"};
-/* the menu's order: OCTAVE beside TRANSPOSE, OFF last (the saved numbers stay: OCTAVE came after OFF) */
-static const uint8_t HS_ORDER[HS_N] = {HS_BPM, HS_MOD, HS_LEVEL, HS_SWING, HS_TRANS, HS_OCT, HS_CHORD, HS_CHSET,
+                                          "OFF", "OCTAVE", "HERA SET", "PAGES"};
+/* the menu's order: PAGES after BPM, OCTAVE beside TRANSPOSE, OFF last (the saved numbers stay: OCTAVE and PAGES came
+ * after OFF) */
+static const uint8_t HS_ORDER[HS_N] = {HS_BPM, HS_PAGES, HS_MOD, HS_LEVEL, HS_SWING, HS_TRANS, HS_OCT, HS_CHORD, HS_CHSET,
                                        HS_ARATE, HS_PATTERN, HS_OFF};
 static uint32_t hs_step(uint32_t v, int32_t s)  /* KNOB 1 steps, 0 (OCT+): steps and wraps */
 {
@@ -111,7 +132,16 @@ static uint32_t home_select(void) { return HOME_SELECT < HS_N ? HOME_SELECT : HS
 /* GLO SELECT (the menu): what SELECT turns with GLO held, on any page (the same choices), kept in bits 1..4 of
  * favorites.factory[15][24] (bit 0: a CZ-1 star; 0, any other: BPM) */
 #define GLO_SELECT (favorites.factory[15][24])
-static uint32_t glo_select(void) { return ((GLO_SELECT >> 1) & 15u) < HS_N ? (GLO_SELECT >> 1) & 15u : HS_BPM; }
+static uint32_t glo_select(void)
+{
+    uint32_t v = (GLO_SELECT >> 1) & 15u;
+    return v < HS_N && v != HS_PAGES ? v : HS_BPM;
+}
+static uint32_t glo_hs_step(uint32_t v, int32_t s)   /* hs_step without PAGES (HOME's alone) */
+{
+    v = hs_step(v, s);
+    return v == HS_PAGES ? hs_step(v, s) : v;
+}
 static void glo_select_set(uint32_t v) { GLO_SELECT = (uint8_t)((GLO_SELECT & ~0x1Eu) | (v & 15u) << 1); }
 /* UNUSED TRACKS (the menu): HIDE in bit 5 of the same byte. SHOW (0): Stage and MIXER keep a greyed row for each
  * place not in use, saying "Add track"; HIDE: the tracks in use share the rows (one track: the wide card) */
@@ -627,10 +657,7 @@ static void open_family(uint32_t fam)
         }
         ui.page = (uint8_t)i;
     } else if (fam == FAM_SAVE) {
-        uint32_t i;
-        for (i = 0; i < NPAGES; i++)
-            if (PAGES[i].graph == GR_USER) break;
-        ui.page = (uint8_t)i;                         /* SAVE enters the sound save screen directly */
+        ui.page = (uint8_t)page_first(FAM_SAVE);     /* SAVE enters PROJECT (Hookology), then USER, then the presets */
     } else {
         ui.page = ui.fam_last[fam] && PAGES[ui.fam_last[fam]].fam == fam && page_visible(ui.fam_last[fam]) ? ui.fam_last[fam]
                                                                           : (uint8_t)page_first(fam);
@@ -642,18 +669,16 @@ static void open_family(uint32_t fam)
         slot_save_sheet();                       /* SAVE: USER; OCT+ then its slot's sheet on Save here (ui_slots.c) */
 }
 
-/* GLO always enters the mixer from another family. Subsequent taps visit the
- * global settings, then return to the mixer; recording has no navigation role. */
+/* GLO enters the global settings at TEMPO from another family; further taps visit the rest, then TEMPO again (the
+ * mixer is HOME's: Hookology) */
 static void open_global(void)
 {
     uint32_t i;
-    if (!ui.home && cur_page()->fam == FAM_TRK) {
-        ui.page = (uint8_t)page_first(FAM_GLO);
-    } else if (!ui.home && cur_page()->fam == FAM_GLO) {
+    if (!ui.home && cur_page()->fam == FAM_GLO) {
         for (i = ui.page + 1u; i < NPAGES && (PAGES[i].fam != FAM_GLO || !page_visible(i)); i++) {}
-        ui.page = (uint8_t)(i < NPAGES ? i : page_first(FAM_TRK));
+        ui.page = (uint8_t)(i < NPAGES ? i : page_first(FAM_GLO));
     } else {
-        ui.page = (uint8_t)page_first(FAM_TRK);
+        ui.page = (uint8_t)page_first(FAM_GLO);
     }
     ui.home = 0;
     page_entered();

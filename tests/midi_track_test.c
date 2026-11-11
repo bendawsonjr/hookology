@@ -137,8 +137,8 @@ static void silent_and_saved(void)
     reset_midi(0); track_t *t = TSEL;
     t->p[P_E0] = 14; t->p[P_E1] = 1;
     int16_t level = t->p[P_LEVEL], pan = t->p[P_PAN];
-    tracks_edit(0, -20); tracks_edit(1, 10);
-    assert(t->p[P_LEVEL] == level && t->p[P_PAN] == pan);
+    mixer_knob(0, -20); mixer_knob(1, 10); mixer_knob(2, 30);
+    assert(t->p[P_LEVEL] == level && t->p[P_PAN] == pan && !t->p[P_FXSEND]);
     go_title("FX"); edit_param(0, 10); edit_param(3, 100); press(B_OCTUP);
     assert(t->p[P_FXTYPE] == FX_OFF && pop.on != POP_LIST && cur_page()->graph == GR_FXRACK);
     /* Stale/restored FX and audio modulation cannot allocate or render. */

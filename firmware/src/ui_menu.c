@@ -524,7 +524,7 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
         ui.force = 1; ok = 0;
     }
     if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_GLO_SEL) {    /* .. GLO SELECT the same */
-        glo_select_set(hs_step(glo_select(), s));
+        glo_select_set(glo_hs_step(glo_select(), s));
         ui.force = 1; ok = 0;
     }
     if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_REC_MODE) {

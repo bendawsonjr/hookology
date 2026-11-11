@@ -547,31 +547,47 @@ static int32_t list_accel(uint32_t role, int32_t s, uint32_t total, uint32_t *fa
     return accel_by(role, s, total > 256u ? 16u : total > 64u ? 8u : total > 16u ? 4u : 1u, fast);
 }
 
-/* MIXER page: KNOB 1 LEVEL, 2 PAN, 3 unused, 4 MUTE of the selected track (right = ON, left = OFF: the
- * track itself is ALGORITHM's, on every page). Pattern length stays on SEQ. */
-static void tracks_edit(uint32_t slot, int32_t steps)
+/* HOME's MIXER: KNOB 1 LEVEL, 2 PAN, 3 SEND (the FX send: CHAIN's, or SPLIT's to slot 1), 4 MUTE of the selected track
+ * (right = ON, left = OFF: the track itself is ALGORITHM's, on every page); the value turned in the header, "T2 PAN L20".
+ * A MIDI-only track: MUTE alone */
+static void mixer_knob(uint32_t slot, int32_t steps)
 {
+    static const uint8_t ID[3] = {P_LEVEL, P_PAN, P_FXSEND};
+    static const char *const NAME[4] = {" VOL ", " PAN ", " SEND ", " MUTE "};
     track_t *t = TSEL;
+    char a[12], b[12];
+    int32_t v;
     if (midi_track_only(t) && slot != 3u) return;
-    int16_t *vp;
-    const param_desc_t *d;
-    switch (slot) {
-    case 3:
+    if (slot == 3u) {
         t->p[P_MUTE] = (int16_t)(steps > 0);
-        return;
-    case 0:
-        vp = &t->p[P_LEVEL];
-        d = &TP[P_LEVEL];
-        break;
-    case 2:
-        return;
-    default:
-        vp = &t->p[P_PAN];
-        d = &TP[P_PAN];
-        break;
+        str_cpy(b, t->p[P_MUTE] ? "ON" : "OFF", sizeof b);
+    } else {
+        int16_t *vp = &t->p[ID[slot]];
+        const param_desc_t *d = &TP[ID[slot]];
+        *vp = (int16_t)clamp(*vp + accel(EN_K1 + slot, steps, d->max - d->min), d->min, d->max);
+        motion_capture(t, ID[slot], *vp);
+        v = *vp;
+        if (slot == 0u && v) {                          /* the level in dB, or OFF */
+            int32_t db = LEVEL_DB_X10[v & 127];
+            fmt_int(b, (db + (db < 0 ? -5 : 5)) / 10);
+            str_cpy(b + str_len(b), "dB", 3);
+        } else if (slot == 0u) {
+            str_cpy(b, "OFF", sizeof b);
+        } else if (slot == 1u && v) {                   /* L20, C, R20 */
+            b[0] = v < 0 ? 'L' : 'R';
+            fmt_int(b + 1, v < 0 ? -v : v);
+        } else if (slot == 1u) {
+            str_cpy(b, "C", sizeof b);
+        } else {                                        /* the send in %, as the FX pages show it */
+            const char *u;
+            param_format(d, v, b, &u);
+            str_cpy(b + str_len(b), u, sizeof b - str_len(b));
+        }
     }
-    *vp = (int16_t)clamp(*vp + accel(EN_K1 + slot, steps, d->max - d->min), d->min, d->max);
-    motion_capture(t, (uint32_t)(vp - t->p), *vp);
+    a[0] = 'T';
+    fmt_int(a + 1, (int32_t)song.sel + 1);
+    str_cpy(a + str_len(a), NAME[slot & 3u], sizeof a - str_len(a));
+    ui_say(a, b);
 }
 
 /* HOME's TRACKS (ui_tracks.c): the selected track's KNOB 1 SWING, 2 LEVEL, 3 STEPS, 4 PAN. ALGORITHM picks the track */
@@ -1197,10 +1213,6 @@ static void edit_param(uint32_t slot, int32_t steps)
     if(pg->scope==SC_DRUMHIT){drum_hit_edit(slot,steps);return;}
     if (pg->scope == SC_STEP) {
         step_edit(slot, steps);
-        return;
-    }
-    if (pg->scope == SC_TRK) {
-        tracks_edit(slot, steps);
         return;
     }
     if (pg->graph == GR_SCALE_PICKER) {
@@ -1905,7 +1917,7 @@ static void page_tap(uint32_t b)
         return;
     }
     if (b == B_GLO) {
-        open_global();                                  /* MIXER -> GLOBAL -> SYSTEM -> MIXER */
+        open_global();                                  /* TEMPO -> GLOBAL -> SYSTEM .. -> TEMPO */
         return;
     }
     if (b == B_EDIT && !ui.home && (cur_page()->graph == GR_USER || cur_page()->graph == GR_SLOTS)) {
@@ -2051,7 +2063,7 @@ static void page_knob_edit(uint32_t k, int32_t s)
 {
     const page_t *pg = cur_page();
     int16_t *hv;
-    if (ui.home || pg->scope == SC_STEP || pg->scope == SC_TRK || ((pg->scope==SC_DRUM || pg->scope==SC_DRUMHIT) && pg->id[k]!=255) || page_desc(pg, k, &hv) ||
+    if (ui.home || pg->scope == SC_STEP || ((pg->scope==SC_DRUM || pg->scope==SC_DRUMHIT) && pg->id[k]!=255) || page_desc(pg, k, &hv) ||
         (pg->graph == GR_USER && k == 0u) || ((pg->graph == GR_MOD || pg->graph == GR_FXRACK) && k == 1u)
         || pg->graph == GR_SONG || pg->graph == GR_PATGRID || pg->graph == GR_SCALE_PICKER || (scale_settings_page(pg) && k == 1u)
         || (pg->graph == GR_SLICES && k < 2u)) {       /* (not an empty column) */
@@ -2073,6 +2085,10 @@ static void page_knob_edit(uint32_t k, int32_t s)
     }
     if (ui.home && ui.home_pg == HP_TRACKS) {
         tracks_knob(k, s);
+        return;
+    }
+    if (ui.home && ui.home_pg == HP_MIXER) {
+        mixer_knob(k, s);
         return;
     }
     momentary_take(k);
@@ -2142,6 +2158,12 @@ static void select_turn(uint32_t hs, int32_t s)
     const char *unit = "";
     int32_t x;
     switch (hs) {
+    case HS_PAGES:                                      /* HOME's pages, both ways (wraps), as SELECT turns a section's */
+        if (ui.home) {
+            ui.home_pg = (uint8_t)(s > 0 ? home_next(ui.home_pg) : home_prev(ui.home_pg));
+            ui.force = 1;
+        }
+        return;
     case HS_BPM:
         song.g[G_BPM] = (int16_t)clamp(song.g[G_BPM] + accel(EN_SELECT, s, GP[G_BPM].max - GP[G_BPM].min), GP[G_BPM].min,
                                        GP[G_BPM].max);
@@ -2401,7 +2423,7 @@ static void ui_input(void)
     }
     uint32_t bank_notes = notes;
     uint32_t home = btn_hold(&ui.home_t0, B_HOME, now, 1);
-    uint32_t rec = btn_hold(&ui.rec_t0, B_REC, now, !ui.menu && !ui.confirm && !name_on());   /* held: MIXER */
+    uint32_t rec = btn_hold(&ui.rec_t0, B_REC, now, !ui.menu && !ui.confirm && !name_on());   /* held: a take */
     if (ft_on || ft_rec_eat) {                          /* (the take's press: it closed it) */
         if (!((fm1_in.buttons >> panel.btn[B_REC]) & 1u)) ft_rec_eat = 0;
         rec = BT_NONE;
@@ -2679,7 +2701,7 @@ static void ui_input(void)
         open_family(FAM_SEQ);
     }
     if (home == BT_TAP && ui.home && !pop.on) {         /* HOME acts on release (a hold opens the menu); on HOME: its */
-        ui.home_pg = ui.home_pg == HP_STAGE ? HP_VIEW : ui.home_pg == HP_VIEW ? HP_TRACKS : HP_STAGE;   /* the next page */
+        ui.home_pg = (uint8_t)home_next(ui.home_pg);   /* the next page */
         ui.force = 1;
     } else if (home == BT_TAP) {
         go_home();                                      /* (to the page it was on) */
@@ -2717,8 +2739,10 @@ static void ui_input(void)
                 transport_req = 2;
             else if (!ui.home && cur_page()->graph == GR_SONG)
                 chain_play_ui();
-            else if (sections_page())
-                sections_play();
+            else if (sections_page() || (ui.home && ui.home_pg == HP_MIXER && chain_config.rsv[CHAIN_LOOP] &&
+                                         chain_config.count))
+                sections_play();                        /* (MIXER too with SONG LOOP on, Hookology: the song cycling
+                                                         * while mixing; LOOP off: the loop, as on TRACKS) */
             else
                 transport_req = 1;
             break;
@@ -2812,6 +2836,8 @@ static void ui_input(void)
         sec_build_delete();
     } else if (scs.build && sections_page() && !ui.layer && (oct & 2u)) {
         /* (OCT+ does nothing in BUILD) */
+    } else if (sections_page() && !secs.rec && !ui.layer && (oct & 2u)) {   /* SECTIONS: OCT+ SONG LOOP on / off */
+        sections_loop();
     } else if (list_on() && (oct & 2u)) {                      /* a list page: OCT+ the row's list, OCT- Stage */
         list_enter();
     } else if (list_on() && (oct & 1u)) {

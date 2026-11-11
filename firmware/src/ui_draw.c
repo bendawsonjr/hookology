@@ -433,10 +433,11 @@ static void draw_head(void)
                 cv_text_on(x + 6, ty_y(H_HEAD / 2, TY_LB), TY_LB, b, T_MID, T_BG);
         } else if (!ui.home) {                          /* a page: where it is in its family */
             head_pages(x + 6, 236 - cw - (low ? 22 : 0) - hw);
-        } else if (x + 6 + 40 <= 236 - cw - (low ? 22 : 0) - hw - 6) {   /* HOME: its pages, where there is room */
-            static const uint8_t ORDER[3] = {HP_TRACKS, HP_STAGE, HP_VIEW};
+        } else if (x + 6 + 52 <= 236 - cw - (low ? 22 : 0) - hw - 6) {   /* HOME: its four pages, where there is room */
+            static const uint8_t ORDER[4] = {HP_TRACKS, HP_MIXER, HP_STAGE, HP_VIEW};
             uint32_t i;
-            for (i = 0, x += 6; i < 3u; i++) {
+            for (i = 0, x += 6; i < 4u; i++) {
+                if (ORDER[i] == HP_STAGE && !home_stage_on) continue;   /* (hidden: ui.c) */
                 int32_t w = ORDER[i] == ui.home_pg ? 16 : 6;
                 cv_rrect(x, H_HEAD / 2 - 3, w, 6, 3, ORDER[i] == ui.home_pg ? T_THEME : T_LINE, T_BG);
                 x += w + 6;
@@ -804,24 +805,6 @@ static void draw_columns(void)
     uint32_t c;
     char val[12];
     const char *unit;
-    if (cur_page()->scope == SC_TRK) {                 /* LEVEL PAN MUTE of the selected track */
-        const track_t *t = TSEL;
-        if (midi_track_only(t)) {
-            draw_column(0, "LEVEL", "--", "", T_DIM, -1, ICON_NONE);
-            draw_column(1, "PAN", "--", "", T_DIM, -1, ICON_NONE);
-            draw_column(2, "", "", "", T_DIM, -1, ICON_NONE);
-            draw_column(3, "MUTE", t->p[P_MUTE] ? "ON" : "OFF", "", t->p[P_MUTE] ? T_ACCENT : VAL(3u), -1, ICON_AUTO);
-            return;
-        }
-        uint32_t lvl = trk_level(song.sel);
-        param_format(&TP[P_LEVEL], (int32_t)lvl, val, &unit);   /* (0: OFF) */
-        draw_column(0, "LEVEL", val, unit, lvl && !t->p[P_MUTE] ? VAL(0u) : T_DIM, (int32_t)lvl * 1000 / 127, ICON_AUTO);
-        param_format(&TP[P_PAN], t->p[P_PAN], val, &unit);
-        draw_column(1, "PAN", val, unit, VAL(1u), RATIO(&TP[P_PAN], t->p[P_PAN]), param_icon(&TP[P_PAN], t->p[P_PAN]));
-        draw_column(2, "", "", "", T_DIM, -1, ICON_NONE);
-        draw_column(3, "MUTE", t->p[P_MUTE] ? "ON" : "OFF", "", t->p[P_MUTE] ? T_ACCENT : VAL(3u), -1, ICON_AUTO);
-        return;
-    }
 #if MELODEE_SLICE
     if (cur_page()->graph == GR_SLICES) {                /* SLICE POS, then SPLIT JOIN (ui_slice.c) */
         uint32_t n = slice_count(), j = slice_sel(), src, div, ok = slice_src(&src, &div) && src;
@@ -1300,10 +1283,14 @@ static void draw_page(void)
         melodee_dbg.stage = 4;
         draw_columns();
         melodee_dbg.stage = 5;
+        if (ui.home && ui.home_pg == HP_STAGE && !home_stage_on)
+            ui.home_pg = HP_TRACKS;                     /* (Stage hidden, ui.c: never left on it) */
         if (ui.home && ui.home_pg == HP_VIEW)           /* the chord view (ui_view.c) */
             view_draw();
         else if (ui.home && ui.home_pg == HP_TRACKS)    /* TRACKS (ui_tracks.c) */
             tracks_draw();
+        else if (ui.home && ui.home_pg == HP_MIXER)     /* MIXER's strips (ui_pages.c) */
+            mixer_draw();
         else if (ui.home)                               /* Stage: its panel and the lanes (ui_stage.c), no footer */
             stage_draw();
         else

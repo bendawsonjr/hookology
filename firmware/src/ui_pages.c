@@ -11,9 +11,8 @@
  * response (a page with a cutoff), FM6's algorithm (its chart), else the sound itself (the scope, smooth, live).
  * NOTES (SEQ > STEP; a melodic track): the roll the whole height (PR_TOP, PR_H: ui_graph.c, in two slices),
  * the knobs as chips under it (the one turning filled).
- * MIXER: Stage's columns as channel strips: the sound, its level (a ring, dB in it) and meter, PAN, MUTE,
- * armed;
- * the selected track's lifted, the knob just turned (its control) in text.
+ * HOME's MIXER (mixer_draw): a channel strip a track, its sound sideways beside its fader and meter, PAN and SEND
+ * sliders, MUTE, armed; the selected track's lifted, the knob just turned (its control) in TEXT.
  * Each part remembers what it drew. draw_column draws the knobs in the style col_style asks. Included by
  * ui_draw.c */
 enum { PV_NONE, PV_CURVE, PV_RINGS, PV_FADERS, PV_MIXER, PV_NOTES, PV_MOD, PV_GRID, PV_RACK };
@@ -51,8 +50,6 @@ static uint32_t pv_kind(void)
     if (pg->graph == GR_NONE || pg->graph == GR_ARP || pg->graph == GR_STEPS ||
         pg->graph == GR_CHORD || pg->graph == GR_HERA)
         return PV_RINGS;
-    if (pg->graph == GR_TRK)
-        return PV_MIXER;
     if (pg->graph == GR_ROLL && !drum_track(TSEL))
         return PV_NOTES;
     if (pg->graph == GR_MOD)
@@ -806,23 +803,29 @@ static void pv_picture(void)
 }
 
 /* ---------------------------------------------------------- MIXER --- */
-/* MIXER (Hookology, vertical): a channel strip a track of the group shown, side by side, tinted in its colour (the
- * selected one more, outlined): its numeral (armed: a REC dot), its sound, its pan ("L20", "C"), then its level as a
- * fader filling from the bottom in its colour with the meter beside it, and the level in dB under it; muted: dim,
- * "MUTE" in red; a MIDI-only track: "MIDI" for the fader. The knobs are the selected track's: KNOB 1 LEVEL, 2 PAN,
- * 4 MUTE (ui_input.c tracks_edit); the value the knob turns in text */
+/* MIXER (Hookology, HOME's second page): a channel strip a track of the group shown, side by side, tinted in its colour
+ * (the selected one more, outlined): its numeral (armed: a REC dot), PAN a slider from its centre mark, the FX SEND a
+ * bar filling from the left, then its sound's name sideways (reading up) beside the level's fader (filling from the
+ * bottom in its colour) and the meter; muted: dim, "MUTE" in red; a MIDI-only track: "MIDI" for its controls. The
+ * knobs are the selected track's: KNOB 1 LEVEL, 2 PAN, 3 SEND, 4 MUTE (ui_input.c mixer_knob, its value in the header);
+ * the control the knob turns drawn in TEXT */
 #define PV_MIX_Y 32                                     /* the strips: rows 32 .. 239 */
 #define PV_MIX_H 207
 #define PV_MIX_GAP 2
-#define PV_FAD_Y 80                                     /* the fader: rows PV_FAD_Y .. + PV_FAD_H in a strip */
-#define PV_FAD_H 96
+#define PV_PAN_Y 44                                     /* PAN's slider: its line's centre row in a strip */
+#define PV_SND_Y 54                                     /* SEND's bar: rows PV_SND_Y .. + 6 */
+#define PV_FAD_Y 64                                     /* the fader: rows PV_FAD_Y .. + PV_FAD_H in a strip */
+#define PV_FAD_H 126
 #define PV_FAD_W 10
 #define PV_MET_W 4
+#define PV_NAME_W 20                                    /* the name's column, to the fader (TY_LB's line sideways,
+                                                         * its descenders and a gap) */
+#define PV_CLU_W (PV_NAME_W + PV_FAD_W + 3 + PV_MET_W)
 static struct { uint32_t strip[NTRK]; uint8_t meter[NTRK]; } pvm;
 static uint32_t pv_mix_n(void) { uint32_t n = stage_rows(); return n ? n : 1u; }
 static int32_t pv_mix_w(void) { int32_t n = (int32_t)pv_mix_n(); return (BOX_W - (n - 1) * PV_MIX_GAP) / n; }
 static int32_t pv_mix_x(uint32_t k) { return BOX_X + (int32_t)(k % NROWS) * (pv_mix_w() + PV_MIX_GAP); }
-static int32_t pv_fad_x(int32_t w) { return w / 2 - (PV_FAD_W + 3 + PV_MET_W) / 2; }
+static int32_t pv_fad_x(int32_t w) { return w / 2 - PV_CLU_W / 2 + PV_NAME_W; }   /* (the name left of it) */
 /* track k's meter: a 4 px column beside its fader, as tall as the output now */
 static void pv_meter_draw(uint32_t k, int32_t x, int32_t y, uint16_t c, uint16_t bg)
 {
@@ -846,19 +849,19 @@ static void pv_strip(uint32_t k)
 {
     track_t *t = &trk[k];
     uint32_t sel = k == song.sel, mute = t->p[P_MUTE] != 0, arm = (song.rec >> k) & 1u, lvl = trk_level(k), sig;
-    uint32_t hot = sel && ui.hot_t ? ui.hot_col + 1u : 0u;   /* 1 LEVEL, 2 PAN, 3 unused, 4 MUTE */
-    uint32_t midi = midi_track_only(t);
+    uint32_t hot = sel && ui.hot_t ? ui.hot_col + 1u : 0u;   /* 1 LEVEL, 2 PAN, 3 SEND, 4 MUTE */
+    uint32_t midi = midi_track_only(t), send = (uint32_t)clamp(t->p[P_FXSEND], 0, 127);
     int32_t pk = t->peak, m, pan = clamp(t->p[P_PAN], -64, 63), w = pv_mix_w(), h = PV_MIX_H, x0 = pv_mix_x(k), fx = pv_fad_x(w);
     uint16_t tc = mute ? T_DIM : T_TRK(k), bg = ux_mix(T_BG, mute ? T_TRK(k) : tc, sel ? 24 : 11);
     const aafont_t *tf = TY_TX, *lf = TY_LB;
-    char nm[20], b[12], pn[8], d[2] = {(char)('1' + k), 0};
+    char nm[20], d[2] = {(char)('1' + k), 0};
     t->peak = 0;
     m = mute ? 0 : meter_px(pk);
     if (m < pvm.meter[k] - 1)
         m = pvm.meter[k] - 1;                           /* (falls ~2 dB a frame) */
     sound_name(t, nm);
     sig = str_hash(1u + sel * 2u + mute * 4u + arm * 8u + hot * 16u + midi * 128u, nm) + lvl * 7919u +
-          (uint32_t)(pan + 128) * 104729u + (uint32_t)w * 31u + ux.gen * 977u + ux.pal * 31u;
+          (uint32_t)(pan + 128) * 104729u + send * 15485863u + (uint32_t)w * 31u + ux.gen * 977u + ux.pal * 31u;
     if (!ui.force && sig == pvm.strip[k]) {
         if (m != pvm.meter[k] && !midi) {               /* the meter alone */
             pvm.meter[k] = (uint8_t)(m < 0 ? 0 : m);
@@ -868,16 +871,9 @@ static void pv_strip(uint32_t k)
     }
     pvm.strip[k] = sig;
     pvm.meter[k] = (uint8_t)(m < 0 ? 0 : m);
-    if (lvl) {                                          /* the level in dB, or Off */
-        int32_t db = LEVEL_DB_X10[lvl];
-        fmt_int(b, (db + (db < 0 ? -5 : 5)) / 10);
-    } else {
-        str_cpy(b, "Off", sizeof b);
-    }
-    if (pan) { pn[0] = pan < 0 ? 'L' : 'R'; fmt_int(pn + 1, pan < 0 ? -pan : pan); }
-    else str_cpy(pn, "C", sizeof pn);
     for (uint32_t band = 0; band < (uint32_t)h; band += CV_MAX / (uint32_t)w) {
-        int32_t lf_h = (int32_t)lvl * PV_FAD_H / 127, cx = w / 2;
+        int32_t lf_h = (int32_t)lvl * PV_FAD_H / 127, cx = w / 2, sx = 8, sw = w - 16;
+        uint16_t well = ux_mix(bg, T_LINE, 60);
         cv_begin_band((uint32_t)w, (uint32_t)h, T_BG, band);
         if (sel) {
             cv_rrect(0, 0, w, h, 8, tc, T_BG);
@@ -888,26 +884,27 @@ static void pv_strip(uint32_t k)
         cv_rrect(cx - 14, 7, 28, 28, 7, tc, bg);        /* the numeral */
         cv_text_c(cx, ty_y(21, tf), tf, d, T_INK, tc);
         if (arm) cv_disc(cx + 12, 9, 9, T_REC, 0);
-        cv_free_text(5, ty_y(49, lf), lf, nm, mute ? T_DIM : T_TEXT, bg, w - 10);
-        if (!midi) cv_text_c(cx, ty_y(67, lf), lf, pn, hot == 2u ? T_TEXT : T_MID, bg);
         if (midi) {
-            cv_text_c(cx, ty_y(PV_FAD_Y + PV_FAD_H / 2, lf), lf, "MIDI", T_MID, bg);
+            cv_text_c(cx, ty_y((PV_PAN_Y + PV_SND_Y + 6) / 2, lf), lf, "MIDI", T_MID, bg);   /* (for PAN and SEND) */
+            cv_text_up(fx - PV_NAME_W, PV_FAD_Y + PV_FAD_H, lf, nm, mute ? T_DIM : T_TEXT, bg, PV_FAD_H);
         } else {
-            cv_rrect(fx, PV_FAD_Y, PV_FAD_W, PV_FAD_H, 3, ux_mix(bg, T_LINE, 60), bg);   /* the fader */
+            int32_t px = sx + (pan + 64) * sw / 127;    /* PAN: the line, its centre mark, the dot */
+            cv_rrect(sx, PV_PAN_Y - 1, sw, 3, 1, well, bg);
+            cv_rect(sx + sw / 2 - 1, PV_PAN_Y - 4, 2, 9, hot == 2u ? T_TEXT : T_MID);
+            cv_disc(px, PV_PAN_Y, 9, hot == 2u ? T_TEXT : tc, 0);
+            cv_rrect(sx, PV_SND_Y, sw, 6, 3, well, bg);   /* SEND: the bar, filling from the left */
+            if (send)
+                cv_rrect(sx, PV_SND_Y, (int32_t)send * sw / 127 < 6 ? 6 : (int32_t)send * sw / 127, 6, 3,
+                         hot == 3u ? T_TEXT : tc, well);
+            cv_text_up(fx - PV_NAME_W, PV_FAD_Y + PV_FAD_H, lf, nm, mute ? T_DIM : T_TEXT, bg, PV_FAD_H);
+            cv_rrect(fx, PV_FAD_Y, PV_FAD_W, PV_FAD_H, 3, well, bg);   /* the fader */
             if (lvl)
                 cv_rrect(fx, PV_FAD_Y + PV_FAD_H - (lf_h < 6 ? 6 : lf_h), PV_FAD_W, lf_h < 6 ? 6 : lf_h, 3,
-                         hot == 1u ? T_TEXT : tc, ux_mix(bg, T_LINE, 60));
+                         hot == 1u ? T_TEXT : tc, well);
             pv_meter_draw(k, fx + PV_FAD_W + 3, PV_FAD_Y, tc, bg);
         }
-        if (mute) {
-            cv_text_c(cx, ty_y(PV_FAD_Y + PV_FAD_H + 18, lf), lf, "MUTE", hot == 4u ? T_TEXT : T_REC, bg);
-        } else if (!midi) {
-            int32_t vw = text_w(tf, b), uw = lvl && w >= 80 ? text_w(lf, "dB") + 2 : 0;   /* ("-14dB" on wide strips;
-                                                         * in one line; no room: the number alone) */
-            int32_t vx = cx - (vw + uw) / 2;
-            cv_text_on(vx, ty_y(PV_FAD_Y + PV_FAD_H + 16, tf), tf, b, hot == 1u ? tc : T_TEXT, bg);
-            if (uw) cv_text_on(vx + vw + 2, ty_y(PV_FAD_Y + PV_FAD_H + 16, tf) + tf->cap - lf->cap, lf, "dB", T_MID, bg);
-        }
+        if (mute)
+            cv_text_c(cx, ty_y(PV_FAD_Y + PV_FAD_H + 9, lf), lf, "MUTE", hot == 4u ? T_TEXT : T_REC, bg);
         cv_blit_band((uint32_t)x0, (uint32_t)PV_MIX_Y);
     }
 }
@@ -928,6 +925,17 @@ static void pv_free(uint32_t k)
         cv_text_c(cx, ty_y(h / 2, TY_LB), TY_LB, "Add", T_DIM, bg);
         cv_blit_band((uint32_t)pv_mix_x(k), (uint32_t)PV_MIX_Y);
     }
+}
+
+/* HOME's MIXER: the strips of the selected track's group (under the header draw_page drew) */
+static void mixer_draw(void)
+{
+    uint32_t k;
+    for (k = trk_group(); k < trk_group() + stage_rows(); k++)
+        if (k < trk_n())
+            pv_strip(k);
+        else
+            pv_free(k);                                 /* (UNUSED TRACKS SHOW: a greyed strip, "Add") */
 }
 
 /* ----------------------------------------------------------- draw --- */
@@ -995,18 +1003,6 @@ static void pv_draw(void)
             draw_columns();
             pv_rack_rows();
         }
-        return;
-    }
-    if (kind == PV_MIXER) {
-        uint32_t k;
-        if (ui.force)
-            lcd_fill(0, H_HEAD, 240, 240 - H_HEAD, T_BG);
-        draw_head();
-        for (k = trk_group(); k < trk_group() + stage_rows(); k++)   /* (the selected track's four) */
-            if (k < trk_n())
-                pv_strip(k);
-            else
-                pv_free(k);                     /* (UNUSED TRACKS SHOW: a greyed strip, "Add") */
         return;
     }
     pv_tab_h = (kind == PV_RINGS || kind == PV_CURVE) && designer_on() && designer_tabs_on() ? SEC_TAB_H : 0;

@@ -336,7 +336,8 @@ static const char *song_edit_status(void)
 {
     if (song_picker.active) return "SET PRESET";
     if (chain.running && chain.config.rsv[CHAIN_LOOP]) return "SONG LOOP";
-    if (!ui.home && cur_page()->graph == GR_SECTIONS) return secs.rec ? "SONG REC" : sec_build_on() ? "BUILD" : "";
+    if (!ui.home && cur_page()->graph == GR_SECTIONS)
+        return secs.rec ? "SONG REC" : sec_build_on() ? "BUILD" : chain_config.rsv[CHAIN_LOOP] && chain_config.count ? "LOOP" : "";
     if (ui.home || cur_page()->graph != GR_SONG) return "";
     if (se.pending) return se.pending == SONG_CELL_MOVE || se.pending == SONG_SECTIONS_MOVE ? "MOVE TO..." : "COPY TO...";
     if (se.range) return "SELECTED";

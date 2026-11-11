@@ -285,6 +285,23 @@ static void sec_build_delete(void)
 }
 
 /* PLAY on SECTIONS: the song from its first entry (SONG plays from a row); no song, the loop */
+/* OCT+ on SECTIONS (Hookology): SONG LOOP on / off, the song's own (SONG's sheet, saved with it). Stopped: an edit (EDIT
+ * held undoes it); playing: at once, for the song playing too (chain_tick reads it at the song's end) */
+static void sections_loop(void)
+{
+    uint32_t on = !chain_config.rsv[CHAIN_LOOP];
+    if (!chain_config.count) { ui_message("NO SONG YET"); return; }
+    if (chain_busy()) {
+        fm1_irq_off();
+        chain_config.rsv[CHAIN_LOOP] = (uint8_t)on;
+        if (chain.running || chain.armed) chain.config.rsv[CHAIN_LOOP] = (uint8_t)on;
+        fm1_irq_on();
+        ui.force = 1;
+    } else {
+        song_loop_set((int)on);
+    }
+    if (chain_config.rsv[CHAIN_LOOP] == on) ui_say("SONG LOOP ", on ? "ON" : "OFF");
+}
 static void sections_play(void)
 {
     if (scs.build) { scs.build = 0; ui.force = 1; }

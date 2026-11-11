@@ -167,7 +167,7 @@ static void ui_power_on(void)
     memset(&song, 0, sizeof song);
     memset(&chain, 0, sizeof chain);
     chain_defaults(&chain_config);
-    pattern_init(); sec_reset(); scs.build = 0; tracks.knob_ms = 0; tracks.out = 0; tracks.clr = 0; trc.t0 = 0; page_patterns_on = page_song_on = 1;   /* (their tests: hidden in the build, ui.c) */
+    pattern_init(); sec_reset(); scs.build = 0; tracks.knob_ms = 0; tracks.out = 0; tracks.clr = 0; trc.t0 = 0; page_patterns_on = page_song_on = 1; home_stage_on = 1;   /* (their tests: hidden in the build, ui.c) */
     memset(&ui, 0, sizeof ui);
     memset(&boot_work, 0, sizeof boot_work);
     memset(&step_history, 0, sizeof step_history);
@@ -322,6 +322,7 @@ static uint8_t stored_note(uint32_t slot, uint32_t track, uint32_t step)
     return proj_import(&p, &proj_slot[slot], sizeof proj_slot[slot]) ? p.t[track].step[step].note[0] : 0;
 }
 static int msg_is(const char *s) { return ui.msg_t && str_eq(ui.msg, s); }
+static int msg_has(const char *s) { return ui.msg_t && !strncmp(ui.msg, s, strlen(s)); }
 static void my_steps(track_t *t)                  /* "recorded" steps */
 {
     uint32_t i;
@@ -335,9 +336,16 @@ static void my_steps(track_t *t)                  /* "recorded" steps */
     t->p[P_SLEN] = 32;
 }
 
-static void go_page(uint32_t graph)               /* the page that draws graph */
+static void go_mixer(void)                        /* HOME's MIXER (Hookology: no longer a GLO page) */
+{
+    go_home();
+    ui.home_pg = HP_MIXER;
+    ui.force = 1;
+}
+static void go_page(uint32_t graph)               /* the page that draws graph (GR_TRK: HOME's MIXER) */
 {
     uint32_t i;
+    if (graph == GR_TRK) { go_mixer(); return; }
     for (i = 0; i < NPAGES; i++)
         if (PAGES[i].graph == graph)
             break;
@@ -493,9 +501,9 @@ static int test_rec(void)
     for (k = 0; k < 3u; k++) {
         ui_power_on();
         track_select(2);
-        open_family(FAMS[k]);
+        if (k == 0) go_mixer(); else open_family(FAMS[k]);   /* (the mixer: HOME's) */
         press(B_REC);
-        bad += check(k == 0 ? "REC on TRACKS: arms the selected track without starting PLAY" :
+        bad += check(k == 0 ? "REC on the MIXER: arms the selected track without starting PLAY" :
                      k == 1 ? "REC on SEQ: arms the selected track without starting PLAY" : "REC on ARP: arms the selected track without starting PLAY",
                      song.rec == 4u && transport_req == 0u);
         song.playing = 1;
@@ -692,7 +700,9 @@ static int test_save(void)
     set_engine_of(&trk[0], 3);                    /* (a general sound: the Prophet keeps its own slots) */
     trk[0].p[P_E1] = 5;
     press(B_SAVE);
-    bad += check("SAVE opens USER on its slot, no sheet popped up, without writing a slot",
+    bad += check("SAVE opens PROJECT first (Hookology)", !ui.home && cur_page()->graph == GR_SLOTS && !pop.on);
+    press(B_SAVE);
+    bad += check("SAVE again: USER on its slot, no sheet popped up, without writing a slot",
                  !ui.home && cur_page()->graph == GR_USER && !pop.on && !up_used(0));
     press(B_OCTUP);
     bad += check("..OCT+: the slot's sheet, on Save here", pop.on == POP_SHEET && str_eq(pop.rows[pop.sel].label, "Save here"));
@@ -708,12 +718,14 @@ static int test_save(void)
                      !name_on() && up_used(0) && up_value(up_rec(0), P_E1) == 5 && ui.act == 0u && str_eq(nmb, au));
     }
     press(B_SAVE);
-    bad += check("SAVE again still cycles to PROJECT", cur_page()->graph == GR_SLOTS);
-    go_home();
+    ok = cur_page()->graph == GR_BROWSE;
     press(B_SAVE);
+    bad += check("SAVE again cycles USER > the presets (ALL) > PROJECT", ok && cur_page()->graph == GR_SLOTS);
+    go_home();
+    press(B_SAVE); press(B_SAVE);
     ok = cur_page()->graph == GR_USER && !pop.on;
     press(B_OCTUP);
-    bad += check("SAVE from HOME returns directly to USER (OCT+: its sheet, on Save here), even after visiting PROJECT",
+    bad += check("SAVE from HOME: PROJECT, then USER (OCT+: its sheet, on Save here)",
                  ok && pop.on == POP_SHEET && str_eq(pop.rows[pop.sel].label, "Save here"));
     press(B_OCTUP);
     bad += check("direct SAVE still asks before overwriting an occupied slot",
@@ -797,6 +809,7 @@ static int test_save(void)
 static void go_title(const char *title)
 {
     uint32_t i;
+    if (str_eq(title, "MIXER")) { go_mixer(); return; }
     for (i = 0; i < NPAGES && !str_eq(PAGES[i].title, title); i++)
         ;
     ui.home = 0;
@@ -890,18 +903,21 @@ static int test_tracks(void)
     int bad = 0;
     track_t before;
     ui_power_on();
-    open_family(FAM_TRK);
+    go_mixer();
     before = trk[0];
-    turn(EN_PRESET, 1);
-    bad += check("TRACKS: the PRESETS knob does nothing", trk[0].preset == before.preset && !memcmp(trk[0].p, before.p, sizeof before.p));
     turn(EN_K4, 1);
     bad += check("MIXER KNOB 4 right: MUTE ON (the selected track stays)", trk[0].p[P_MUTE] == 1 && song.sel == 0);
     turn(EN_K1, -3);
     bad += check("KNOB 1 changes LEVEL only (MUTE stays)", trk[0].p[P_MUTE] == 1 && trk[0].p[P_LEVEL] == before.p[P_LEVEL] - 3);
     turn(EN_K2, 2);
     bad += check("KNOB 2 changes PAN", trk[0].p[P_PAN] == before.p[P_PAN] + 2);
+    turn(EN_K3, 5);
+    bad += check("KNOB 3 changes the FX SEND, its value in the header", trk[0].p[P_FXSEND] == before.p[P_FXSEND] + 5 &&
+                 trk[0].p[P_SLEN] == before.p[P_SLEN] && msg_has("T1 SEND"));
+    turn(EN_K2, -4);
+    bad += check("  KNOB 2's value in the header: \"T1 PAN L2\"", msg_is("T1 PAN L2"));
     turn(EN_K4, -1);
-    bad += check("MIXER KNOB 4 left: MUTE OFF", trk[0].p[P_MUTE] == 0);
+    bad += check("MIXER KNOB 4 left: MUTE OFF", trk[0].p[P_MUTE] == 0 && msg_is("T1 MUTE OFF"));
     turn(EN_ALGO, 1);
     bad += check("ALGORITHM selects the track", song.sel == 1);
     return bad;
@@ -1094,6 +1110,8 @@ static int test_home_view(void)
     bad += check("HOME on Stage: the second page (the chord view)", ui.home && ui.home_pg == 1u);
     press(B_HOME);
     bad += check("  HOME again: TRACKS", ui.home && ui.home_pg == HP_TRACKS);
+    press(B_HOME);
+    bad += check("  HOME again: MIXER (after TRACKS)", ui.home && ui.home_pg == HP_MIXER);
     press(B_HOME);
     bad += check("  HOME again: Stage", ui.home && ui.home_pg == 0u);
     press(B_HOME);
@@ -2831,17 +2849,13 @@ static int test_product_ux(void)
     bad += check("REC in ABOUT does nothing (the document and its scroll stay)",
                  ui.menu == 2 && !ui.menu_scroll && song.rec == 0 && !transport_req);
     ui_power_on(); press(B_GLO);
-    bad += check("GLO directly opens the four-channel MIXER", cur_page()->graph == GR_TRK);
-    int16_t len = TSEL->p[P_SLEN], send = TSEL->p[P_RESERVED36];
-    turn(EN_K3, 1);
-    bad += check("MIXER K3 is inert, never changes sequence length", TSEL->p[P_SLEN] == len && TSEL->p[P_RESERVED36] == send);
-    press(B_GLO); ok = cur_page()->fam == FAM_GLO && str_eq(cur_page()->title, "TEMPO");   /* (Hookology: TEMPO first) */
+    ok = cur_page()->fam == FAM_GLO && str_eq(cur_page()->title, "TEMPO");   /* (Hookology: the mixer is HOME's) */
     press(B_GLO); ok &= str_eq(cur_page()->title, "GLOBAL");
     press(B_GLO); ok &= str_eq(cur_page()->title, "SYSTEM");
     press(B_GLO); ok &= str_eq(cur_page()->title, "WEIGHTS");
     press(B_GLO); ok &= str_eq(cur_page()->title, "WEIGHTS 2");
-    press(B_GLO); ok &= cur_page()->graph == GR_TRK;
-    bad += check("GLO cycles MIXER > TEMPO > GLOBAL > SYSTEM > WEIGHTS > WEIGHTS 2 > MIXER", ok);
+    press(B_GLO); ok &= str_eq(cur_page()->title, "TEMPO");
+    bad += check("GLO cycles TEMPO > GLOBAL > SYSTEM > WEIGHTS > WEIGHTS 2 > TEMPO", ok);
     go_home(); hold(B_SEQ);
     bad += check("long SEQ goes directly to PATTERNS (the song under it) with no tap on release", cur_page()->graph == GR_PATGRID);
     turn(EN_SELECT, 1);
@@ -3064,7 +3078,7 @@ static int test_layer(void)
             btn_down(PB[i]); frame();
             ok &= ui.home;
             btn_up(PB[i]); frame();
-            ok &= !ui.home && (PB[i] == B_GLO ? cur_page()->graph == GR_TRK : cur_page()->fam == PF[i]);
+            ok &= !ui.home && (PB[i] == B_GLO ? cur_page()->fam == FAM_GLO : cur_page()->fam == PF[i]);
             if (PB[i] == B_SCL || PB[i] == B_GLO || PB[i] == B_EDIT)
                 continue;                             /* (a layer of their own: held long is a peek) */
             ui_power_on_general();
@@ -4144,7 +4158,7 @@ static int test_quick_layers(void)
         btn_down(LB[i]);
         for (flash = 0, k = 0; k < 20u; k++) { frame(); flash |= ui.layer; }      /* 0.32 s */
         btn_up(LB[i]); frame();
-        ok &= !flash && !ui.home && (LB[i] == B_GLO ? cur_page()->graph == GR_TRK :
+        ok &= !flash && !ui.home && (LB[i] == B_GLO ? cur_page()->fam == FAM_GLO :
                                      LB[i] == B_SCL ? cur_page()->fam == FAM_SCL : str_eq(cur_page()->title, "EDIT 1"));
         hint &= !ui.msg_t;
         frames(320);                              /* another ordinary tap, outside the double-tap window */
@@ -4668,9 +4682,9 @@ static int test_bughunt_ui2(void)
             }
         bad += check("STEP entry with CHRD: POLY the chord, MONO its root, as live recording writes", ok);
     }
-    {   /* 3. MIXER (vertical, Hookology): the knob just turned is the control drawn in text (K1 the fader, K2 the pan,
-         * K3 nothing, K4 MUTE) in the selected track's strip (ui_pages.c pv_strip) */
-        uint32_t k, a[4][3], ok = 1;
+    {   /* 3. MIXER (HOME, Hookology): the knob just turned is the control drawn in TEXT (K1 the fader, K2 the pan,
+         * K3 the send, K4 MUTE) in the selected track's strip (ui_pages.c pv_strip) */
+        uint32_t k, a[4][4], ok = 1;
         for (k = 0; k < 4u; k++) {
             int32_t X, w;
             ui_power_on();
@@ -4680,11 +4694,13 @@ static int test_bughunt_ui2(void)
             turn(EN_K1 + k, 1);                                       /* (K4 right: MUTE on) */
             ui.force = 1; frame();
             a[k][0] = text_in(X + pv_fad_x(w), PV_MIX_Y + PV_FAD_Y, X + pv_fad_x(w) + PV_FAD_W, PV_MIX_Y + PV_FAD_Y + PV_FAD_H);   /* the fader */
-            a[k][1] = text_in(X + 4, PV_MIX_Y + 59, X + w - 4, PV_MIX_Y + 75);   /* the pan */
+            a[k][1] = text_in(X + 4, PV_MIX_Y + PV_PAN_Y - 5, X + w - 4, PV_MIX_Y + PV_PAN_Y + 6);   /* the pan */
+            a[k][3] = text_in(X + 4, PV_MIX_Y + PV_SND_Y, X + w - 4, PV_MIX_Y + PV_SND_Y + 6);       /* the send */
             a[k][2] = TSEL->p[P_MUTE] != 0;
         }
-        ok = a[0][0] && !a[0][1] && !a[1][0] && a[1][1] && !a[2][0] && !a[2][1] && !a[3][0] && a[3][2] && !a[2][2];
-        bad += check("MIXER: K1 lights the fader, K2 the pan, K4 MUTE, K3 nothing", ok);
+        ok = a[0][0] && !a[0][1] && !a[0][3] && !a[1][0] && a[1][1] && !a[1][3] && !a[2][0] && !a[2][1] && a[2][3] &&
+             !a[3][0] && !a[3][1] && !a[3][3] && a[3][2] && !a[2][2];
+        bad += check("MIXER: K1 lights the fader, K2 the pan, K3 the send, K4 MUTE", ok);
     }
     {   /* 4. renaming the slot the music came from renames the music: the next SAVE prefills the new name */
         char pn[16];
@@ -5828,6 +5844,31 @@ static int test_select_octave(void)
     bad += check("  the menu lists OCTAVE beside TRANSPOSE, OFF still last, the saved numbers kept",
                  hs_step(HS_TRANS, 1) == HS_OCT && hs_step(HS_OCT, 1) == HS_CHORD && hs_step(HS_PATTERN, 1) == HS_OFF &&
                  hs_step(HS_OFF, 1) == HS_OFF && hs_step(HS_OFF, 0) == HS_BPM && HS_OFF == 8);
+    {   /* HOME SELECT PAGES (Hookology): SELECT turns HOME's pages both ways, wrapping; GLO SELECT never offers it */
+        uint32_t ok;
+        ui_power_on(); HOME_SELECT = HS_PAGES; go_home(); ui.home_pg = HP_TRACKS; ui.msg_t = 0;
+        int16_t bpm = song.g[G_BPM];
+        turn(EN_SELECT, 1); ok = ui.home && ui.home_pg == HP_MIXER;
+        turn(EN_SELECT, 1); ok &= ui.home_pg == HP_STAGE;
+        turn(EN_SELECT, 1); ok &= ui.home_pg == HP_VIEW;
+        turn(EN_SELECT, 1); ok &= ui.home_pg == HP_TRACKS;
+        turn(EN_SELECT, -1); ok &= ui.home_pg == HP_VIEW && song.g[G_BPM] == bpm;
+        bad += check("HOME SELECT PAGES: SELECT turns TRACKS > MIXER > Stage > the chord view, both ways", ok);
+        home_stage_on = 0; ui.home_pg = HP_TRACKS;
+        turn(EN_SELECT, 1); ok = ui.home_pg == HP_MIXER;
+        turn(EN_SELECT, 1); ok &= ui.home_pg == HP_VIEW;
+        turn(EN_SELECT, -1); ok &= ui.home_pg == HP_MIXER;
+        press(B_HOME); ok &= ui.home_pg == HP_VIEW;
+        ui.home_pg = HP_STAGE; ui.force = 1; frame(); ok &= ui.home_pg == HP_TRACKS;
+        home_stage_on = 1;
+        bad += check("  Stage hidden (Hookology): TRACKS > MIXER > the chord view; never left on Stage", ok);
+        bad += check("  the menu lists PAGES after BPM; GLO SELECT skips it",
+                     hs_step(HS_BPM, 1) == HS_PAGES && hs_step(HS_PAGES, 1) == HS_MOD && glo_hs_step(HS_BPM, 1) == HS_MOD &&
+                     glo_hs_step(HS_MOD, -1) == HS_BPM && str_eq(HS_NAME[HS_PAGES], "PAGES"));
+        glo_select_set(HS_PAGES);
+        bad += check("  a stored GLO SELECT PAGES reads as BPM", glo_select() == HS_BPM);
+        glo_select_set(0); HOME_SELECT = 0;
+    }
     ui_power_on();
     return bad;
 }

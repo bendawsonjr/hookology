@@ -553,7 +553,7 @@ static void mock_state(int s)
         go_page(GR_TRK);
         trk[0].p[P_LEVEL] = 100; trk[1].p[P_LEVEL] = 84; trk[2].p[P_LEVEL] = 64; trk[3].p[P_LEVEL] = 110;
         trk[0].p[P_PAN] = -20; trk[1].p[P_PAN] = 24; trk[2].p[P_PAN] = 0; trk[3].p[P_PAN] = -4;
-        trk[0].p[P_RESERVED36] = 30; trk[1].p[P_RESERVED36] = 80; trk[2].p[P_RESERVED36] = 10; trk[3].p[P_RESERVED36] = 0;
+        trk[0].p[P_FXSEND] = 30; trk[1].p[P_FXSEND] = 80; trk[2].p[P_FXSEND] = 10; trk[3].p[P_FXSEND] = 0;
         trk[2].p[P_MUTE] = 1;
         song.rec = 2u;
         trk[0].peak = 11000; trk[1].peak = 3300; trk[3].peak = 20000;     /* (the mock's stand-in meters) */
@@ -903,7 +903,7 @@ static void ref_scene(int s)
         break;
     case S_REF_MIXER: {                              /* (R5) the mock's levels, pans, sends; 3 muted, 1 and 4 armed */
         static const int16_t LV[4] = {91, 70, 44, 112}, PN[4] = {0, -20, 0, 13}, RV[4] = {51, 15, 0, 20};
-        for (k = 0; k < NROWS; k++) { trk[k].p[P_LEVEL] = LV[k]; trk[k].p[P_PAN] = PN[k]; trk[k].p[P_RESERVED36] = RV[k]; }
+        for (k = 0; k < NROWS; k++) { trk[k].p[P_LEVEL] = LV[k]; trk[k].p[P_PAN] = PN[k]; trk[k].p[P_FXSEND] = RV[k]; }
         trk[2].p[P_MUTE] = 1; song.rec = 1u | 8u; song.playing = 0;
         go_title("MIXER");
         break;
@@ -1367,14 +1367,14 @@ static void setup(int s)
     case S_MIXER:
         go_page(GR_TRK);
         trk[0].p[P_LEVEL] = 100; trk[1].p[P_LEVEL] = 84; trk[2].p[P_LEVEL] = 64; trk[3].p[P_LEVEL] = 110;
-        trk[0].p[P_PAN] = -20; trk[1].p[P_PAN] = 24; trk[3].p[P_PAN] = -4; trk[1].p[P_RESERVED36] = 80;
+        trk[0].p[P_PAN] = -20; trk[1].p[P_PAN] = 24; trk[3].p[P_PAN] = -4; trk[1].p[P_FXSEND] = 80;
         trk[2].p[P_MUTE] = 1; trk[3].p[P_MUTE] = 1; song.rec = 2u | 8u; trk[0].peak = 9000;
         break;
     case S_MIXER_PAN:                            /* PAN just turned, the ends of each knob, OFF, armed while stopped */
         go_page(GR_TRK); song.playing = 0; song.sel = 1;
         trk[0].p[P_LEVEL] = 127; trk[1].p[P_LEVEL] = 0; trk[2].p[P_LEVEL] = 1; trk[3].p[P_LEVEL] = 104;
         trk[0].p[P_PAN] = -64; trk[1].p[P_PAN] = 63; trk[2].p[P_PAN] = 0; trk[3].p[P_PAN] = 1;
-        trk[0].p[P_RESERVED36] = 127; trk[2].p[P_RESERVED36] = 1; trk[3].p[P_MUTE] = 1;
+        trk[0].p[P_FXSEND] = 127; trk[2].p[P_FXSEND] = 1; trk[3].p[P_MUTE] = 1;
         song.rec = 1u | 8u; ui.hot_col = 3; ui.hot_t = 30;
         break;
     case S_FX_MIDIVERB: case S_FX_MIDIDELAY: case S_FX_MIDI_RACK: case S_FX_MIDI_LIST:
