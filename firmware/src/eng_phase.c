@@ -31,6 +31,7 @@ typedef struct {
     uint32_t vib_phase, vib_ticks, noise;
     float native_dc[2];
     cz_native_freq_t native_freq;
+    float up[3];                                        /* QUALITY LIGHT: the last three half-rate samples (cz_native.c) */
 } cz_voice_t;
 typedef struct { float rate[8], level[8]; uint8_t sustain, end; } cz_native_def_t;
 typedef struct {

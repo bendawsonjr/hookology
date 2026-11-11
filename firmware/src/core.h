@@ -251,7 +251,8 @@ static int param_master_fx(uint32_t id){return id>=G_MFXTYPE && id<=G_MFX3CHAR;}
 #define P_CHSET P_RESERVED48                   /* HERA chord set - 1 (chord.c CH_HERA) */
 /* VOICES (Hookology): the track's voice limit, 0 ALL, 1..8 (voice.c trk_vlimit); took a retired slot as P_CHSET did */
 #define P_VMAX P_RESERVED47
-/* QUALITY (Hookology): a Prophet track's FULL (0) or LIGHT (1, half rate: eng_prophet_test.c p5_samples_light) */
+/* QUALITY (Hookology): a Prophet or CZ-1 track's FULL (0) or LIGHT (1, half rate: eng_prophet_test.c p5_samples_light,
+ * cz_native.c cz_native_render) */
 #define P_P5Q P_RESERVED46
 #define CHRD_HERA 12                           /* P_CHRD's chord.c CH_HERA: scale_map needs it before chord.c */
 static int param_retired(uint32_t id)

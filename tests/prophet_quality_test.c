@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Hookology contributors */
-/* QUALITY (Hookology): a Prophet chord rendered FULL and LIGHT on the host.
+/* QUALITY (Hookology): a Prophet or CZ-1 chord rendered FULL and LIGHT on the host ("cz50": CZ-1 preset 50).
  *   prophet_quality_test                    checks: LIGHT keeps the tone below 4 kHz within 1 dB per octave band, peaks
  *                                           within 2 dB of FULL, costs under 70 % of FULL (host instructions: a ranking,
  *                                           not the FM-1's cycles; device timing: tools/usb_audio_stats.py)
@@ -21,12 +21,12 @@ static uint64_t instructions(void)
     return 0;
 }
 static int32_t pcm[2][44100 * 3];
-static double render(const char *dir, uint32_t preset, uint32_t light)
+static double render_eng(const char *dir, uint32_t engine, uint32_t preset, uint32_t light)
 {
     int32_t *pc=pcm[light];
     memset(trk,0,sizeof trk);trk_voices_bind();eng_state_reset();
     memset(p5_ready,0,sizeof p5_ready);
-    host_tracks_init(); host_preset(&trk[0], ENGI_PROPHET, preset);
+    host_tracks_init(); host_preset(&trk[0], engine, preset);
     track_t *t=&trk[0];
     t->p[P_VOICE]=V_POLY; t->p[P_P5Q]=(int16_t)light;
     static const uint8_t chord[4]={48,55,64,71};
@@ -43,12 +43,13 @@ static double render(const char *dir, uint32_t preset, uint32_t light)
     uint64_t ins=instructions()-i0;
     double cost=voice_samples?(double)ins/(double)voice_samples:0.0;
     if(dir){
-        char path[512];snprintf(path,sizeof path,"%s/%u_%s.pcm",dir,preset,light?"light":"full");
+        char path[512];snprintf(path,sizeof path,"%s/%s%u_%s.pcm",dir,engine==ENGI_CZ?"cz":"",preset,light?"light":"full");
         FILE *f=fopen(path,"wb");fwrite(pc,sizeof pc[0],n,f);fclose(f);
-        printf("%u,%s,%.1f\n",preset,light?"LIGHT":"FULL",cost);
+        printf("%s%u,%s,%.1f\n",engine==ENGI_CZ?"cz":"",preset,light?"LIGHT":"FULL",cost);
     }
     return cost;
 }
+static double render(const char *dir, uint32_t preset, uint32_t light) { return render_eng(dir, ENGI_PROPHET, preset, light); }
 /* the energy in the octave band around fc (an RBJ band-pass, Q 1.41) */
 static double band(const int32_t *x,uint32_t n,double fc)
 {
@@ -61,11 +62,12 @@ static double band(const int32_t *x,uint32_t n,double fc)
 }
 static int checks(void)
 {
-    static const uint32_t P[]={23u,1u,120u};            /* Whiny Opener, It's a Prophet, a pad */
+    static const uint32_t E[]={ENGI_PROPHET,ENGI_PROPHET,ENGI_PROPHET,ENGI_CZ,ENGI_CZ};
+    static const uint32_t P[]={23u,1u,120u,50u,2u};    /* Whiny Opener, It's a Prophet, a pad; CZ-1 FAT ENSEMBLE, BRASS 2 */
     static const double F[]={125,250,500,1000,2000,4000};
     int bad=0;
-    for(uint32_t k=0;k<3u;k++){
-        double full=render(0,P[k],0),light=render(0,P[k],1),worst=0;
+    for(uint32_t k=0;k<5u;k++){
+        double full=render_eng(0,E[k],P[k],0),light=render_eng(0,E[k],P[k],1),worst=0;
         int32_t peak=0,peak_full=0;
         for(uint32_t i=0;i<44100u*3u;i++){
             int32_t a=pcm[1][i]<0?-pcm[1][i]:pcm[1][i],f=pcm[0][i]<0?-pcm[0][i]:pcm[0][i];
@@ -77,9 +79,9 @@ static int checks(void)
             double d=10.0*log10((band(pcm[1],44100u*3u,F[b])+1e-9)/(band(pcm[0],44100u*3u,F[b])+1e-9));
             if(fabs(d)>fabs(worst))worst=d;
         }
-        int ok=fabs(worst)<=1.0 && fabs(pd)<=2.0 && (full<=0.0 || light<0.7*full);
-        printf("Prophet QUALITY: preset %u LIGHT within %.2f dB below 4 kHz, peak %+.2f dB, %.0f%% of FULL's host cost  %s\n",
-               P[k],worst,pd,full>0.0?100.0*light/full:0.0,ok?"ok":"FAIL");
+        int ok=fabs(worst)<=1.0 && fabs(pd)<=2.0 && (full<=0.0 || light<(E[k]==ENGI_CZ?0.8:0.7)*full);
+        printf("%s QUALITY: preset %u LIGHT within %.2f dB below 4 kHz, peak %+.2f dB, %.0f%% of FULL's host cost  %s\n",
+               E[k]==ENGI_CZ?"CZ-1":"Prophet",P[k],worst,pd,full>0.0?100.0*light/full:0.0,ok?"ok":"FAIL");
         bad+=!ok;
     }
     {   /* the shared budget counts a LIGHT voice as FULL (beta27: cheaper let a six-track mix overload) */
@@ -97,8 +99,9 @@ int main(int argc,char **argv)
     if(argc<2)return checks()?1:0;
     puts("preset,mode,host_instructions_per_voice_sample");
     for(int a=2;a<argc || a==2;a++){
-        uint32_t preset=argc>2?(uint32_t)atoi(argv[a]):23u;
-        render(argv[1],preset,0);render(argv[1],preset,1);
+        const char *arg=argc>2?argv[a]:"23";
+        uint32_t cz=arg[0]=='c',preset=(uint32_t)atoi(arg+(cz?2:0)),e=cz?ENGI_CZ:ENGI_PROPHET;   /* ("cz50": CZ-1 50) */
+        render_eng(argv[1],e,preset,0);render_eng(argv[1],e,preset,1);
         if(argc<=2)break;
     }
     return 0;
