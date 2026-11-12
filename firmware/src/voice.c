@@ -162,7 +162,8 @@ static uint32_t voice_units(const track_t *t)
     return e->units ? e->units(t) : VOICE_SCALE * (trk_nvoice(t) > NPOLY ? 1u : 2u);
 }
 
-/* A shared effect's cost in units, off the budget: about 200 us, REVERB 377 */
+/* A shared effect's cost in units, off the budget: about 200 us, REVERB 377; REVERB LIGHT (ECO, Hookology) 5: on the
+ * user's Bop its share of busy blocks fell 78 % (52 -> 11 per 10,000 jobs), counted a third, rounded up */
 static uint32_t voice_fx_units(void)
 {
 #if MELODEE_ADMISSION
@@ -171,7 +172,7 @@ static uint32_t voice_fx_units(void)
     uint32_t u = 0;
     for (uint32_t k = 0; k < FX_SLOTS; k++) {
         int32_t type = song.g[G_MFXTYPE + k * FX_PARAMS];
-        u += type == FX_REVERB ? 15u : type != FX_OFF ? 8u : 0u;
+        u += type == FX_REVERB ? (song.g[G_ECO] == 1 ? 5u : 15u) : type != FX_OFF ? 8u : 0u;
     }
     return u;
 #endif

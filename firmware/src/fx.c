@@ -25,6 +25,7 @@ typedef struct {
     int32_t rng, random, mix;
     int16_t rate, character;
     uint8_t type, mono, decim, failed;
+    uint8_t light;                /* (Hookology) REVERB LIGHT: the half-rate tank (ECONOMY) */
     int32_t echo, damp[4];
     int32_t rev_damp[8], rev_l, rev_r, rev_prev_l, rev_prev_r;
     int32_t rev_bass[2];
@@ -434,7 +435,8 @@ static void fx_slot_prepare(fx_plan_t *plan,uint32_t si,const int16_t *p)
     uint32_t bus=fx_profile_control>>30u,profiling=bus!=0u;
     if(profiling){type=(fx_profile_control>>(slot*4u))&15u;target=type?(bus?32768:100*256):0;}
 #endif
-    uint32_t changed=f->type!=type;
+    uint32_t light=type==FX_REVERB && song.g[G_ECO]==1;   /* (Hookology: ECONOMY's REVERB LIGHT) */
+    uint32_t changed=f->type!=type || (type==FX_REVERB && f->light!=light);
     if(f->type && type && changed && f->mix)target=0;
     if(!target && !f->mix){
         if(f->type || resource[RES_FX0+si].size){resource[RES_FX0+si].size=0;fx_zero(f);}
@@ -442,11 +444,11 @@ static void fx_slot_prepare(fx_plan_t *plan,uint32_t si,const int16_t *p)
     }
     if(f->epoch!=fx_epoch || (type && changed && !f->mix)){
         resource[RES_FX0+si].size=0;fx_zero(f);
-        f->epoch=fx_epoch;f->type=(uint8_t)type;f->rng=(int32_t)(0x73a9825du+(NROWS*FX_SLOTS+si)*997u);
+        f->epoch=fx_epoch;f->type=(uint8_t)type;f->light=(uint8_t)light;f->rng=(int32_t)(0x73a9825du+(NROWS*FX_SLOTS+si)*997u);
     }
     f->rate=(int16_t)clamp(p[2],0,127);f->character=(int16_t)clamp(p[3],0,127);
     if(fx_has_tone(f->type)){   /* the low cut (section 0: the floor, TONE above 0 higher), TONE below 0 the high cut (1) */
-        uint32_t slot=si%FX_SLOTS,div=f->type==FX_REVERB?1u:4u;
+        uint32_t slot=si%FX_SLOTS,div=f->type==FX_REVERB?(f->light?4u:1u):4u;
         int32_t tone=clamp(song.g[G_MFXTONE+slot],-FX_TONE_MAX,FX_TONE_MAX);
         for(uint32_t k=0;k<2u;k++){   /* (a2: the cutoff now, Hz; 0 off) */
             int32_t hz=k?(tone<0?fx_tone_hz(tone):0):fx_low_cut_hz(f->type,tone);
@@ -464,7 +466,7 @@ static void fx_slot_prepare(fx_plan_t *plan,uint32_t si,const int16_t *p)
     if(f->type==FX_ROOM || f->type==FX_CHORUS || f->type==FX_REVERB || fx_sloop_type(f->type)){
         if(f->type==FX_REVERB)for(uint32_t k=0;k<FX_STATE_COUNT;k++)
             if(k!=si && fx_state[k].type==FX_REVERB && resource[RES_FX0+k].size)return;
-        uint32_t bytes=f->type==FX_REVERB?sizeof(fx_sloop_reverb_t):fx_sloop_type(f->type)?fx_sloop_insert_bytes(f->type):2048u;
+        uint32_t bytes=f->type==FX_REVERB?(f->light?sizeof(fx_sloop_reverb_light_t):sizeof(fx_sloop_reverb_t)):fx_sloop_type(f->type)?fx_sloop_insert_bytes(f->type):2048u;
         if(!f->failed && !resource[RES_FX0+si].size){
             void *(*volatile allocate)(uint32_t,uint32_t)=fx_memory;mem=allocate(RES_FX0+si,bytes);if(!mem)f->failed=1;
         }else if(resource[RES_FX0+si].size)mem=resource[RES_FX0+si].ptr;
@@ -482,7 +484,10 @@ static __attribute__((noinline,section(".audio_text"))) int fx_slot_run(const fx
     if(fx_sloop_type(f->type)){
         fx_sloop_insert_run(f,(fx_sloop_insert_t *)mem,n,target,fx_left,fx_right,plan->third,plan->shared);
     }
-    else if(f->type==FX_REVERB){fx_sloop_reverb_run(f,(fx_sloop_reverb_t *)mem,n,target,fx_left,fx_right);}
+    else if(f->type==FX_REVERB){
+        if(f->light)fx_sloop_reverb_light_run(f,(fx_sloop_reverb_light_t *)mem,n,target,fx_left,fx_right);
+        else fx_sloop_reverb_run(f,(fx_sloop_reverb_t *)mem,n,target,fx_left,fx_right);
+    }
     else if(f->type==FX_CHORUS){
         if(!n)return 1;
         if(!f->age){f->rev_l=f->rev_r=256*65536;f->age=1;}
