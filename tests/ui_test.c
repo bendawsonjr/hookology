@@ -167,7 +167,7 @@ static void ui_power_on(void)
     memset(&song, 0, sizeof song);
     memset(&chain, 0, sizeof chain);
     chain_defaults(&chain_config);
-    pattern_init(); sec_reset(); scs.build = 0; tracks.knob_ms = 0; tracks.out = 0; tracks.clr = 0; trc.t0 = 0; page_patterns_on = page_song_on = 1; home_stage_on = 1;   /* (their tests: hidden in the build, ui.c) */
+    pattern_init(); sec_reset(); scs.build = 0; tracks.knob_ms = 0; tracks.out = 0; tracks.clr = 0; trc.t0 = 0; page_patterns_on = page_song_on = 1; home_stage_on = home_view_on = 1;   /* (their tests: hidden in the build, ui.c) */
     memset(&ui, 0, sizeof ui);
     memset(&boot_work, 0, sizeof boot_work);
     memset(&step_history, 0, sizeof step_history);
@@ -5881,8 +5881,15 @@ static int test_select_octave(void)
         turn(EN_SELECT, -1); ok &= ui.home_pg == HP_MIXER;
         press(B_HOME); ok &= ui.home_pg == HP_VIEW;
         ui.home_pg = HP_STAGE; ui.force = 1; frame(); ok &= ui.home_pg == HP_TRACKS;
-        home_stage_on = 1;
         bad += check("  Stage hidden (Hookology): TRACKS > MIXER > the chord view; never left on Stage", ok);
+        home_view_on = 0; ui.home_pg = HP_TRACKS;
+        turn(EN_SELECT, 1); ok = ui.home_pg == HP_MIXER;
+        turn(EN_SELECT, 1); ok &= ui.home_pg == HP_TRACKS;
+        turn(EN_SELECT, -1); ok &= ui.home_pg == HP_MIXER;
+        press(B_HOME); ok &= ui.home_pg == HP_TRACKS;
+        ui.home_pg = HP_VIEW; ui.force = 1; frame(); ok &= ui.home_pg == HP_TRACKS;
+        home_stage_on = home_view_on = 1;
+        bad += check("  the chord view hidden too (Hookology): HOME turns TRACKS > MIXER; never left on it", ok);
         bad += check("  the menu lists PAGES after BPM; GLO SELECT skips it",
                      hs_step(HS_BPM, 1) == HS_PAGES && hs_step(HS_PAGES, 1) == HS_MOD && glo_hs_step(HS_BPM, 1) == HS_MOD &&
                      glo_hs_step(HS_MOD, -1) == HS_BPM && str_eq(HS_NAME[HS_PAGES], "PAGES"));

@@ -100,16 +100,26 @@ enum { HP_STAGE, HP_VIEW, HP_TRACKS, HP_MIXER };   /* HOME's pages: Stage (ui_st
 #define HOOKOLOGY_STAGE_PAGE 0
 #endif
 static uint8_t home_stage_on = HOOKOLOGY_STAGE_PAGE;
-static uint32_t home_next(uint32_t pg)
+/* the chord view (the circle of fifths) hidden too (Hookology, 2026-11-11: not in use); HOOKOLOGY_VIEW_PAGE=1 brings it
+ * back after MIXER (and Stage) */
+#ifndef HOOKOLOGY_VIEW_PAGE
+#define HOOKOLOGY_VIEW_PAGE 0
+#endif
+static uint8_t home_view_on = HOOKOLOGY_VIEW_PAGE;
+static const uint8_t HOME_ORDER[4] = {HP_TRACKS, HP_MIXER, HP_STAGE, HP_VIEW};   /* HOME's turn */
+static int home_pg_on(uint32_t pg) { return pg == HP_STAGE ? home_stage_on : pg == HP_VIEW ? home_view_on : 1; }
+static uint32_t home_step(uint32_t pg, uint32_t dir)   /* the next page shown (dir 1) or the one before (3) */
 {
-    return pg == HP_TRACKS ? HP_MIXER : pg == HP_MIXER ? (home_stage_on ? HP_STAGE : HP_VIEW) : pg == HP_STAGE ? HP_VIEW
-                                                                                                           : HP_TRACKS;
+    uint32_t i = 0;
+    while (i < 4u && HOME_ORDER[i] != pg) i++;
+    for (uint32_t k = 0; k < 4u; k++) {
+        i = (i + dir) & 3u;
+        if (home_pg_on(HOME_ORDER[i])) return HOME_ORDER[i];
+    }
+    return HP_TRACKS;
 }
-static uint32_t home_prev(uint32_t pg)
-{
-    return pg == HP_TRACKS ? HP_VIEW : pg == HP_VIEW ? (home_stage_on ? HP_STAGE : HP_MIXER) : pg == HP_STAGE ? HP_MIXER
-                                                                                                             : HP_TRACKS;
-}
+static uint32_t home_next(uint32_t pg) { return home_step(pg, 1u); }
+static uint32_t home_prev(uint32_t pg) { return home_step(pg, 3u); }
 /* HOME SELECT (the menu): what SELECT turns on HOME, kept in favorites.factory[15][25] (0, any other: BPM) */
 /* PAGES (Hookology): HOME's pages, as SELECT turns the other sections' (HOME SELECT only: GLO SELECT skips it) */
 enum { HS_BPM, HS_MOD, HS_LEVEL, HS_SWING, HS_TRANS, HS_CHORD, HS_ARATE, HS_PATTERN, HS_OFF, HS_OCT, HS_CHSET, HS_PAGES,

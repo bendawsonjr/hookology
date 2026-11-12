@@ -181,6 +181,9 @@ static void head_chip_text(char *b)
     } else if (pg->graph == GR_FMEG) {                  /* FM6's EG RATE / LVL: "OP3 EG" */
         str_cpy(b, "OP1 EG", 16);
         b[2] = (char)('1' + fm6_opsel % 6u);
+    } else if (pg->graph == GR_FXRACK && pg->scope == SC_TRACK) {   /* a track's FX rack: its sound's name (Hookology) */
+        sound_name(TSEL, b);
+        if (!b[0]) str_cpy(b, pg->title, 16);
     } else if (pg->fam == FAM_FX && pg->graph == GR_NONE) {   /* an FX slot: its effect */
         str_cpy(b, N_FX[clamp((pg->scope == SC_GLOBAL ? song.g : TSEL->p)[pg->id[0] - 1u], 0, FX_COUNT - 1)], 16);
     } else if (pg->scope != SC_ENGINE && sec_on()) {   /* an engine in sections: the page's name in its section */
@@ -434,12 +437,11 @@ static void draw_head(void)
         } else if (!ui.home) {                          /* a page: where it is in its family */
             head_pages(x + 6, 236 - cw - (low ? 22 : 0) - hw);
         } else if (x + 6 + 52 <= 236 - cw - (low ? 22 : 0) - hw - 6) {   /* HOME: its four pages, where there is room */
-            static const uint8_t ORDER[4] = {HP_TRACKS, HP_MIXER, HP_STAGE, HP_VIEW};
             uint32_t i;
             for (i = 0, x += 6; i < 4u; i++) {
-                if (ORDER[i] == HP_STAGE && !home_stage_on) continue;   /* (hidden: ui.c) */
-                int32_t w = ORDER[i] == ui.home_pg ? 16 : 6;
-                cv_rrect(x, H_HEAD / 2 - 3, w, 6, 3, ORDER[i] == ui.home_pg ? T_THEME : T_LINE, T_BG);
+                if (!home_pg_on(HOME_ORDER[i])) continue;   /* (hidden: ui.c) */
+                int32_t w = HOME_ORDER[i] == ui.home_pg ? 16 : 6;
+                cv_rrect(x, H_HEAD / 2 - 3, w, 6, 3, HOME_ORDER[i] == ui.home_pg ? T_THEME : T_LINE, T_BG);
                 x += w + 6;
             }
         }
@@ -1286,8 +1288,8 @@ static void draw_page(void)
         melodee_dbg.stage = 4;
         draw_columns();
         melodee_dbg.stage = 5;
-        if (ui.home && ui.home_pg == HP_STAGE && !home_stage_on)
-            ui.home_pg = HP_TRACKS;                     /* (Stage hidden, ui.c: never left on it) */
+        if (ui.home && !home_pg_on(ui.home_pg))
+            ui.home_pg = HP_TRACKS;                     /* (Stage, the chord view hidden, ui.c: never left on one) */
         if (ui.home && ui.home_pg == HP_VIEW)           /* the chord view (ui_view.c) */
             view_draw();
         else if (ui.home && ui.home_pg == HP_TRACKS)    /* TRACKS (ui_tracks.c) */
