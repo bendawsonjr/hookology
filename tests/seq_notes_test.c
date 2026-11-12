@@ -73,7 +73,9 @@ static int deletion_history(void)
     recorded_note_t before_take[RECORD_MAX];memcpy(before_take,recording,sizeof before_take);
     song.rec=1;seq_start();seq_advance(0);seq_advance(180);input_on(t,60,120);seq_advance(60);input_off(t,60);seq_stop();song.rec=0;
     frame();bad+=check("slot reuse by recording undoes the take instead of stale deletions",step_history_apply(0)&&!memcmp(before_take,recording,sizeof before_take));
-    bad+=check("redo restores the new take in its reused slot",step_history_apply(1)&&recording[0].vel==120);
+    int found=0;   /* (Hookology: the take's 60 near the last old 60 replaces it as a double, in that slot) */
+    if(step_history_apply(1))for(uint32_t i=0;i<RECORD_MAX;i++)found+=recording[i].vel==120;
+    bad+=check("redo restores the new take in its reused slot",found==1);
     return bad;
 }
 
@@ -574,9 +576,31 @@ static int swung_notes_editing(void)
     return bad;
 }
 
+/* Hookology: Remove doubles (the pattern sheet) */
+static int remove_doubles(void)
+{
+    raw_begin(); track_t *t=&trk[0]; song.sel=0;
+    seq_advance(600);input_on(t,60,70);input_on(t,64,90);seq_advance(150);input_off(t,60);seq_advance(150);input_on(t,60,100);   /* (a fast repeat:
+                                                                                                    * kept while recording) */
+    seq_advance(150);input_off(t,60);input_off(t,64);seq_advance(3000);input_on(t,60,80);seq_advance(150);input_off(t,60);
+    seq_stop(); song.rec=0;
+    uint32_t before=0;for(uint32_t i=0;i<RECORD_MAX;i++)before+=recording[i].vel!=0;
+    recorded_note_t saved[RECORD_MAX];memcpy(saved,recording,sizeof saved);
+    go_page(GR_ROLL);frame();notes_remove_doubles();
+    uint32_t after=0,soft=0,loud=0,chord=0,far=0;
+    for(uint32_t i=0;i<RECORD_MAX;i++)if(recording[i].vel){after++;uint32_t n=recorded_note(&recording[i]);
+        soft+=n==60u&&recording[i].vel==70u;loud+=n==60u&&recording[i].vel==100u;chord+=n==64u;far+=n==60u&&recording[i].vel==80u;}
+    int bad=check("Remove doubles: the softer of two 60s 7 ms apart goes; the louder, the chord's 64 and a later 60 stay",
+                  before==4u&&after==3u&&!soft&&loud==1u&&chord==1u&&far==1u&&str_eq(head_msg(),"1 DOUBLE REMOVED"));
+    frame();step_history_apply(0);frame();
+    bad+=check("  EDIT undoes it, byte for byte",!memcmp(saved,recording,sizeof saved));
+    step_history_apply(1);frame();notes_remove_doubles();
+    bad+=check("  run again: NO DOUBLES",str_eq(head_msg(),"NO DOUBLES"));
+    return bad;
+}
 int main(void)
 {
-    int bad=selection_and_delete()+deletion_history()+loop_drums_and_playback()+timing_geometry_and_context()+control_clashes()+property_edits_and_mixed_patterns()+manual_chord_controls()+dense_selection_and_protection()+drum_recording_layout()+live_erase_manual()+live_erase_raw()+live_erase_scope_and_drums()+erase_edit_hold_conflicts()+bulk_and_pattern_clears()+swung_notes_editing();
+    int bad=selection_and_delete()+deletion_history()+loop_drums_and_playback()+timing_geometry_and_context()+control_clashes()+property_edits_and_mixed_patterns()+manual_chord_controls()+dense_selection_and_protection()+drum_recording_layout()+live_erase_manual()+live_erase_raw()+live_erase_scope_and_drums()+erase_edit_hold_conflicts()+bulk_and_pattern_clears()+swung_notes_editing()+remove_doubles();
     printf("Recorded note editing: %s\n",bad?"FAILED":"all passed");
     return !!bad;
 }

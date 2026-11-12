@@ -245,6 +245,41 @@ static void note_transform(int32_t delta,uint32_t quantum,int mode)
     if(bulk.on){bulk.on=2;memcpy(bulk.notes,moved,sizeof moved);bulk.generation=recording_generation;}note_transaction_end();fm1_irq_on();ui_message(quantize?"NOTES QUANTIZED":copy?"Copying..":"Moving..");
 }
 static void note_move_snapped(int32_t delta,uint32_t quantum,int copy){note_transform(delta,quantum,copy);}
+/* Hookology: Remove doubles (the pattern sheet). In the pattern shown, two recorded notes of one pitch starting
+ * nearer than a 32nd note are one note played twice: the louder stays (equal: the earlier). Undoable as a note edit. */
+static void notes_remove_doubles(void)
+{
+    if(song.playing||chain_busy()||live_rec_sel()){ui_message("STOP TO EDIT");return;}
+    track_t *t=TSEL;
+    recording_prune(t);
+    uint32_t window=recording_dup_window(t),len=step_pattern_len(t),found=0;
+    uint8_t gone[RECORD_MAX/8u];memset(gone,0,sizeof gone);
+    for(uint32_t i=recording_head[recording_owner(t)];i<RECORD_MAX;i=recording_next[i]){
+        if((gone[i/8u]>>(i%8u))&1u)continue;
+        for(uint32_t j=recording_next[i];j<RECORD_MAX;j=recording_next[j]){
+            if((gone[j/8u]>>(j%8u))&1u)continue;
+            const recorded_note_t *a=&recording[i],*b=&recording[j];
+            if(recorded_note(a)!=recorded_note(b)||recording_gap(recorded_step(a),a->on,recorded_step(b),b->on,len)>=window)continue;
+            uint32_t pa=recorded_step(a)*RECORD_UNIT+a->on,pb=recorded_step(b)*RECORD_UNIT+b->on;
+            uint32_t lose=a->vel!=b->vel?(a->vel<b->vel?i:j):(pa<=pb?j:i);
+            gone[lose/8u]|=(uint8_t)(1u<<(lose%8u));found++;
+            if(lose==i)break;
+        }
+    }
+    if(!found){ui_message("NO DOUBLES");return;}
+    fm1_irq_off();
+    if(!note_transaction_begin()){fm1_irq_on();return;}
+    uint64_t touched=0;
+    for(uint32_t i=recording_head[recording_owner(t)];i<RECORD_MAX;){
+        uint32_t next=recording_next[i];
+        if((gone[i/8u]>>(i%8u))&1u){touched|=(uint64_t)1u<<recording_view(t,&recording[i]);recording_remove(t,i);}
+        i=next;
+    }
+    for(uint32_t s=0;s<NSTEP;s++)if((touched>>s)&1u)notes_rebuild(t,s);
+    note_transaction_end();fm1_irq_on();
+    bulk_clear();ui.note_pick=0;
+    char b[8];fmt_int(b,(int32_t)found);ui_say(b,found==1u?" DOUBLE REMOVED":" DOUBLES REMOVED");
+}
 static void note_quantize(uint32_t quantum)
 {
     uint32_t selected=bulk.on;

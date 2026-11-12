@@ -128,6 +128,22 @@ static int replace_during_replay(void)
     seq_stop();
     return bad;
 }
+/* Hookology: a note played again on a later pass within a 32nd note of the same pitch replaces it (a double); further
+ * apart, or another pitch, it is a note of its own (DIV 1/16: a step 6144 samples, a 32nd 3072) */
+static int doubles_replaced(void)
+{
+    raw_begin();track_t *t=&trk[0];seq_advance(600);input_on(t,60,70);input_on(t,64,70);seq_advance(300);input_off(t,60);input_off(t,64);
+    raw_replay();seq_advance(1000);song.rec=1;input_on(t,60,111);seq_advance(300);input_off(t,60);
+    uint32_t n60=0,n64=0,v=0;for(uint32_t i=0;i<RECORD_MAX;i++)if(recording[i].vel){if(recorded_note(&recording[i])==60u){n60++;v=recording[i].vel;}else n64++;}
+    int bad=check("a later pass's same note 9 ms away replaces the first (a double); the chord's other note stays",n60==1u&&v==111u&&n64==1u);
+    seq_stop();
+    raw_begin();t=&trk[0];t->p[P_SDIV]=1;seq_advance(600);input_on(t,60,70);seq_advance(300);input_off(t,60);
+    raw_replay();seq_advance(4600);song.rec=1;input_on(t,60,111);seq_advance(300);input_off(t,60);
+    n60=0;for(uint32_t i=0;i<RECORD_MAX;i++)n60+=recording[i].vel&&recorded_note(&recording[i])==60u;
+    bad+=check("a later pass's same note more than a 32nd away (DIV 1/8, one step) is a note of its own",n60==2u);
+    seq_stop();t->p[P_SDIV]=2;
+    return bad;
+}
 static int standalone_and_template(void)
 {
     raw_begin();track_t *t=&trk[0];seq_stop();pattern_switch(t,7);seq_start();seq_advance(0);
@@ -729,7 +745,7 @@ static int project_recording_quantization(void)
 #ifndef RECORDING_NO_MAIN
 int main(void)
 {
-    int bad=project_recording_quantization()+exclusive_recording()+explicit_rec()+take_quantization()+first_note_start()+pattern_passes()+control_tick_precision()+repeated_hits()+independent_lengths()+raw_loop()+raw_storage()+raw_capacity()+copy_and_edit()+slow_precision()+replace_during_replay()+standalone_and_template()+full_recording_replay();
+    int bad=project_recording_quantization()+exclusive_recording()+explicit_rec()+take_quantization()+first_note_start()+pattern_passes()+control_tick_precision()+repeated_hits()+independent_lengths()+raw_loop()+raw_storage()+raw_capacity()+copy_and_edit()+slow_precision()+replace_during_replay()+doubles_replaced()+standalone_and_template()+full_recording_replay();
     printf("%s\n",bad?"RAW RECORDING TEST FAILED":"Raw recording tests passed");return !!bad;
 }
 #endif

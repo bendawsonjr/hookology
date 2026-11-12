@@ -24,7 +24,8 @@ static uint64_t instructions(void)
     return 0;
 }
 
-/* The original allocation, retained verbatim from parent 18fbd7e. */
+/* The original allocation, retained verbatim from parent 18fbd7e; Hookology (beta41): a double from an earlier pass
+ * within a 32nd note in the step is replaced too, and a capture is marked as this pass's (flag 32). */
 static __attribute__((noinline)) int capture_reference(track_t *t, uint32_t note, uint32_t vel, uint32_t step)
 {
     /* Retire overwritten overview cells before a new take can own them again. */
@@ -34,13 +35,13 @@ static __attribute__((noinline)) int capture_reference(track_t *t, uint32_t note
     uint32_t span = step_samples(t, period, actual), pos = t->seq_pos >= 0x7FFFFFFFu ? 0u : t->seq_pos;
     uint32_t on = (uint32_t)(((uint64_t)pos * RECORD_UNIT + span / 2u) / span), free = RECORD_MAX;
     if (on > 65535u) on = 65535u;
+    uint32_t window = recording_dup_window(t);
     for (uint32_t i = 0; i < RECORD_MAX; i++) {
         recorded_note_t *r = &recording[i];
         if (recorded_owner(r) == owner && (recording_flags[i] & 1u) && recorded_note(r) == note) recording_finish(i);
         /* Repeated passes replace the same pitch at the same captured time.
          * Distinct hits in one step remain separate events. */
-        uint32_t same_time = r->on == on;
-        if (r->vel && recorded_owner(r) == owner && recorded_note(r) == note && recorded_step(r) == actual && same_time) free = i;
+        if (r->vel && recorded_owner(r) == owner && recorded_note(r) == note && recording_is_dup(t, r, actual, on, step, window)) free = i;
         else if (free == RECORD_MAX && (!r->vel || (!recording_present(r) && !recording_sounding(i) && !(recording_flags[i] & 1u)))) free = i;
     }
     if (free == RECORD_MAX) { recording_full = 1; return 0; }
@@ -52,7 +53,7 @@ static __attribute__((noinline)) int capture_reference(track_t *t, uint32_t note
     recorded_set_owner(r, owner); recorded_set_step(r, actual, step != actual, step == 0u && actual);   /* (7-bit owners) */
     recording_insert(t, free);
     memset(&recording_run[free], 0, sizeof recording_run[free]);
-    recording_flags[free] = 13;
+    recording_flags[free] = 13u | 32u;
     recording_live_add(free);
     t->step[step].flags |= SF_RECORDED;
     recording_tracks |= (uint8_t)(1u << trk_index(t));

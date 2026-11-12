@@ -17,7 +17,8 @@ _Static_assert(sizeof recording_run == RECORD_MAX * 4u, "shared capture/deadline
 #else
 static struct { uint32_t held, left; } recording_run[RECORD_MAX];
 #endif
-static uint8_t recording_flags[RECORD_MAX]; /* 1: live hold; 2: runtime list; 4: heard this loop; 8: captured in this take; 16: release overview bit 6 */
+static uint8_t recording_flags[RECORD_MAX]; /* 1: live hold; 2: runtime list; 4: heard this loop; 8: captured in this take; 16: release overview bit 6;
+                                            * 32: captured in this pass of the loop (Hookology: not a double, recording_is_dup) */
 static uint32_t recording_fraction[NTRK];
 /* Index by bank and cache onset arithmetic outside the steady audio tick. */
 static uint16_t recording_head[NTRK * NPAT] = {[0 ... NTRK * NPAT - 1u] = RECORD_MAX};
@@ -511,7 +512,7 @@ static void recording_finish(uint32_t i)
 static void recording_stop(track_t *t)
 {
     uint32_t owner = recording_owner(t);
-    uint8_t clear = 4u | (!song.playing && !t->p[P_RECQ] ? 8u : 0u);
+    uint8_t clear = 4u | 32u | (!song.playing && !t->p[P_RECQ] ? 8u : 0u);
     for (uint32_t i = recording_head[owner]; i < RECORD_MAX; i = recording_next[i]) {
         if ((recording_flags[i] & 1u)) recording_finish(i);
         recording_end(t, i);
@@ -526,7 +527,7 @@ static void recording_stop(track_t *t)
 /* Punch-out finishes the take without releasing the pattern's playback voices. */
 static void recording_seal(track_t *t)
 {
-    uint8_t clear = t->p[P_RECQ] ? 0u : 8u;
+    uint8_t clear = 32u | (t->p[P_RECQ] ? 0u : 8u);
     for (uint32_t i = recording_head[recording_owner(t)]; i < RECORD_MAX; i = recording_next[i]) {
         if (recording_flags[i] & 1u) recording_finish(i);
         recording_flags[i] &= (uint8_t)~clear;
@@ -657,6 +658,33 @@ static void recording_heard(const track_t *t, uint32_t period, uint32_t *actual,
     *span = step_samples(t, period, *actual);
     *pos = *span > back ? *span - back : 0u;
 }
+/* Hookology: doubles. A 32nd note in this track's onset units (RECORD_UNIT a step; the step's length from DIV, swing
+ * aside); two events of one pitch nearer than this are one note played twice. */
+static uint32_t seq_div_samples(uint32_t div);           /* (mix.c) */
+static uint32_t recording_dup_window(const track_t *t)
+{
+    uint32_t step = seq_div_samples((uint32_t)t->p[P_SDIV]), d = seq_div_samples(3u);   /* (N_DIV 3: 1/32) */
+    if (!step) return 0u;
+    return d < 65536u ? RECORD_UNIT * d / step : RECORD_UNIT / 2u;   /* (32-bit: no 64-bit division in the audio code) */
+}
+/* the distance between two onsets (step, on) in a loop of len steps, either way round */
+static uint32_t recording_gap(uint32_t sa, uint32_t oa, uint32_t sb, uint32_t ob, uint32_t len)
+{
+    /* (32-bit: at most NSTEP x RECORD_UNIT = 2^22; the FM-1's audio code has no 64-bit division) */
+    uint32_t loop = (len ? len : 1u) * RECORD_UNIT, a = sa * RECORD_UNIT + oa, b = sb * RECORD_UNIT + ob;
+    uint32_t d = a > b ? a - b : b - a;
+    d %= loop;
+    return d > loop - d ? loop - d : d;
+}
+/* recording: an event of this pitch from an earlier pass (not played just now: a fast repeat stays), in the step written
+ * (its view), nearer than a 32nd note: the new note replaces it */
+static int recording_is_dup(const track_t *t, const recorded_note_t *r, uint32_t actual, uint32_t on, uint32_t step, uint32_t window)
+{
+    if (recorded_step(r) == actual && r->on == on) return 1;    /* (the same captured time, as before) */
+    if (recording_flags[r - recording] & 32u) return 0;
+    uint32_t len = t->p[P_SLEN] > 0 ? (uint32_t)t->p[P_SLEN] : 1u;
+    return recording_view(t, r) == step && recording_gap(recorded_step(r), r->on, actual, on, len) < window;
+}
 static int recording_note(track_t *t, uint32_t note, uint32_t vel, uint32_t step)
 {
 #if MELODEE_CAPTURE_FAST
@@ -666,6 +694,7 @@ static int recording_note(track_t *t, uint32_t note, uint32_t vel, uint32_t step
     recording_heard(t, period, &actual, &pos, &span);
     uint32_t on = (uint32_t)(((uint64_t)pos * RECORD_UNIT + span / 2u) / span), free = RECORD_MAX;
     if (on > 65535u) on = 65535u;
+    uint32_t window = recording_dup_window(t);
     /* Every event of this owner, and only those, is on its bank list. One
      * walk retires overwritten overview cells (as recording_prune does, in
      * list order), seals this pitch's live hold and keeps the highest-index
@@ -678,7 +707,7 @@ static int recording_note(track_t *t, uint32_t note, uint32_t vel, uint32_t step
             recording_remove(t, i);
         } else if (recorded_note(r) == note) {
             if (recording_flags[i] & 1u) recording_finish(i);
-            if (recorded_step(r) == actual && r->on == on && (free == RECORD_MAX || i > free)) free = i;
+            if (recording_is_dup(t, r, actual, on, step, window) && (free == RECORD_MAX || i > free)) free = i;   /* (Hookology: a double) */
         }
         i = next;
     }
@@ -698,13 +727,13 @@ static int recording_note(track_t *t, uint32_t note, uint32_t vel, uint32_t step
     recording_heard(t, period, &actual, &pos, &span);
     uint32_t on = (uint32_t)(((uint64_t)pos * RECORD_UNIT + span / 2u) / span), free = RECORD_MAX;
     if (on > 65535u) on = 65535u;
+    uint32_t window = recording_dup_window(t);
     for (uint32_t i = 0; i < RECORD_MAX; i++) {
         recorded_note_t *r = &recording[i];
         if (recorded_owner(r) == owner && (recording_flags[i] & 1u) && recorded_note(r) == note) recording_finish(i);
-        /* Repeated passes replace the same pitch at the same captured time.
-         * Distinct hits in one step remain separate events. */
-        uint32_t same_time = r->on == on;
-        if (r->vel && recorded_owner(r) == owner && recorded_note(r) == note && recorded_step(r) == actual && same_time) free = i;
+        /* Repeated passes replace the same pitch at the same captured time, and (Hookology) one within a 32nd note in
+         * the same step: a double. Hits further apart in one step remain separate events. */
+        if (r->vel && recorded_owner(r) == owner && recorded_note(r) == note && recording_is_dup(t, r, actual, on, step, window)) free = i;
         else if (free == RECORD_MAX && (!r->vel || (!recording_present(r) && !recording_sounding(i) && !(recording_flags[i] & 1u)))) free = i;
     }
 #endif
@@ -717,7 +746,7 @@ static int recording_note(track_t *t, uint32_t note, uint32_t vel, uint32_t step
     recorded_set_owner(r, owner); recorded_set_step(r, actual, step != actual, step == 0u && actual);
     recording_insert(t, free);
     memset(&recording_run[free], 0, sizeof recording_run[free]);
-    recording_flags[free] = 13;
+    recording_flags[free] = 13u | 32u;
     recording_live_add(free);
     t->step[step].flags |= SF_RECORDED;
     recording_tracks |= (uint8_t)(1u << trk_index(t));
@@ -884,7 +913,7 @@ static void recording_zero(track_t *t, uint32_t seek)
     uint32_t phase = recording_prefix(t, period, t->seq_idx) + t->seq_pos;
     recording_sync(t, period);
 #if MELODEE_RECORD_CURSOR
-    for (uint32_t i = recording_head[recording_owner(t)]; i < RECORD_MAX; i = recording_next[i]) recording_flags[i] &= (uint8_t)~4u;
+    for (uint32_t i = recording_head[recording_owner(t)]; i < RECORD_MAX; i = recording_next[i]) recording_flags[i] &= (uint8_t)~(4u | 32u);
     uint32_t i = recording_head[recording_owner(t)];
     while (i < RECORD_MAX && recording_due[i] <= phase) {
         uint32_t next = recording_next[i];
@@ -895,7 +924,7 @@ static void recording_zero(track_t *t, uint32_t seek)
     recording_schedule[trk_index(t)].cursor = (uint16_t)i;
 #else
     for (uint32_t i = recording_head[recording_owner(t)]; i < RECORD_MAX; i = recording_next[i]) {
-        recording_flags[i] &= (uint8_t)~4u;
+        recording_flags[i] &= (uint8_t)~(4u | 32u);
         if (recording_active(t, i)) {
             uint32_t on = recording_play_on(t, i, period);
             if (on <= phase && !recording_behind(i, on, phase, period, seek)) recording_fire(t, i, period, phase - on);

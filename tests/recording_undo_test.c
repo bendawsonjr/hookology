@@ -185,8 +185,8 @@ static int note_capacity(void)
     bad+=check("redo retries successfully when a note slot is freed",recording_history(1)&&!memcmp(finished,recording,sizeof finished));
     seq_stop();
     undo_fixture(0,0);
-    for(uint32_t i=1;i<RECORD_MAX;i++){
-        recorded_note_t r={0};recorded_set_note(&r,(uint8_t)(i%128u));r.vel=90;r.duration=100;r.on=(uint16_t)(i*60u);
+    for(uint32_t i=1;i<RECORD_MAX;i++){   /* (no 60: the take's 60 near another would replace it as a double, Hookology) */
+        recorded_note_t r={0};recorded_set_note(&r,(uint8_t)(i%128u==60u?61u:i%128u));r.vel=90;r.duration=100;r.on=(uint16_t)(i*60u);
         recording_restore_note(TSEL,i,r);
     }
     memcpy(before,recording,sizeof before);undo_take_start();input_on(TSEL,60,120);seq_advance(100);input_off(TSEL,60);rec_set(TSEL,0);
