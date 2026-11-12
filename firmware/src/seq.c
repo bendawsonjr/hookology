@@ -1194,6 +1194,28 @@ static __attribute__((noinline)) void seq_step(track_t *t, const step_t *s, uint
     t->seq_hold = (s->flags & SF_SLIDE) != 0 || next_tie;   /* next step a TIE: keep the notes to it */
 }
 
+/* (Hookology, as SLOOP) the shared song clock: LEN or DIV changed while playing puts the track where it would be had
+ * it always had them since it started (its seq_clock), so what plays now is what STOP and PLAY play: a take lands
+ * where it was heard. The step is not fired again (the next one plays at its time). */
+static uint32_t seq_sig_of(const track_t *t) { return (uint32_t)clamp(t->p[P_SLEN], 1, NSTEP) | (uint32_t)t->p[P_SDIV] << 8; }
+static void seq_sync(track_t *t)
+{
+    uint32_t sig = seq_sig_of(t);
+    if (sig == t->seq_sig) return;
+    t->seq_sig = (uint16_t)sig;
+    if (!song.playing || t->seq_pos >= 0x7FFFFFFFu) return;
+    uint32_t period = seq_div_samples((uint32_t)t->p[P_SDIV]), len = sig & 0xFFu;
+    uint32_t a = step_samples(t, period, 0), b = step_samples(t, period, 1), loop = recording_loop(t, period);
+    if (!loop || !(a + b)) return;
+    uint32_t r = t->seq_clock % loop, idx = r / (a + b) * 2u, rem = r % (a + b);
+    if (rem >= a && idx + 1u < len) {
+        idx++;
+        rem -= a;
+    }
+    t->seq_idx = (uint16_t)idx;
+    t->seq_pos = rem;
+}
+
 static void seq_grid_tick(track_t *t, uint32_t n)
 {
     uint32_t period, len;
@@ -1210,6 +1232,7 @@ static void seq_grid_tick(track_t *t, uint32_t n)
     period = seq_div_samples((uint32_t)t->p[P_SDIV]);
     len = (uint32_t)t->p[P_SLEN];
     t->seq_pos += n;
+    t->seq_clock += n;
     for (;;) {
         uint32_t cur_len = step_samples(t, period, t->seq_idx);
         if (t->seq_pos < cur_len && t->seq_pos != 0x7FFFFFFFu + n)
@@ -1218,6 +1241,8 @@ static void seq_grid_tick(track_t *t, uint32_t n)
         uint32_t punch_in = 0;
         t->seq_pos = starting ? (chain.running ? chain.carry : secs.carry) : t->seq_pos - cur_len;
         if (starting) {
+            t->seq_clock = (uint32_t)chain.seek_samples[trk_index(t)] + t->seq_pos;   /* (the shared clock from here: seq_sync) */
+            t->seq_sig = (uint16_t)seq_sig_of(t);
             t->seq_pos += chain.seek_phase[trk_index(t)]; chain.seek_phase[trk_index(t)] = 0;
         }
         t->seq_idx = (uint16_t)((t->seq_idx + 1u) % (len ? len : 1u));
@@ -1230,7 +1255,7 @@ static void seq_grid_tick(track_t *t, uint32_t n)
                 punch_in = 1;
             }
         }
-        if (!t->seq_idx && t->slen_next) {              /* HOME's STEPS: the length at the loop end */
+        if (!t->seq_idx && t->slen_next) {              /* (a length left waiting by an older build: now) */
             t->p[P_SLEN] = t->slen_next;
             t->slen_next = 0;
             len = (uint32_t)t->p[P_SLEN];
@@ -1291,6 +1316,7 @@ static void seq_grid_tick(track_t *t, uint32_t n)
  * loop zero once. MIDI batches may cross several boundaries in one call. */
 static void seq_tick(track_t *t, uint32_t n)
 {
+    seq_sync(t);
     if (chain_rest(t)) { seq_grid_tick(t, n); return; }
     seq_erase_pass(t, t->seq_idx, 0);
     if (!((recording_tracks | song.rec) & (1u << trk_index(t)))) { seq_grid_tick(t, n); return; }
@@ -1407,7 +1433,8 @@ static void events_block(uint32_t n)
     ft_block();
     seq_advanced = 0;
     uint32_t i, pr;
-    if(song.playing || transport_req==1u)resource_release(RES_NOTE_HISTORY);
+    /* (Hookology: the note history stays while playing, so a clear done playing can be undone; a voice or effect
+     * that needs its memory retires it, resources.c resource_get) */
     uint32_t selected_clock = (uint32_t)song.g[G_CLOCK];
     if (midi_clock.selected != selected_clock) {
         seq_stop();
@@ -1570,7 +1597,6 @@ static void events_block(uint32_t n)
 #if MELODEE_BLE
     if (ble_discard && (int32_t)(mi_r - ble_discard_until) >= 0) ble_discard = 0;
 #endif
-    if(song.playing)resource_release(RES_NOTE_HISTORY);
     uint32_t sync_units = 0;
     if (clock_mode) {
         if (song.playing) {

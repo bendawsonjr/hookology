@@ -34,27 +34,37 @@ static void knobs(void)
     t->p[P_SSWING]=100; assert(track_swing(t)==SWING_MAX);
     puts("TRACKS: level, pan, swing and steps (KNOB 1..4) of the selected track alone passed");
 }
+/* (Hookology, beta45) STEPS at once, playing too: the track takes its place on the shared song clock, so what plays
+ * after the change is what STOP and PLAY play (a take recorded over it lands where it was heard) */
 static void at_loop_end(void)
 {
     track_t *t=setup();
     t->step[12]=(step_t){.time=ST_NOTE,.n=1,.note={60}};
-    t->p[P_SLEN]=16; song.playing=1; seq_advance(beat_samples()); assert(t->seq_idx);
-    tracks_knob(3,-1); assert(t->p[P_SLEN]==16 && t->slen_next==15);
-    loop_end(t); assert(t->p[P_SLEN]==15 && !t->slen_next);
-    /* back to the length playing: nothing waits */
-    seq_advance(beat_samples()); tracks_knob(3,1); assert(t->slen_next==16); tracks_knob(3,-1); assert(!t->slen_next);
-    /* STOP does it at once */
-    tracks_knob(3,-1); assert(t->slen_next==14); seq_stop(); assert(t->p[P_SLEN]==14 && !t->slen_next);
-    /* shorter hides the steps, longer brings them back */
+    t->p[P_SLEN]=16; t->p[P_SSWING]=0; song.g[G_SWING]=0;
+    seq_start(); seq_advance(0);
+    uint32_t step=seq_div_samples((uint32_t)t->p[P_SDIV]);
+    seq_advance(step*20u+10u); assert(t->seq_idx==4);
+    tracks_knob(3,-1); assert(t->p[P_SLEN]==15 && !t->slen_next);
+    seq_advance(1); assert(t->seq_idx==20%15);                  /* at once, where 15 steps since PLAY would be */
+    seq_advance(step*7u); uint32_t live=t->seq_idx, pos=t->seq_pos;
+    seq_stop(); seq_start(); seq_advance(0); seq_advance(step*27u+11u);
+    assert(t->seq_idx==live && t->seq_pos==pos && live==27%15);
+    /* DIV too: 1/8 from 1/16 */
+    seq_advance(step*3u); t->p[P_SDIV]=1; seq_advance(1);
+    uint32_t s8=seq_div_samples(1u), clock=step*30u+12u;
+    assert(t->seq_idx==clock/s8%15 && t->seq_pos==clock%s8);
+    seq_stop(); t->p[P_SDIV]=2;
+    /* stopped: at once as before; shorter hides the steps, longer brings them back */
+    tracks_knob(3,-1); assert(t->p[P_SLEN]==14 && !t->slen_next);
     t->p[P_SLEN]=8; tracks_knob(3,1); assert(t->p[P_SLEN]==9); t->p[P_SLEN]=16; assert(t->step[12].n==1 && t->step[12].note[0]==60);
-    puts("TRACKS: STEPS at the loop end, cancelled, on STOP, and hidden steps kept passed");
+    puts("TRACKS: STEPS at once on the shared song clock (LEN and DIV), as STOP and PLAY play it, hidden steps kept passed");
 }
 static void one_length(void)
 {
     track_t *t=setup(); t->p[P_SLEN]=16; song.playing=1; seq_advance(beat_samples());
-    tracks_knob(3,1); assert(t->slen_next==17);
+    tracks_knob(3,1); assert(t->p[P_SLEN]==17 && !t->slen_next);
     assert(!pattern_half(t,t->pattern,0)); pattern_half(t,t->pattern,1);
-    assert(t->p[P_SLEN]==8 && !t->slen_next && tr_steps(t)==8);        /* halve: the shortcut's length wins and both agree */
+    assert(t->p[P_SLEN]==9 && !t->slen_next && tr_steps(t)==9);        /* halve 17 (STEPS at once): 9, one length */
     seq_stop();
     t=setup(); assert(tr_steps(t)==16); t->p[P_SLEN]=32; assert(tr_steps(t)==32);
     puts("TRACKS: one length with the halve and double shortcut passed");
@@ -83,7 +93,7 @@ static void stored(void)
     puts("TRACKS: per-track values saved with the project passed");
 }
 /* OCT- held on TRACKS: a second nothing, the next the lane fills, then the playing pattern cleared (EDIT held undoes);
- * let go early nothing; a tap the octave down; playing, at the loop end */
+ * let go early nothing; a tap the octave down; playing too, at once (Hookology) */
 static void hold_clear(void)
 {
     track_t *t=setup(); int8_t oct;
@@ -99,10 +109,23 @@ static void hold_clear(void)
     hold(B_EDIT); assert(t->step[3].n==1);                                           /* undo */
     song.playing=1; seq_advance(beat_samples()); assert(t->seq_idx);
     btn_down(B_OCTDN); frame(); frames(2100u); btn_up(B_OCTDN); frame();
-    assert(t->step[3].n==1 && msg_is("CLEAR AT LOOP END"));
-    loop_end(t); frame(); frame(); assert(!t->step[3].n);
+    assert(!t->step[3].n && msg_is("TRACK 1 CLEARED") && song.playing);   /* (Hookology: at once, playing too) */
+    hold(B_EDIT); assert(t->step[3].n==1);                                           /* undo, playing */
     seq_stop();
-    puts("TRACKS: OCT- held clears the track (a tap the octave, let go early nothing, undo, at the loop end) passed");
+    {   /* the user's case (beta46): a drum part recorded live, cleared playing, the audio running a few seconds, EDIT */
+        undo_depth++; set_engine_of(t,ENGI_DRUM); undo_depth--;
+        track_defaults_steps(t);
+        seq_start(); seq_advance(0); uint32_t st=seq_div_samples((uint32_t)t->p[P_SDIV]);
+        press(B_REC); seq_advance(st*2u); input_on(t,36,100); seq_advance(st); input_off(t,36); press(B_REC);
+        assert(!seq_is_empty(t) && recording_head[recording_owner(t)]<RECORD_MAX);
+        btn_down(B_OCTDN); frame(); frames(2100u); btn_up(B_OCTDN); frame();
+        assert(seq_is_empty(t) && song.playing);
+        for(uint32_t i=0;i<3000u;i++) events_block(CTL);                             /* (~3 s of audio blocks) */
+        hold(B_EDIT);
+        assert(!seq_is_empty(t) && msg_is("UNDO"));
+        seq_stop();
+    }
+    puts("TRACKS: OCT- held clears the track (a tap the octave, let go early nothing, undo, at once while playing) passed");
 }
 /* a drum key held on TRACKS: KNOB 1 that drum's level (EDIT > LANES), the strip names it, the kit's eight under it;
  * let go: the track's LEVEL again; a synth track: LEVEL with a key held too */

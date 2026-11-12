@@ -362,7 +362,7 @@ if core && [ $TABLES = 1 ]; then
     t "A project saved by stock Melodee 1.6.1 loads" stock_project_test $FW
     t "REC MODE FREE: tempo and length from a take, the grid, limits, overdub, latency, undo" free_take_test $FW
     t "Six sound tracks: tracks 5 and 6 sound, save, reload and page; tracks 7 and 8 stay MIDI" six_track_test $FW
-    t "HOME TRACKS: knobs, STEPS at the loop end, one length, stored values" home_tracks_test $FW
+    t "HOME TRACKS: knobs, STEPS at once on the shared song clock, one length, stored values" home_tracks_test $FW
     t "HERA chord sets: every chord and voicing, keys, recording, saved set and stored layout" hera_chord_test $FW
     t "project record (FUN16 round trip, the song chain, names, FM6 patches; older formats refused)" project_test $FW
     t "motion, whole-step chance, an older parameter count, song restore and ARP repeat" motion_test -O1 $FW

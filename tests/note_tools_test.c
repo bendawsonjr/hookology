@@ -41,7 +41,12 @@ int main(void)
     setup();manual(1,60,1);manual(2,62,1);cursor_set(1);frame();btn_down(B_ENV);btn_down(B_SCL);frame();turn(EN_SELECT,4);btn_up(B_SCL);btn_up(B_ENV);frame();
     bad+=check("fractional movement into an unselected manual note rolls back atomically",TSEL->step[1].note[0]==60&&TSEL->step[2].note[0]==62&&!recording[0].vel);
     setup();manual(1,60,1);cursor_set(1);frame();turn(EN_K3,1);transport_req=1;events_block(CTL);
-    bad+=check("starting playback releases temporary editor history before synthesis",song.playing&&!resource[RES_NOTE_HISTORY].size);
+    bad+=check("starting playback keeps the editor history (Hookology: a clear while playing can be undone)",song.playing&&resource[RES_NOTE_HISTORY].size);
+    {   /* ..and a voice or effect that needs the memory retires it */
+        void *p=resource_get(RES_FX0,RESOURCE_CAPACITY);   /* (more than any one bank: the first try fails) */
+        (void)p;bad+=check("..a voice or effect needing the memory retires it",!resource[RES_NOTE_HISTORY].size);
+        resource_release(RES_FX0);
+    }
     setup();recorded_note_t a={.step=2,.on=5000,.note7=60,.vel=70,.duration=RECORD_UNIT/2,.owner=(uint8_t)recording_owner(TSEL)};
     recorded_note_t b=a;b.step=4;b.on=9000;recorded_set_note(&b,64);b.vel=99;
     recording_restore_note(TSEL,0,a);recording_restore_note(TSEL,1,b);note_rebuild_all();TSEL->step[2].probability=73;

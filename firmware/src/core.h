@@ -521,6 +521,9 @@ typedef struct track {
     volatile uint32_t pattern_gen;                      /* invalidates editor history even for identical banks */
     uint32_t seq_pos;            /* samples (INT), or MIDI musical units, into the step */
     uint16_t seq_idx;
+    uint16_t seq_sig;            /* (Hookology) LEN and DIV the position was last placed for (seq.c seq_sync) */
+    uint32_t seq_clock;          /* (Hookology) musical units since the track last started (PLAY, a section): the shared
+                                  * song clock its step is placed on when LEN or DIV changes */
     uint8_t seq_notes[4 + NLANE];   /* sounding seq notes (the step's notes, then its hits) */
     uint8_t seq_n;
     uint8_t seq_hold;            /* last step slides: keep the notes until the next step */

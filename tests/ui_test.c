@@ -5394,12 +5394,21 @@ static int test_loop_end_edits(void)
     my_steps(t);
     confirm_open(CF_CLEAR_SEQ, 0); frame();
     press(B_OCTUP);
+    bad += check("playing: Clear pattern at once (Hookology), the transport on", seq_is_empty(t) && msg_is("PATTERN CLEARED") &&
+                 song.playing && !dq_n);
+    my_steps(t);
+    motion_capture(t, P_LEVEL, 79);
+    confirm_open(CF_CLEAR_MOTION, 0); frame();
+    press(B_OCTUP);
+    bad += check("playing: Clear motion at once (Hookology)", !motion_count(t) && msg_is("MOTION CLEARED") && !dq_n);
+    confirm_open(CF_DEL_PAT, 0); frame();
+    press(B_OCTUP);
     seq_advance(loop);                              /* (no frame in its last step) */
     bad += check("  a frame missed the last step: the loop's first step silent, the edit still waits",
                  !seq_is_empty(t) && (seq_hush & 1u) && !gates());
     frame();
     bad += check("  .. the next frame does it, the track plays again", seq_is_empty(t) && !(seq_hush & 1u) &&
-                 msg_is("PATTERN CLEARED"));
+                 msg_is("PATTERN DELETED"));
     pattern_copy_ui(0, 2, 0);
     bad += check("a copy into the pattern playing: at the loop end (was refused)", seq_is_empty(t) &&
                  msg_is("COPY AT LOOP END"));

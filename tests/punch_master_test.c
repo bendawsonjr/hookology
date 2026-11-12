@@ -128,12 +128,12 @@ static void tempo_memory(void)
         }
     }
     reset();for(uint32_t id=0;id<RES_COUNT;id++)resource_release(id);
-    assert(resource_get(RES_NOTE_HISTORY,RESOURCE_MAIN_CAPACITY));
+    assert(resource_get(RES_ENGINE0,RESOURCE_MAIN_CAPACITY));   /* (an engine's: no history to retire, Hookology) */
     punch.req=PX_ECHO;test_signal(0);int32_t dry[CTL];memcpy(dry,l,sizeof l);punch_process(l,r,CTL);
     assert(punch_memory_failed && punch.cur==-1 && !memcmp(dry,l,sizeof l));
     uint32_t failures=resource_failures;for(uint32_t i=0;i<8;i++)punch_process(l,r,CTL);assert(failures==resource_failures);
     punch.req=PX_MONO;test_signal(0);punch_process(l,r,CTL);assert(punch.cur==PX_MONO);
-    resource_release(RES_NOTE_HISTORY);punch_reset();punch_panel_lock=0;
+    resource_release(RES_ENGINE0);punch_reset();punch_panel_lock=0;
     puts("Punch timing/memory: measured external tempo, grid wait, dry memory fallback and no allocation retry storm passed");
 }
 static void hot_mix(void)

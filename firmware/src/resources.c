@@ -144,8 +144,10 @@ static inline void *resource_get(uint32_t id, uint32_t bytes)
         || id==RES_USB_TRACKS
 #endif
        ) &&
-       (resource[RES_STEP_UNDO].size || resource[RES_LOAD_UNDO].size || resource[RES_SONG_UNDO].size)){
+       (resource[RES_STEP_UNDO].size || resource[RES_LOAD_UNDO].size || resource[RES_SONG_UNDO].size ||
+        resource[RES_NOTE_HISTORY].size)){
         resource_release(RES_STEP_UNDO);resource_release(RES_LOAD_UNDO);resource_release(RES_SONG_UNDO);
+        resource_release(RES_NOTE_HISTORY);             /* (Hookology: kept while playing, retired for a voice) */
         p=resource_allocate(id,bytes);
     }
     /* A history snapshot must never prevent a voice/effect from acquiring its

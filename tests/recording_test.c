@@ -502,6 +502,34 @@ static int rec_at_once(void)
     return bad;
 }
 
+
+/* Hookology (beta45): the user's case. Playing, the track's LEN changes, REC, a note, STOP, PLAY: the note sounds at the
+ * same moment after PLAY as it was heard (the shared song clock) */
+static int length_change_take(void)
+{
+    int bad = 0;
+    pass_begin(0, 16, 0);
+    track_t *t = TSEL;
+    t->p[P_SSWING] = 0;
+    uint32_t step = seq_div_samples(t->p[P_SDIV]);
+    seq_advance(step * 21u + 7u);                       /* bar 2, step 5 */
+    t->p[P_SLEN] = 12;                                  /* (as STEPS or LEN would) */
+    seq_advance(step);
+    press(B_REC);
+    seq_advance(step * 3u);
+    uint32_t heard = step * 25u + 7u;                   /* units since PLAY */
+    input_on(t, 72, 100);
+    uint32_t idx = t->seq_idx;
+    seq_advance(step / 4u); input_off(t, 72);
+    press(B_REC);
+    seq_stop();
+    bad += check("the note went into the step the shared clock was on (25 % 12 = 1)", idx == 1u && t->step[1].time == ST_NOTE && t->step[1].note[0] == 72);
+    seq_start(); seq_advance(0); seq_advance(heard + 1u);
+    bad += check("after STOP and PLAY it sounds at the moment it was heard", t->seq_idx == idx && gate_note(t, 72));
+    seq_stop(); led_pos_init();
+    return bad;
+}
+
 static int first_note_start(void)
 {
     int bad = 0;
@@ -771,7 +799,7 @@ static int project_recording_quantization(void)
 #ifndef RECORDING_NO_MAIN
 int main(void)
 {
-    int bad=project_recording_quantization()+exclusive_recording()+explicit_rec()+rec_at_once()+take_quantization()+first_note_start()+pattern_passes()+control_tick_precision()+repeated_hits()+independent_lengths()+raw_loop()+raw_storage()+raw_capacity()+copy_and_edit()+slow_precision()+replace_during_replay()+doubles_replaced()+standalone_and_template()+full_recording_replay();
+    int bad=project_recording_quantization()+exclusive_recording()+explicit_rec()+rec_at_once()+length_change_take()+take_quantization()+first_note_start()+pattern_passes()+control_tick_precision()+repeated_hits()+independent_lengths()+raw_loop()+raw_storage()+raw_capacity()+copy_and_edit()+slow_precision()+replace_during_replay()+doubles_replaced()+standalone_and_template()+full_recording_replay();
     printf("%s\n",bad?"RAW RECORDING TEST FAILED":"Raw recording tests passed");return !!bad;
 }
 #endif

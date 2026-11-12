@@ -177,8 +177,15 @@ static void seq_clear_now(uint32_t kind, uint32_t k)
         note_transaction.sound_clear = kind == CF_DEL_PAT;
     } else {
         load_begin(t, UNDO_PAT | (kind == CF_DEL_PAT ? UNDO_PATTERN_SOUND : 0));
+        fm1_irq_off();
         track_defaults_steps(t);
+        fm1_irq_on();
         load_end(t);
+    }
+    if (song.playing) {                                 /* (Hookology: playing, a track cleared at once is silent at once) */
+        fm1_irq_off();
+        seq_release(t);
+        fm1_irq_on();
     }
     if (kind == CF_DEL_PAT) {
         pattern_sound[k % NTRK][t->pattern] = 0;
@@ -640,21 +647,20 @@ static int32_t steps_land(int32_t from, int32_t to)
     }
     return to;
 }
-/* STEPS: LEN, as SEQ's and the pattern dialog's: shorter hides the steps past it, longer shows them again. Playing, at
- * the track's loop end (seq.c); STOP does it at once */
+/* STEPS: LEN, as SEQ's and the pattern dialog's: shorter hides the steps past it, longer shows them again. At once,
+ * playing too (Hookology: the track takes its place on the shared song clock, seq.c seq_sync) */
 static void tracks_steps(track_t *t, int32_t s)
 {
     char v[8];
-    int32_t len = t->p[P_SLEN], from = t->slen_next ? t->slen_next : len;
+    int32_t from = t->slen_next ? t->slen_next : t->p[P_SLEN];
     int32_t to = steps_land(from, clamp(from + accel(EN_K4, s, NSTEP - 1), 1, NSTEP));
     if (to == from) return;
     fm1_irq_off();
-    if (song.playing) t->slen_next = (uint8_t)(to == len ? 0 : to);
-    else t->p[P_SLEN] = (int16_t)to;
+    t->slen_next = 0;
+    t->p[P_SLEN] = (int16_t)to;
     fm1_irq_on();
     fmt_int(v, to);
     ui_say("STEPS ", v);
-    if (t->slen_next) ui_message("STEPS AT LOOP END");
 }
 /* TRACKS: KNOB 1 LEVEL, 2 PAN, 3 SWING, 4 STEPS (the strip comes in, ui_tracks.c) */
 /* TRACKS: the lowest drum key held on the selected drum track: its note + 1 (0: none, not a drum track) */
@@ -1836,7 +1842,7 @@ static int layer_allowed(void);
 static uint32_t ly_bit(uint32_t l);
 
 /* TRACKS: OCT- held clears the selected track, as its pattern dialog's Clear does (CF_CLEAR_TRK: the pattern playing,
- * at the loop end while playing; EDIT held undoes). The first second nothing; through the next a bar fills in its
+ * at once, playing too (Hookology); EDIT held undoes). The first second nothing; through the next a bar fills in its
  * lane (tracks.clr); full, cleared. Let go before: nothing (a tap: the octave down, as on Stage; a kit: nothing) */
 #define TRC_WAIT_MS 1000u
 #define TRC_HOLD_MS 1000u
@@ -1866,8 +1872,7 @@ static void tr_clear_poll(void)
     tracks.clr = 0;
     {
         uint32_t k = song.sel % NTRK;
-        if (!dq_defer(CF_CLEAR_TRK, k, trk[k].pattern, 0))
-            dq_do(CF_CLEAR_TRK, k, trk[k].pattern, 0);
+        dq_do(CF_CLEAR_TRK, k, trk[k].pattern, 0);      /* (Hookology: at once, playing too, as the bar fills) */
     }
 }
 
@@ -2276,9 +2281,9 @@ static void ui_confirm_accept(void)
         for (uint32_t i = G_MFXTONE; i <= G_MFX3TONE; i++)
             song.g[i] = 0;
         ui_message("SHARED FX CLEARED");
-    } else if (kind == CF_CLEAR_MOTION) {                /* (playing: at the loop end, dq_defer) */
+    } else if (kind == CF_CLEAR_MOTION) {                /* (Hookology: at once, playing too) */
         uint32_t k = ui.confirm_trk % NTRK;
-        if (!chain_busy() && !dq_defer(kind, k, trk[k].pattern, 0))
+        if (!chain_busy())
             dq_do(kind, k, trk[k].pattern, 0);
     } else if (kind == CF_DEL_ROW) {
         uint32_t r = ui.confirm_trk;
@@ -2307,9 +2312,10 @@ static void ui_confirm_accept(void)
         if (!chain_busy()) { sound_init_of(TSEL, TSEL->eng_req); ui_message("SOUND INIT"); }
     } else if (kind == CF_PAT_KEY) {            /* SEQ's pattern dialog: OCT+ as its key again */
         pattern_key_delete(ui.confirm_trk % NTRK, ui.pat_dlg % NPAT);
-    } else {                                    /* CF_DEL_PAT, CF_CLEAR_SEQ, CF_CLEAR_TRK (playing: at the loop end) */
+    } else {                                    /* CF_DEL_PAT (playing: at the loop end), CF_CLEAR_SEQ, CF_CLEAR_TRK (at once,
+                                                 * playing too: Hookology) */
         uint32_t k = ui.confirm_trk % NTRK;
-        if (!dq_defer(kind, k, trk[k].pattern, 0))
+        if (kind == CF_CLEAR_TRK || kind == CF_CLEAR_SEQ || !dq_defer(kind, k, trk[k].pattern, 0))
             dq_do(kind, k, trk[k].pattern, 0);
     }
 }
