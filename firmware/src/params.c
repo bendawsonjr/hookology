@@ -58,7 +58,8 @@ static const char *const N_STROKE[] = {"DOWN", "UP", "ALT"};
 static const char *const N_VOIC[] = {"CLOSE", "OPEN", "INV1", "INV2", "+OCT"};   /* VC_CLOSE .. VC_BASS */
 static const char *const N_VOICE[] = {"POLY", "MONO", "LEG", "UNI"};   /* V_POLY .. V_UNISON */
 static const char *const N_VMAX[] = {"ALL", "1", "2", "3", "4", "5", "6", "7", "8"};   /* P_VMAX: VOICES */
-static const char *const N_P5Q[] = {"FULL", "LIGHT"};   /* P_P5Q: a Prophet's QUALITY */
+static const char *const N_P5Q[] = {"FULL", "LIGHT"};
+static const char *const N_ECO[] = {"OFF", "ON"};       /* G_ECO: the project's ECONOMY */   /* P_P5Q: a Prophet's QUALITY */
 static const char *const N_GLMODE[] = {"RATE", "TIME"};
 static const char *const N_PRIO[] = {"LAST", "LOW", "HIGH"};
 static const char *const N_ALLOC[] = {"ROT", "REUSE"};
@@ -287,7 +288,7 @@ static const param_desc_t GP[G_COUNT] = {
     [G_RESERVED7] = PD("", F_INT, 0, 127, 0),
     [G_RESERVED8] = PD("", F_INT, 0, 127, 0),
     [G_RESERVED9] = PD("", F_INT, 0, 127, 0),
-    [G_RESERVED10] = PD("", F_INT, 0, 127, 0),
+    [G_ECO] = PE("ECO", N_ECO, 0),   /* ECONOMY (one knob cell: ECO, as the header) */
     [G_RESERVED11] = PD("", F_INT, 0, 127, 0),
     [G_MIDI] = PE("MIDI", N_MIDI_INPUT, 0),
     [G_DRUMCH] = PE("DRUM", N_DRUMCH, 10),
@@ -706,7 +707,7 @@ static const page_t PAGES[] = {
     {"VOICE 2", FAM_EDIT, SC_TRACK, GR_NONE, {P_ALLOC, P_DETUNE, P_PAN, P_MUTE}},
     {"VOICE 3", FAM_EDIT, SC_TRACK, GR_NONE, {P_SPRD, P_VMAX, P_P5Q, 0xFF}},   /* VOICES: the track's limit; QUALITY:
                                                                                  * a Prophet's */
-    {"TEMPO", FAM_GLO, SC_GLOBAL, GR_NONE, {G_BPM, G_SWING, G_PROJECT_RECQ, 0xFF}},   /* project speed, swing and recording grid
+    {"TEMPO", FAM_GLO, SC_GLOBAL, GR_NONE, {G_BPM, G_SWING, G_PROJECT_RECQ, G_ECO}},   /* project speed, swing and recording grid
                                                                                      * (Hookology: GLO's first; the mixer is HOME's) */
     {"GLOBAL", FAM_GLO, SC_GLOBAL, GR_NONE, {G_A4, G_BUDGET, G_CLOCK, G_TUNE}}, /* device reference/budget; CLK/TUNE kept */
     {"SYSTEM", FAM_GLO, SC_GLOBAL, GR_NONE, {G_MIDI, G_DRUMCH, G_ROUTE, G_INFO}},

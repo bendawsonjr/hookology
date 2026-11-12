@@ -334,7 +334,7 @@ static __attribute__((noinline)) void cz_native_render(track_t *t,voice_t *v,int
     }
     v->s[4]=(int32_t)(c->native_eg[first][2].level*256.0f);
     uint32_t modulation=(b[15]>>3)&7u;
-    if(t->p[P_P5Q]==1 && !(n&1u)){                     /* QUALITY LIGHT: half rate (cz_native_light) */
+    if(trk_light(t) && !(n&1u)){                     /* QUALITY LIGHT: half rate (cz_native_light) */
         const cz_light_t L={pd,(const float (*)[2])amp,step,m,ph,tg,inc,first,last,modulation};
         void (*volatile run)(cz_voice_t *,const cz_light_t *,int32_t *,uint32_t)=cz_native_light;
         run(c,&L,out,n);

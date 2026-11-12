@@ -625,7 +625,7 @@ static void p5_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
         base->pa_env,base->pa_b,base->pf_env,base->pf_b,base->pw_env,base->pw_b,
         base->pwm_a+width_mod,base->pwm_b+width_mod,base->la,base->lb,base->ln,
         ia,ib,part->wheel,part->wheel_pitch};
-    s->light=t->p[P_P5Q]==1 && !(n&1u) && P5_OVERSAMPLE==1;   /* QUALITY LIGHT: half rate (p5_samples_light) */
+    s->light=trk_light(t) && !(n&1u) && P5_OVERSAMPLE==1;   /* QUALITY LIGHT: half rate (p5_samples_light) */
     if(audio_batch_active){
         const p5_batch_t job={s,p,c,*m,n};audio_batch_push(p5_batch_kernel,&job,sizeof job,out,n,AP_PROPHET);return;
     }

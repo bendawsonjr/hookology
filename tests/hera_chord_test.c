@@ -81,7 +81,11 @@ static void stored(void)
     /* the slot's old motion events stay inert and readable; the other retired slots stay retired */
     assert(param_retired(P_CHSET) && !param_reserved(P_CHSET) && param_reserved(P_RESERVED45) && param_reserved(P_RESERVED33) && !param_reserved(P_VMAX) && !param_reserved(P_P5Q));
     assert(param_kept(P_CHSET));
-    puts("HERA: set saved in the project, older projects read set 1, retired slots unchanged passed");
+    /* ECONOMY (Hookology): a project setting, saved and loaded with it; never a reserved slot */
+    t=setup(); song.g[G_ECO]=1; assert(!project_save(2)); song.g[G_ECO]=0; project_load(2); assert(song.g[G_ECO]==1);
+    song.g[G_ECO]=0; assert(!project_save(3)); song.g[G_ECO]=1; project_load(3); assert(song.g[G_ECO]==0);
+    assert(!global_reserved(G_ECO) && global_reserved(G_SAFETY));
+    puts("HERA: set saved in the project, older projects read set 1, retired slots unchanged, ECONOMY saved passed");
 }
 int main(void)
 {

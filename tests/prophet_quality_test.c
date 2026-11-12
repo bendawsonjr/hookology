@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Hookology contributors */
-/* QUALITY (Hookology): a Prophet or CZ-1 chord rendered FULL and LIGHT on the host ("cz50": CZ-1 preset 50).
+/* QUALITY (Hookology): a Prophet, CZ-1, FM6 or SID chord rendered FULL and LIGHT on the host ("cz50": CZ-1 preset 50).
  *   prophet_quality_test                    checks: LIGHT keeps the tone below 4 kHz within 1 dB per octave band, peaks
  *                                           within 2 dB of FULL, costs under 70 % of FULL (host instructions: a ranking,
  *                                           not the FM-1's cycles; device timing: tools/usb_audio_stats.py)
@@ -21,6 +21,7 @@ static uint64_t instructions(void)
     return 0;
 }
 static int32_t pcm[2][44100 * 3];
+static int16_t eco;                     /* the project's ECONOMY for the next render (host_tracks_init resets song) */
 static double render_eng(const char *dir, uint32_t engine, uint32_t preset, uint32_t light)
 {
     int32_t *pc=pcm[light];
@@ -28,7 +29,7 @@ static double render_eng(const char *dir, uint32_t engine, uint32_t preset, uint
     memset(p5_ready,0,sizeof p5_ready);
     host_tracks_init(); host_preset(&trk[0], engine, preset);
     track_t *t=&trk[0];
-    t->p[P_VOICE]=V_POLY; t->p[P_P5Q]=(int16_t)light;
+    t->p[P_VOICE]=V_POLY; t->p[P_P5Q]=(int16_t)light; song.g[G_ECO]=eco;
     static const uint8_t chord[4]={48,55,64,71};
     for(uint32_t k=0;k<4u;k++)trk_note_on(t,chord[k],100);
     uint64_t i0=instructions(), voice_samples=0;
@@ -43,9 +44,9 @@ static double render_eng(const char *dir, uint32_t engine, uint32_t preset, uint
     uint64_t ins=instructions()-i0;
     double cost=voice_samples?(double)ins/(double)voice_samples:0.0;
     if(dir){
-        char path[512];snprintf(path,sizeof path,"%s/%s%u_%s.pcm",dir,engine==ENGI_CZ?"cz":"",preset,light?"light":"full");
+        char path[512];snprintf(path,sizeof path,"%s/%s%u_%s.pcm",dir,engine==ENGI_CZ?"cz":engine==ENGI_FM6?"fm":engine==ENGI_SID?"si":"",preset,light?"light":"full");
         FILE *f=fopen(path,"wb");fwrite(pc,sizeof pc[0],n,f);fclose(f);
-        printf("%s%u,%s,%.1f\n",engine==ENGI_CZ?"cz":"",preset,light?"LIGHT":"FULL",cost);
+        printf("%s%u,%s,%.1f\n",engine==ENGI_CZ?"cz":engine==ENGI_FM6?"fm":engine==ENGI_SID?"si":"",preset,light?"LIGHT":"FULL",cost);
     }
     return cost;
 }
@@ -62,11 +63,12 @@ static double band(const int32_t *x,uint32_t n,double fc)
 }
 static int checks(void)
 {
-    static const uint32_t E[]={ENGI_PROPHET,ENGI_PROPHET,ENGI_PROPHET,ENGI_CZ,ENGI_CZ};
-    static const uint32_t P[]={23u,1u,120u,50u,2u};    /* Whiny Opener, It's a Prophet, a pad; CZ-1 FAT ENSEMBLE, BRASS 2 */
+    static const uint32_t E[]={ENGI_PROPHET,ENGI_PROPHET,ENGI_PROPHET,ENGI_CZ,ENGI_CZ,ENGI_FM6,ENGI_FM6,ENGI_FM6,ENGI_SID,ENGI_SID,ENGI_SID};
+    static const uint32_t P[]={23u,1u,120u,50u,2u,0u,1u,9u,16u,10u,9u};    /* Whiny Opener, It's a Prophet, a pad; CZ-1 FAT ENSEMBLE, BRASS 2;
+                                                                 * FM6 TINE EP, BELL, BRASS SECT; SID PWM PAD, SYNC LEAD, RING LEAD */
     static const double F[]={125,250,500,1000,2000,4000};
     int bad=0;
-    for(uint32_t k=0;k<5u;k++){
+    for(uint32_t k=0;k<NELEM(E);k++){
         double full=render_eng(0,E[k],P[k],0),light=render_eng(0,E[k],P[k],1),worst=0;
         int32_t peak=0,peak_full=0;
         for(uint32_t i=0;i<44100u*3u;i++){
@@ -79,9 +81,19 @@ static int checks(void)
             double d=10.0*log10((band(pcm[1],44100u*3u,F[b])+1e-9)/(band(pcm[0],44100u*3u,F[b])+1e-9));
             if(fabs(d)>fabs(worst))worst=d;
         }
-        int ok=fabs(worst)<=1.0 && fabs(pd)<=2.0 && (full<=0.0 || light<(E[k]==ENGI_CZ?0.8:0.7)*full);
+        int ok=fabs(worst)<=(E[k]==ENGI_SID?1.5:1.0) && fabs(pd)<=2.0   /* (SID: bright edges, its 4 kHz band droops ~1 dB) */ && (full<=0.0 || light<(E[k]==ENGI_CZ?0.8:E[k]==ENGI_FM6?0.88:E[k]==ENGI_SID?0.75:0.7)*full);
         printf("%s QUALITY: preset %u LIGHT within %.2f dB below 4 kHz, peak %+.2f dB, %.0f%% of FULL's host cost  %s\n",
-               E[k]==ENGI_CZ?"CZ-1":"Prophet",P[k],worst,pd,full>0.0?100.0*light/full:0.0,ok?"ok":"FAIL");
+               E[k]==ENGI_CZ?"CZ-1":E[k]==ENGI_FM6?"FM6":E[k]==ENGI_SID?"SID":"Prophet",P[k],worst,pd,full>0.0?100.0*light/full:0.0,ok?"ok":"FAIL");
+        bad+=!ok;
+    }
+    for(uint32_t k=0;k<4u;k++){   /* ECONOMY (G_ECO): a FULL track plays exactly as LIGHT */
+        uint32_t e=k==3u?ENGI_SID:k==2u?ENGI_FM6:k?ENGI_CZ:ENGI_PROPHET,p=k==3u?16u:k==2u?1u:k?50u:23u;
+        /* (the CZ-1 renders the same twice: an exact match; a Prophet's free-running phases do not: LIGHT's cost) */
+        double full=render_eng(0,e,p,0),light;
+        eco=0;light=render_eng(0,e,p,1);
+        eco=1;double as=render_eng(0,e,p,0);eco=0;song.g[G_ECO]=0;
+        int ok=k?!memcmp(pcm[0],pcm[1],sizeof pcm[0]):(full<=0.0 || (as<0.8*full && as<1.15*light));
+        printf("%s ECONOMY: a FULL track renders as LIGHT  %s\n",k==3u?"SID":k==2u?"FM6":k?"CZ-1":"Prophet",ok?"ok":"FAIL");
         bad+=!ok;
     }
     {   /* the shared budget counts a LIGHT voice as FULL (beta27: cheaper let a six-track mix overload) */
@@ -100,7 +112,7 @@ int main(int argc,char **argv)
     puts("preset,mode,host_instructions_per_voice_sample");
     for(int a=2;a<argc || a==2;a++){
         const char *arg=argc>2?argv[a]:"23";
-        uint32_t cz=arg[0]=='c',preset=(uint32_t)atoi(arg+(cz?2:0)),e=cz?ENGI_CZ:ENGI_PROPHET;   /* ("cz50": CZ-1 50) */
+        uint32_t cz=arg[0]=='c',fm=arg[0]=='f',si=arg[0]=='s',preset=(uint32_t)atoi(arg+(cz||fm||si?2:0)),e=cz?ENGI_CZ:fm?ENGI_FM6:si?ENGI_SID:ENGI_PROPHET;   /* ("cz50": CZ-1 50, "fm1": FM6 1, "si16": SID 16) */
         render_eng(argv[1],e,preset,0);render_eng(argv[1],e,preset,1);
         if(argc<=2)break;
     }

@@ -321,7 +321,7 @@ static void draw_head(void)
 #if MELODEE_USB_HOST
     sig += uh.on ? (1u + uh.run) * 6151u : 0u;          /* the HOST tag: waiting, or a controller connected */
 #endif
-    sig += load * 2147483u;
+    sig += load * 2147483u + (uint32_t)(song.g[G_ECO] == 1) * 92821u;
     if (head_badge_on()) sig += head_badge_sig() * 2654435769u;
     if (bpm != ui.roll_bpm) {
         char a[8];
@@ -374,12 +374,12 @@ static void draw_head(void)
     } else {
         const aafont_t *cf = TY_TX;                     /* (where you are: plain words in the track's colour;
                                                          * PATTERNS plain, the grid is in colour) */
-        const char *tag = "";
+        const char *tag = song.g[G_ECO] == 1 ? "ECO" : "";   /* (Hookology: the project plays LIGHT) */
 #if MELODEE_USB_HOST
-        if (uh.on) tag = "HOST";
+        if (uh.on) tag = tag[0] ? "ECO HOST" : "HOST";
 #endif
 #if MELODEE_BLE
-        if (mb.on) tag = tag[0] ? "HOST BLE" : "BLE";
+        if (mb.on) tag = !tag[0] ? "BLE" : tag[1] == 'O' ? "HOST BLE" : "ECO BLE";
 #endif
         int32_t hw = tag[0] ? text_w(TY_LB, tag) + 10 : 0;
 

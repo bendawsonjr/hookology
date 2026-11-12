@@ -421,7 +421,7 @@ async function editorMock() {
     await rq(E.req.set(1,41,16));
   }
   {
-    for(const id of [4,5,6,7,8,9,10,11,24,25,26]){
+    for(const id of [4,5,6,7,8,9,11,24,25,26]){   // (10: ECONOMY)
       const d=E.parse[E.CMD.DESC](await rq(E.req.desc(1,id)));
       const r=E.parse[E.CMD.SET](await rq(E.req.set(1,id,127)));
       ok(!d.label && r.value===0,"editor: removed global effect parameter is inert "+id);

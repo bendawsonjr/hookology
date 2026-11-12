@@ -95,6 +95,7 @@ typedef struct {
     uint8_t latch;                           /* C64: write the registers this block (a frame began, a note) */
     int32_t frame;                           /* C64: cycles to the player's next frame (Q16) */
     uint32_t pt_held;                        /* the pulse width register as last written (<< 20) */
+    int32_t up[3];                           /* QUALITY LIGHT (Hookology): the last three half-rate samples */
 } sid_voice_t;
 typedef struct {
     sid_voice_t v[SID_POLY];
@@ -522,8 +523,194 @@ static void sid_render_into(track_t *t,voice_t *v,int32_t *out,uint32_t n,const 
     s->quiet = o > -32 && o < 32 && xlp > -128 && xlp < 128 && ic1 > -256 && ic1 < 256 && ic2 > -256 && ic2 < 256;
 }
 
+/* QUALITY LIGHT (Hookology): sid_render_into at half rate (22.05 kHz), a copy so FULL stays as it is: twice the
+ * accumulator step (edges and noise clocking follow it), the filter's g for the half rate, the output stage's
+ * constants for it, the envelope ramp over the whole block; then a 4-tap halfband interpolation back to 44.1 kHz */
+#define SID_XLP_A2 32411                     /* round(32768 * (1 - exp(-100000 / 22050))) */
+#define SID_XHP_A2 296                       /* round(65536 * (1 - exp(-100 / 22050))) */
+static inline int32_t sid_g_half(int32_t g)  /* tan(2 atan(g)) = 2g / (1 - g^2), Q12; capped near 10 kHz */
+{
+    int32_t d = 4096 - ((g * g) >> 12);
+    return d < 400 ? 40000 : (int32_t)clamp((int32_t)(((int64_t)2 * g * 4096) / d), 0, 40000);
+}
+static __attribute__((noinline,section(".audio_text"))) void sid_render_light(track_t *t,voice_t *v,int32_t *out,uint32_t n,const vmod_t *m,const int16_t *p)
+{
+    sid_voice_t *s = sid_voice(t, v);
+    uint32_t model = sid_model(p), wave = (uint32_t)p[P_E1] & 7u, stack = (uint32_t)p[P_E2] & 7u;
+    const sid_stack_t *st = &SID_STACKS[stack];
+    const int16_t (*dac)[64] = SID_WDAC[model];
+    const uint16_t *gt = SID_FC_G[model];
+    uint32_t nosc = st->nosc, heard = st->heard, bits = SID_MODE_BITS[p[P_E6] & 7], wb = SID_WAVE_BITS[wave];
+    uint32_t sync = stack == SID_SYNC, ring = stack == SID_RING, blep = wave == SID_SAW || wave == SID_PULSE;
+    uint32_t rmask = ring && !(wb & 2u) ? 0x80000000u : 0u;   /* (RING does nothing with the sawtooth on) */
+    uint32_t noisy = wb & 8u, pull = !model && (wb & 2u) && (wb & 5u);   /* (6581, the sawtooth combined) */
+    const uint8_t *wt = sid_table(t, model, wb);
+    uint32_t ph[3], inc[3] = {0, 0, 0}, rcp[3], rsh[3], noise[3], nb[3], hl[3], nh = 0, pt, i, k;
+    int32_t full = dac[0][63] + dac[1][63], zero = SID_ZERO[model] * (heard == 7u ? 3 : 1), knee = SID_KNEE[model];
+    int32_t shp = m->shape - (64 << 8), norm = heard == 7u ? 10923 : 32767, vel = v->vel * 258;
+    int32_t held = s->held, ic1 = s->ic1, ic2 = s->ic2, xlp = s->xlp, xhp = s->xhp, o = 0;
+    int32_t fcr, g, kd, a0, a1, gin, gout, sl, sb, sh;
+    tsvf_t fc;
+    /* the registers this block: frequencies (16 bits), pulse width (12), FC (11), RES (4) */
+    for (k = 0; k < 3u; k++) {
+        ph[k] = v->ph[k];
+        noise[k] = s->noise[k];
+        nb[k] = sid_noise_bits(noise[k]);
+        if (heard >> k & 1u)
+            hl[nh++] = k;                              /* the voices mixed */
+    }
+    uint32_t edge=blep||sync;
+    /* C64: between the player's frames the registers hold what it wrote (a new STACK or edge set-up: at once) */
+    uint32_t hold=sid_c64(p) && !s->latch && s->freq_valid && s->filter_valid && s->stack_key==stack && s->edge_key==edge;
+    s->latch=0;
+    if(!hold && (!s->freq_valid || s->pitch_key!=m->pitch16 || s->fine_key!=m->fine || s->shape_key!=shp ||
+       s->tune_key!=tuning_a4 || s->stack_key!=stack || s->edge_key!=edge)){
+    for (k = 0; k < nosc; k++) {
+        int32_t c = st->cents[k] + (k == 1u && (sync || ring) ? (shp * 75) >> 10 : 0);   /* SHP: +-24 st */
+        uint32_t fn = (uint32_t)(((uint64_t)cents_inc(m->pitch16, c, m->fine) * SID_FREQ_R32 + 0x80000000u) >> 32);
+        inc[k] = (uint32_t)(((uint64_t)(fn > 0xffffu ? 0xffffu : fn) * SID_FREQ_K16) >> 16);
+        rsh[k]=rcp[k]=0;
+        if(edge){
+            for(rsh[k]=0;inc[k]>>rsh[k]>=65536u;rsh[k]++);
+            rcp[k]=inc[k]?0xffffffffu/(inc[k]>>rsh[k]):0u;
+        }
+        s->inc_cache[k]=inc[k];s->rcp_cache[k]=rcp[k];s->rsh_cache[k]=rsh[k];
+    }
+    s->pitch_key=m->pitch16;s->fine_key=m->fine;s->shape_key=shp;s->tune_key=tuning_a4;
+    s->stack_key=stack;s->edge_key=edge;s->freq_valid=1;
+    }else for(k=0;k<nosc;k++){inc[k]=s->inc_cache[k];rcp[k]=s->rcp_cache[k];rsh[k]=s->rsh_cache[k];}
+    uint32_t nn = n >> 1, half[CTL / 2u];
+    for (k = 0; k < 3u; k++) {
+        inc[k] <<= 1;
+        if (edge && inc[k]) {
+            for (rsh[k] = 0; inc[k] >> rsh[k] >= 65536u; rsh[k]++);
+            rcp[k] = 0xffffffffu / (inc[k] >> rsh[k]);
+        }
+    }
+    if (!hold) {
+        s->pt_held = (uint32_t)clamp(p[P_E3] * 32 + (sync || ring ? 0 : shp / 32), 0, 4095) << 20;
+        fcr = clamp(p[P_E4] * 16 + (p[P_E4] >> 3) + (m->cutoff >> 4), 0, 2047);
+        g = gt[fcr >> 4] + (((gt[(fcr >> 4) + 1] - gt[fcr >> 4]) * (fcr & 15)) >> 4);
+        kd = SID_RES_K[model][clamp(p[P_E5], 0, 15)];
+        if(!s->filter_valid || s->fc_key!=g || s->kd_key!=kd){
+            tsvf_coef_gk(&s->filter_cache,g,kd);s->fc_key=g;s->kd_key=kd;s->filter_valid=1;
+        }
+    }
+    pt = s->pt_held;
+    kd = s->kd_key;
+    tsvf_coef_gk(&fc, sid_g_half(s->fc_key), kd);
+    sl = bits & 1u ? 1 : 0;                            /* the chip's sum: LP and HP against BP */
+    sb = bits & 2u ? -1 : 0;
+    sh = bits & 4u ? 1 : 0;
+    gin = 4096 + p[P_E7] * 64;                         /* DRIVE: into the filter x1..x3, out x1..x1/2 */
+    gout = (4096 << 12) / (4096 + p[P_E7] * 32);
+    a0 = mulq15(mulq15(sid_edac(model, s->env_prev), norm), vel);   /* the envelope DAC over the block */
+    a1 = mulq15(mulq15(sid_edac(model, s->env), norm), vel);
+#if MELODEE_SID_FAST
+    /* Oscillator edges do not depend on the output filters. Keep their
+     * registers out of the filter loop, retaining the delayed edge sample. */
+    int32_t excitation[CTL];
+#endif
+    for (i = 0; i < nn; i++) {
+        int32_t xn = 0, pre = 0, now = 0, x;
+        uint32_t reset = 0, j;
+        ph[0] += inc[0];                               /* (a voice the stack leaves out: inc 0) */
+        ph[1] += inc[1];
+        ph[2] += inc[2];
+        if (sync && ph[0] - 0x80000000u < inc[0]) {   /* voice 1's MSB rose: voice 2 restarts from 0 */
+            uint32_t d = sid_frac(ph[0] - 0x80000000u, rcp[0], rsh[0]);
+            uint32_t after = (uint32_t)(((uint64_t)inc[1] * d) >> 16), at = ph[1] - after;
+            sid_blep(sid_dac(dac, sid_wave12(wave, wt, 0, 0, pt, noise[1])) -
+                     sid_dac(dac, sid_wave12(wave, wt, at, at, pt, noise[1])), d, &pre, &now);
+            ph[1] = after;
+            reset = 2u;
+        }
+        for (j = 0; j < nh; j++) {
+            uint32_t q = ph[k = hl[j]], w;
+            if (noisy) {                               /* the noise register: clocked by accumulator bit 19 */
+                if (((((q - inc[k]) ^ 0x08000000u) & 0x0fffffffu) + inc[k]) >> 28) {
+                    noise[k] = sid_noise_advance(noise[k], q - inc[k], inc[k]);
+                    nb[k] = sid_noise_bits(noise[k]);
+                }
+                w = nb[k];
+            } else {
+                w = sid_wave_out(wb, wt, q, q ^ (~ph[1] & rmask), pt);
+                if (pull)                              /* output bit 11 low pulls the accumulator's MSB low */
+                    ph[k] = q &= ((w & 0x800u) << 20) | 0x7fffffffu;
+            }
+            xn += sid_dac(dac, w);
+            if (blep && !(reset >> k & 1u)) {          /* its steps band-limited (not when sync just restarted it) */
+                if (q < inc[k] && (wave == SID_SAW || pt))   /* the accumulator wrapped: saw and pulse fall */
+                    sid_blep(-full, sid_frac(q, rcp[k], rsh[k]), &pre, &now);
+                if (wave == SID_PULSE && pt && q - pt < inc[k])   /* the comparator: the pulse rises */
+                    sid_blep(full, sid_frac(q - pt, rcp[k], rsh[k]), &pre, &now);
+            }
+        }
+        x = held + pre;                                /* the sample before, its edges band-limited */
+        held = xn - zero + now;
+#if MELODEE_SID_FAST
+        excitation[i]=x;
+    }
+    for(i=0;i<nn;i++){
+        int32_t x=excitation[i];
+#endif
+        int32_t f;
+        x = (x * (a0 + (((a1 - a0) * (int32_t)(i << 1)) >> CTL_LOG2))) >> 15;
+        if (bits) {                                    /* the filter: a TPT state variable filter */
+            int32_t in = (x * gin) >> 12, v3 = in - ic2, bp, lp, hp;
+            bp = soft_knee((fc.a1 * ic1 + fc.a2 * v3) >> 13, knee);
+            lp = soft_knee(ic2 + ((fc.a2 * ic1 + fc.a3 * v3) >> 13), knee);
+            ic1 = clamp(2 * bp - ic1, -150000, 150000);
+            ic2 = clamp(2 * lp - ic2, -150000, 150000);
+#if MELODEE_SID_FAST
+            /* LP/BP have no high-pass contribution. Its stateless value can
+             * be omitted; both integrators above still advance identically.
+             * Preserve the chip sum's LP + BP + HP order in every mode. */
+            f = lp * sl + bp * sb;
+            if (sh) {
+                hp = in - lp - ((bp * kd) >> 12);
+                f += hp;
+            }
+            f = (f * gout) >> 12;
+#else
+            hp = in - lp - ((bp * kd) >> 12);
+            f = ((lp * sl + bp * sb + hp * sh) * gout) >> 12;
+#endif
+        } else                                         /* OFF: no voice routed to the filter */
+            f = (soft_knee((x * gin) >> 12, knee) * gout) >> 12;
+        xlp += (int32_t)(((int64_t)(clamp(f, -131071, 131071) - xlp) * SID_XLP_A2) >> 15);
+        xhp += (int32_t)(((int64_t)((xlp << 8) - xhp) * SID_XHP_A2) >> 16);
+        o = clamp(xlp - (xhp >> 8), -32767, 32767);
+        half[i] = (uint32_t)o;
+    }
+    {
+        int32_t y0 = s->up[0], y1 = s->up[1], y2 = s->up[2];
+        for (i = 0; i < nn; i++) {
+            int32_t y3 = (int32_t)half[i], y = clamp((9 * (y1 + y2) - y0 - y3) >> 4, -32767, 32767);
+            out[i << 1] += voice_amp(y << 1, m, i << 1);
+            out[(i << 1) + 1u] += voice_amp(y2 << 1, m, (i << 1) + 1u);
+            y0 = y1; y1 = y2; y2 = y3;
+        }
+        s->up[0] = y0; s->up[1] = y1; s->up[2] = y2;
+    }
+    for (k = 0; k < 3u; k++) {
+        v->ph[k] = ph[k];
+        s->noise[k] = noise[k];
+    }
+    s->held = held;
+    s->ic1 = ic1; s->ic2 = ic2; s->xlp = xlp; s->xhp = xhp;
+    /* settled: what is left is a tail below -50 dB or the integrators' rounding residue (a few LSB of DC) */
+    s->quiet = o > -32 && o < 32 && xlp > -128 && xlp < 128 && ic1 > -256 && ic1 < 256 && ic2 > -256 && ic2 < 256;
+}
+
 static void sid_render(track_t *t,voice_t *v,int32_t *out,uint32_t n,const vmod_t *m)
-{ sid_render_into(t,v,out,n,m,t->p); }
+{
+    if (trk_light(t) && !(n & 1u)) {                   /* QUALITY LIGHT: half rate (sid_render_light) */
+        void (*volatile run)(track_t *, voice_t *, int32_t *, uint32_t, const vmod_t *, const int16_t *) = sid_render_light;
+        run(t, v, out, n, m, t->p);
+    } else
+        sid_render_into(t,v,out,n,m,t->p);
+}
 static void sid_block(track_t *t)
 { (void)sid_table(t,sid_model(t->p),SID_WAVE_BITS[t->p[P_E1]&7u]); }
 /* a C64 has one voice for the track's notes (POLY: a new note takes it, the keys still held arpeggiate with it) */

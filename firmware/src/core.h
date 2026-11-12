@@ -79,6 +79,7 @@ _Static_assert(NSTEP <= 128u && NTRK * NPAT <= 128u, "recorded-note identifiers 
 #endif
 #define MELODEE_PROPHET 1
 #define ENGI_FM6 12u
+#define ENGI_SID 3u              /* (Hookology: QUALITY LIGHT checks it) */
 #define ENGI_PROPHET 19u /* 16..18 reserved: historical preset namespaces */
 #define USER_GENERAL 16u
 #define USER_NATIVE_P5 20u
@@ -245,21 +246,25 @@ static int param_master_fx(uint32_t id){return id>=G_MFXTYPE && id<=G_MFX3CHAR;}
 #define G_WDRUM G_RESERVED8
 #define G_SAFETY G_RESERVED9
 #define G_DRREV G_RESERVED26
+/* ECONOMY (Hookology): a project setting, 1 plays every track at QUALITY LIGHT whatever its own (trk_light) */
+#define G_ECO G_RESERVED10
 
 /* P_CHSET took a retired slot: the stored layout, and so every older project, stays as it is. Old motion events may
  * still name the slot; they stay inert (param_retired) */
 #define P_CHSET P_RESERVED48                   /* HERA chord set - 1 (chord.c CH_HERA) */
 /* VOICES (Hookology): the track's voice limit, 0 ALL, 1..8 (voice.c trk_vlimit); took a retired slot as P_CHSET did */
 #define P_VMAX P_RESERVED47
-/* QUALITY (Hookology): a Prophet or CZ-1 track's FULL (0) or LIGHT (1, half rate: eng_prophet_test.c p5_samples_light,
+/* QUALITY (Hookology): a Prophet, CZ-1 or FM6 track's FULL (0) or LIGHT (1, half rate: eng_prophet_test.c p5_samples_light, fm6_core.c fm6_run_light,
  * cz_native.c cz_native_render) */
 #define P_P5Q P_RESERVED46
+/* a track at QUALITY LIGHT: its own setting, or the project's ECONOMY */
+#define trk_light(t) ((t)->p[P_P5Q]==1 || song.g[G_ECO]==1)
 #define CHRD_HERA 12                           /* P_CHRD's chord.c CH_HERA: scale_map needs it before chord.c */
 static int param_retired(uint32_t id)
 { return (id>=P_RESERVED33 && id<=P_RESERVED36) || (id>=P_RESERVED45 && id<=P_RESERVED48); }
 static int param_reserved(uint32_t id) { return param_retired(id) && id != P_CHSET && id != P_VMAX && id != P_P5Q; }
 static int global_reserved(uint32_t id)
-{ return (id>=G_RESERVED4 && id<=G_RESERVED11) || (id>=G_RESERVED24 && id<=G_RESERVED26); }
+{ return ((id>=G_RESERVED4 && id<=G_RESERVED11) && id!=G_ECO) || (id>=G_RESERVED24 && id<=G_RESERVED26); }
 
 /* stored parameters of an older layout -> today's P_* order. A store keeps np = the P_COUNT it was
  * written with; common parameters are only ever added just before P_E0, so the first np - 8 are

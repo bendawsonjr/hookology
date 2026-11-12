@@ -928,7 +928,12 @@ static void engine_batch_kernel(const void *data,int32_t *pcm)
     for(uint32_t k=0;k<8u;k++)params[P_E0+k]=j->engine_params[k];
     for(uint32_t k=0;k<DV_NLANE;k++)params[P_LN0+k]=j->lane_params[k];
     if(j->engine==&ENG_DRUM){dr_scratch_t scratch;drum_render_into(j->track,j->voice,pcm,j->n,&j->modulation,&scratch,params);}
-    else if(j->engine==&ENG_SID)sid_render_into(j->track,j->voice,pcm,j->n,&j->modulation,params);
+    else if(j->engine==&ENG_SID){
+        if(trk_light(j->track) && !(j->n&1u)){          /* QUALITY LIGHT (Hookology): half rate */
+            void (*volatile run)(track_t *,voice_t *,int32_t *,uint32_t,const vmod_t *,const int16_t *)=sid_render_light;
+            run(j->track,j->voice,pcm,j->n,&j->modulation,params);
+        }else sid_render_into(j->track,j->voice,pcm,j->n,&j->modulation,params);
+    }
     else j->engine->render(j->track,j->voice,pcm,j->n,&j->modulation);
 }
 

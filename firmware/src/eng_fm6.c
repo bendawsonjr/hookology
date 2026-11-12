@@ -947,7 +947,7 @@ static int32_t *fm6_pending_out;
 static void fm6_worker_kernel(void *unused)
 {
     (void)unused;
-    void (*volatile run)(fm6_voice_t *, uint32_t, float [2][CTL], float *) = fm6_run_into;
+    void (*volatile run)(fm6_voice_t *, uint32_t, float [2][CTL], float *) = fm6_kernel(fm6_job.voice);
     run(fm6_job.voice, fm6_job.n, fm6_job.bus, fm6_job.sum);
     fm6_output_run(fm6_job.sum, fm6_job.pcm, fm6_job.n, &fm6_job.modulation, fm6_job.gain, 0);
 }
@@ -978,11 +978,11 @@ static void fm6_batch_kernel(const void *data,int32_t *pcm)
     }
 #if MELODEE_DUAL_CORE
     float bus[2][CTL];
-    void (*volatile run)(fm6_voice_t *,uint32_t,float [2][CTL],float *)=fm6_run_into;
+    void (*volatile run)(fm6_voice_t *,uint32_t,float [2][CTL],float *)=fm6_kernel(j->voice);
     run(j->voice,j->n,bus,sum);
 #else
     /* The serial operator kernel also lives beyond XIP's direct-call range. */
-    void (*volatile run)(fm6_voice_t *,uint32_t)=fm6_run;
+    void (*volatile run)(fm6_voice_t *,uint32_t)=fm6_kernel1(j->voice);
     run(j->voice,j->n);memcpy(sum,fm6_sum,j->n*sizeof *sum);
 #endif
     fm6_output_run(sum,pcm,j->n,&j->modulation,j->gain,0);
@@ -992,6 +992,7 @@ static void fm6_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const v
 {
     fm6_voice_t *s = fm6_state(t, v);
     int32_t k = t->p[P_VOICE] == V_UNISON ? VOICE_FS * 2 / 5 : VOICE_FS;
+    s->light = (uint8_t)(trk_light(t) && !(n & 1u));   /* QUALITY LIGHT: half rate (fm6_run_light) */
 #ifndef FM6_TAP
     if(audio_batch_active){
         fm6_part_t *P=FM6P(t);
@@ -1019,7 +1020,7 @@ static void fm6_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const v
 #if MELODEE_DUAL_CORE
     fm6_run(s, n);                                      /* wrapper makes the far call into RAM */
 #else
-    void (*volatile run)(fm6_voice_t *, uint32_t) = fm6_run;
+    void (*volatile run)(fm6_voice_t *, uint32_t) = fm6_kernel1(s);
     run(s, n);
 #endif
 #ifdef FM6_TAP

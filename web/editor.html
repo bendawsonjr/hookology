@@ -2037,7 +2037,7 @@ const reservedFm4 = (engines, e) => e === 1 && (engines || [])[1] === "-";   /* 
 const engineLabel = (engines, e) => (e === 1 && (engines || [])[1] === "-" ? "FM6" : (engines || [])[e] ?? String(e));
 
 const paramReserved = id => (id>=33 && id<=36) || (id>=45 && id<=48);
-const globalReserved = id => (id>=4 && id<=11) || (id>=24 && id<=26);
+const globalReserved = id => (id>=4 && id<=11 && id!==10) || (id>=24 && id<=26);   // 10: ECONOMY (Hookology)
 function makeMockDevice(opt = {}) {
   const NONOFF = ["OFF", "ON"], NDIV = ["1/4", "1/8", "1/16", "1/32", "8T", "16T", "1/2", "1/1", "2BAR", "4BAR"], NGO = ["--", "GO"], NDASH = ["--"];
   const D = (label, fmt, min, max, def, names = null, unit = "") => ({ label, fmt, min, max, def, names, unit });
@@ -2064,7 +2064,7 @@ function makeMockDevice(opt = {}) {
   ];
   const GP = [
     D("BPM", F.BPM, 40, 240, 120), D("SWG", F.PCT, 0, 100, 0), E("CLK", ["INT", "USB", "TRS", "BLE"], 0), D("TUNE", F.INT, -50, 50, 0),
-    ...Array.from({length:8},()=>D("",F.INT,0,127,0)),
+    ...Array.from({length:6},()=>D("",F.INT,0,127,0)), E("ECO", ["OFF", "ON"], 0), D("",F.INT,0,127,0),   /* 10: the project's ECONOMY (Hookology) */
     E("MIDI", ["USB", "TRS", "BLE"], 0), E("DRUM", ["OFF", ...Array.from({ length: 16 }, (_, i) => String(i + 1))], 10), E("ROUT", ["CH1-4", "SEL", "CH5-8", "CH9-12", "CH13-16", "CH1-8"], 0), D("CPU", F.INT, 0, 0, 0),
     D("SLOT", F.INT, 1, 33, 1), E("BOOT", ["OFF", ...Array.from({ length: 32 }, (_, i) => String(i + 1))], 0), E("LOAD", NGO, 0), E("SAVE", NGO, 0),
     E("ENG", ["-", "-", "-", "SID", "-", "-", "-", "-",

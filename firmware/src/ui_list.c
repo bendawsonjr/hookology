@@ -60,8 +60,8 @@ static int list_gone(uint32_t i)
 /* list l's rows shown: all but MPC's degree while QNT is not MPC (the page it was on alone, Kerem 2026-10-11) */
 static int list_row_on(const lrow_t *rw)
 {
-    if (str_eq(rw->page, "VOICE 3") && rw->slot == 2u)   /* QUALITY: a Prophet's or a CZ-1's */
-        return TSEL->eng_req == ENGI_PROPHET || TSEL->eng_req == ENGI_CZ;
+    if (str_eq(rw->page, "VOICE 3") && rw->slot == 2u)   /* QUALITY: a Prophet's, a CZ-1's, an FM6's or a SID's */
+        return TSEL->eng_req == ENGI_PROPHET || TSEL->eng_req == ENGI_CZ || TSEL->eng_req == ENGI_FM6 || TSEL->eng_req == ENGI_SID;
     return !str_eq(rw->page, "MPC") || TSEL->p[P_QUANT] == Q_MPC;
 }
 static uint32_t list_n(const list_t *l)

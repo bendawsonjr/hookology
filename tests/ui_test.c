@@ -2542,12 +2542,16 @@ static int test_popups(void)
         {
             const lrow_t q = {"VOICE 3", 2};
             uint32_t e = TSEL->eng_req;
-            set_engine_of(TSEL, ENGI_FM6);
+            set_engine_of(TSEL, ENGI_DRUM);
             int other = !list_row_on(&q);
+            set_engine_of(TSEL, ENGI_FM6);
+            int fm = list_row_on(&q);
+            set_engine_of(TSEL, ENGI_SID);
+            fm &= list_row_on(&q);
             set_engine_of(TSEL, ENGI_CZ);
             int cz = list_row_on(&q);
             set_engine_of(TSEL, ENGI_PROPHET);
-            bad += check("LISTS: QUALITY (FULL / LIGHT) is a row on a Prophet or CZ-1 track only", other && cz && list_row_on(&q));
+            bad += check("LISTS: QUALITY (FULL / LIGHT) is a row on a Prophet, CZ-1, FM6 or SID track only", other && fm && cz && list_row_on(&q));
             set_engine_of(TSEL, e);
         }
         TSEL->p[P_VMAX] = 0;

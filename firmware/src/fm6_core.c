@@ -355,6 +355,8 @@ typedef struct fm6_voice {                               /* a voice; operators i
     uint8_t still;                                       /* over and at rest: 1 only time goes on, 2 nothing matters */
     uint8_t midi_release;                                /* uses the former alignment byte; restore native R4 on bypass */
     int32_t spb;                                         /* the bend and tune it was at rest with */
+    uint8_t light;                                       /* QUALITY LIGHT (Hookology): this block at half rate */
+    float up[3];                                         /* .. its last three half-rate samples (fm6_run_light) */
 } fm6_voice_t;
 #define FM6_SILENT 1638400                               /* an envelope level no engine renders (MARK I: -96 dB) */
 enum { FM6_P_ADD = 4, FM6_P_FB = 0x40, FM6_P_RUN = 0x80 };   /* plan: bits 0-1 out bus, 4-5 in bus */
@@ -639,12 +641,63 @@ static __attribute__((noinline, section(".dsp_text"))) void fm6_run(fm6_voice_t 
 }
 
 #if MELODEE_DUAL_CORE
+static void fm6_run_light(fm6_voice_t *s, uint32_t n, float bus[2][CTL], float *sum);
 static void fm6_run(fm6_voice_t *s, uint32_t n)
 {
     /* XIP to internal RAM exceeds the target's direct-call range. Both cores
      * use the same RAM kernel with separate scratch, avoiding flash fetch
      * contention without changing operator arithmetic or addition order. */
-    void (*volatile run)(fm6_voice_t *, uint32_t, float [2][CTL], float *) = fm6_run_into;
+    void (*volatile run)(fm6_voice_t *, uint32_t, float [2][CTL], float *) = s->light ? fm6_run_light : fm6_run_into;
     run(s, n, fm6_bus, fm6_sum);
 }
+#endif
+
+/* QUALITY LIGHT (Hookology): the same operators at half rate (22.05 kHz): twice the phase step and gain ramp over half
+ * the samples, then a 4-tap halfband interpolation back to 44.1 kHz (as the CZ-1's cz_native_light). FULL is
+ * fm6_run_into / fm6_run untouched. The voice's steps are put back before anything else reads them. */
+typedef struct { int32_t fq[6]; float dg[6], half[CTL / 2u]; } fm6_light_t;
+static inline __attribute__((always_inline)) void fm6_light_begin(fm6_voice_t *s, fm6_light_t *L)
+{
+    for (uint32_t k = 0; k < 6u; k++) {
+        L->fq[k] = s->fq[k]; L->dg[k] = s->dg[k];
+        s->fq[k] = (int32_t)((uint32_t)L->fq[k] << 1); s->dg[k] = L->dg[k] * 2.0f;
+    }
+}
+static inline __attribute__((always_inline)) void fm6_light_end(fm6_voice_t *s, const fm6_light_t *L, float *sum, uint32_t nh)
+{
+    for (uint32_t k = 0; k < 6u; k++) { s->fq[k] = L->fq[k]; s->dg[k] = L->dg[k]; }
+    float y0 = s->up[0], y1 = s->up[1], y2 = s->up[2];
+    for (uint32_t j = 0; j < nh; j++) {
+        float y3 = L->half[j];
+        sum[j << 1] = (9.0f * (y1 + y2) - y0 - y3) * (1.0f / 16.0f);
+        sum[(j << 1) + 1u] = y2;
+        y0 = y1; y1 = y2; y2 = y3;
+    }
+    s->up[0] = y0; s->up[1] = y1; s->up[2] = y2;
+}
+#if MELODEE_DUAL_CORE
+static __attribute__((noinline,section(".audio_text"))) void fm6_run_light(fm6_voice_t *s, uint32_t n, float bus[2][CTL], float *sum)
+{
+    fm6_light_t L;
+    fm6_light_begin(s, &L);
+    void (*volatile run)(fm6_voice_t *, uint32_t, float [2][CTL], float *) = fm6_run_into;
+    run(s, n >> 1, bus, L.half);
+    fm6_light_end(s, &L, sum, n >> 1);
+}
+/* the operator kernel for this block: FULL or LIGHT */
+typedef void (*fm6_kernel_t)(fm6_voice_t *, uint32_t, float [2][CTL], float *);
+static inline fm6_kernel_t fm6_kernel(const fm6_voice_t *s) { return s->light ? fm6_run_light : fm6_run_into; }
+#else
+static __attribute__((noinline,section(".audio_text"))) void fm6_run_light1(fm6_voice_t *s, uint32_t n)
+{
+    fm6_light_t L;
+    fm6_light_begin(s, &L);
+    void (*volatile run)(fm6_voice_t *, uint32_t) = fm6_run;
+    run(s, n >> 1);
+    memcpy(L.half, fm6_sum, (n >> 1) * sizeof *fm6_sum);
+    fm6_light_end(s, &L, fm6_sum, n >> 1);
+}
+/* the serial operator kernel for this block: FULL or LIGHT */
+typedef void (*fm6_kernel1_t)(fm6_voice_t *, uint32_t);
+static inline fm6_kernel1_t fm6_kernel1(const fm6_voice_t *s) { return s->light ? fm6_run_light1 : fm6_run; }
 #endif
