@@ -539,8 +539,10 @@ static void vlist_input(int32_t k1, int32_t k2, uint32_t oct)
         uint8_t pg = ui.page;
         int32_t steps = fx_names(d) ? (int32_t)fx_rank(vl.sel) - (int32_t)fx_rank(*vp) : vl.sel - *vp;
         ui.page = vl.page;
+        fx_list_take = 1;                               /* (a chosen REVERB moves to this slot) */
         if (steps)
             edit_param(vl.slot, steps);
+        fx_list_take = 0;
         ui.page = pg;
         pop_close();
     }

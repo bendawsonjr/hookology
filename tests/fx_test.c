@@ -534,6 +534,26 @@ static void rack_test(void)
     TSEL->p[P_FXTYPE]=FX_MIDIDELAY;go_title("FX 1");TSEL->p[P_FXTYPE]=FX_OFF;frame();assert(str_eq(cur_page()->title,"FX"));
     puts("FX rack: rows, effect list, slot pages named after their effect, OCT+/OCT-/FX/SELECT navigation, SHARED, SPLIT sends and its sheet: OK");
 }
+/* Hookology: KNOB 2 scrolling a shared slot passes over REVERB while another slot has it (it used to take the reverb from
+ * that slot on the way); the effects' list (OCT+) still moves it on purpose */
+static void shared_reverb_kept(void)
+{
+    ui_power_on();song.g[G_MFXTYPE]=song.g[G_MFX2TYPE]=song.g[G_MFX3TYPE]=FX_OFF;
+    go_title("SHARED");fx_rack_row[1]=0;
+    for(int i=0;i<30 && song.g[G_MFXTYPE]!=FX_REVERB;i++)turn(EN_K2,1);
+    assert(song.g[G_MFXTYPE]==FX_REVERB);
+    turn(EN_K1,1);assert(fx_rack_row[1]==1);
+    int seen=0;
+    for(int i=0;i<30 && song.g[G_MFX2TYPE]!=FX_PHASER;i++){turn(EN_K2,1);seen|=song.g[G_MFX2TYPE]==FX_REVERB;assert(song.g[G_MFXTYPE]==FX_REVERB);}
+    assert(song.g[G_MFX2TYPE]==FX_PHASER && !seen);
+    for(int i=0;i<4;i++){turn(EN_K2,-1);assert(song.g[G_MFXTYPE]==FX_REVERB && song.g[G_MFX2TYPE]!=FX_REVERB);}   /* (back past it too) */
+    pop_close();song.g[G_MFX2TYPE]=FX_OFF;press(B_OCTUP);assert(pop.on==POP_LIST);   /* the list on B: REVERB, OCT+ moves it */
+    for(int i=0;i<30 && vl.sel!=FX_REVERB;i++)turn(EN_K2,1);
+    assert(vl.sel==FX_REVERB);press(B_OCTUP);
+    assert(song.g[G_MFX2TYPE]==FX_REVERB && song.g[G_MFXTYPE]==FX_OFF);
+    song.g[G_MFXTYPE]=song.g[G_MFX2TYPE]=FX_OFF;
+    puts("SHARED: KNOB 2 skips REVERB held by another slot; the list still moves it: OK");
+}
 int main(int argc,char **argv)
 {
     /* Full PCM from f1be889, before the mutually exclusive history union.
@@ -544,7 +564,7 @@ int main(int argc,char **argv)
         0x7705dc943db0ff6bull,0x5cc781ef5a3621a3ull,0xef747476fc21a401ull,
         0xd4c3687f410daf9cull
     };
-    legacy();frozen_three_slots();send_return();separate_sends();fx_chain_test();rate_and_pan();tape_smooth();chorus_test();tone_test();grouped_fx_test();rack_test();
+    legacy();frozen_three_slots();send_return();separate_sends();fx_chain_test();rate_and_pan();tape_smooth();chorus_test();tone_test();grouped_fx_test();rack_test();shared_reverb_kept();
     uint64_t dry=fx_signal(FX_OFF,60,64,0,0);
     assert(dry==original_pcm[FX_OFF]);
     for(uint32_t mode=FX_PHASER;mode<FX_AUDIO_COUNT;mode++){

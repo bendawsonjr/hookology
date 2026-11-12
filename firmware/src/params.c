@@ -729,6 +729,7 @@ static const page_t PAGES[] = {
 };
 #define NPAGES (sizeof(PAGES) / sizeof(PAGES[0]))
 static uint8_t mod_ui_slot;      /* the MOD page: the matrix slot (0..3) KNOB 2..4 edit */
+static uint8_t fx_list_take;     /* (Hookology) the effects' list is applying its choice: REVERB may move (ui_input.c edit_param) */
 static uint8_t fx_rack_row[2];   /* the racks' rows KNOB 2 picks: FX's (0..2 its slots, 3 the shared FX), SHARED's
                                   * (0..2 its slots, 3 RETURN) */
 
