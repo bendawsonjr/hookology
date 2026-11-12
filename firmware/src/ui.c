@@ -287,6 +287,14 @@ enum { CF_NONE, CF_CLEAR_SEQ, CF_CLEAR_TRK, CF_OVR_PROJ, CF_OVR_USER,
 static const page_t *page_over;   /* a quick layer's own four knobs (ui_layer.c), while it edits or draws them */
 static uint32_t drum_hit_selected(void);
 static const page_t *cur_page(void) { return page_over ? page_over : &PAGES[ui.page]; }
+/* KNOB 1 picks, KNOB 2 changes (Hookology, beta30): on MOD and the FX racks, whose second card is the row (the route,
+ * the slot), the physical KNOB 1 and 2 trade places, the cards with them (ui_draw.c draw_column). k: physical (or the
+ * card's slot), the result the other; the same map both ways */
+static uint32_t knob_slot(uint32_t k)
+{
+    uint32_t g = cur_page()->graph;
+    return !ui.home && !ui.menu && (g == GR_MOD || g == GR_FXRACK) && k < 2u ? k ^ 1u : k;
+}
 
 /* the quick layers (ui_layer.c): a button held, the keys and KNOB 1..4 are its shortcuts, its map over the page */
 enum { LAYER_NONE, LAYER_FX, LAYER_GLO, LAYER_SCL, LAYER_N };

@@ -2063,11 +2063,13 @@ static void page_knob_edit(uint32_t k, int32_t s)
 {
     const page_t *pg = cur_page();
     int16_t *hv;
+    uint32_t phys = k;
+    k = knob_slot(k);                                   /* (MOD, the racks: KNOB 1 the row; ui.c) */
     if (ui.home || pg->scope == SC_STEP || ((pg->scope==SC_DRUM || pg->scope==SC_DRUMHIT) && pg->id[k]!=255) || page_desc(pg, k, &hv) ||
         (pg->graph == GR_USER && k == 0u) || ((pg->graph == GR_MOD || pg->graph == GR_FXRACK) && k == 1u)
         || pg->graph == GR_SONG || pg->graph == GR_PATGRID || pg->graph == GR_SCALE_PICKER || (scale_settings_page(pg) && k == 1u)
         || (pg->graph == GR_SLICES && k < 2u)) {       /* (not an empty column) */
-        ui.hot_col = (uint8_t)k;
+        ui.hot_col = (uint8_t)phys;                     /* (the card under the knob turned: draw_column's place) */
         ui.hot_t = 40;
     }
     if (list_on()) {                                    /* a list page: KNOB 2 the row, KNOB 1 its value (ui_list.c) */
@@ -2111,7 +2113,7 @@ static void page_knob(uint32_t k, int32_t s)
     midi_edit_value = midi ? midi_panel_absolute[EN_K1 + k] : -1;
     page_knob_edit(k, s);
     midi_edit_value = -1;
-    if (mlearn_on && !midi) mlearn_take(k);              /* MIDI LEARN: this knob waits for a CC */
+    if (mlearn_on && !midi) mlearn_take(knob_slot(k));   /* MIDI LEARN: this knob waits for a CC */
 }
 
 static int bulk_context(void)

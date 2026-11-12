@@ -306,9 +306,9 @@ static void sheet_do(const char *label)
     for (i = 0; i < pop.n && !str_eq(pop.rows[i].label, label); i++)
         ;
     for (n = 0; n < 16u && pop.sel < i && pop.sel + 1u < pop.n; n++)
-        turn(EN_K2, 1);
+        turn(EN_K1, 1);
     for (n = 0; n < 16u && pop.sel > i; n++)
-        turn(EN_K2, -1);
+        turn(EN_K1, -1);
     press(B_OCTUP);
 }
 static int16_t stored_param(uint32_t slot, uint32_t track, uint32_t id)
@@ -974,8 +974,8 @@ static int test_track_count(void)
     ui.force = 1; frame();
     bad += check("  menu UNUSED TRACKS (OCT+): HIDE, the one track the wide card",
                  (GLO_SELECT & TRACKS_HIDE) && stage_rows() == 1u && st_row_h() == ST_ROWS_H);
-    hold(B_HOME); ui.menu_sel = MI_TRACKS; turn(EN_K1, -1); hold(B_HOME);
-    bad += check("  KNOB 1 left: SHOW again", !(GLO_SELECT & TRACKS_HIDE) && stage_rows() == NROWS && ui.home);
+    hold(B_HOME); ui.menu_sel = MI_TRACKS; turn(EN_K2, -1); hold(B_HOME);
+    bad += check("  KNOB 2 left: SHOW again", !(GLO_SELECT & TRACKS_HIDE) && stage_rows() == NROWS && ui.home);
     bad += check("  no pattern at all: Stage's card shows no pattern pill, no steps (a synth)", stage_seq_idle(0));
     one_note(&trk[0], 3, 60);
     ok = !stage_seq_idle(0);
@@ -1781,12 +1781,12 @@ static int test_display_preferences(void)
     bad += check("COLOR OCT+ previews the next palette (DAY, light) without closing the menu",
                  settings.palette == 1 && T_BG == UI_PALETTES[1].bg && ux.light && ui.menu == 1 && !song.octave &&
                  memcmp(before, host_screen, sizeof before) && !memcmp(sounds, trk, sizeof sounds));
-    turn(EN_K1, 1);
+    turn(EN_K2, 1);
     {
         int steps_ok = settings.palette == 2;
-        for (uint32_t k = 3; k < NPALETTES; k++) { turn(EN_K1, 1); steps_ok &= settings.palette == k; }
-        bad += check("COLOR KNOB 1 steps on through SUNSET .. LO-FI, then wraps to NIGHT",
-                     steps_ok && (turn(EN_K1, 1), settings.palette == UI_DEFAULT_INDEX));
+        for (uint32_t k = 3; k < NPALETTES; k++) { turn(EN_K2, 1); steps_ok &= settings.palette == k; }
+        bad += check("COLOR KNOB 2 steps on through SUNSET .. LO-FI, then wraps to NIGHT",
+                     steps_ok && (turn(EN_K2, 1), settings.palette == UI_DEFAULT_INDEX));
     }
     press(B_OCTDN);
     bad += check("OCT- leaves display preferences without changing musical state",
@@ -2188,9 +2188,9 @@ static int test_step_sheets(void)
     press(B_OCTUP);
     bad += check("..OCT+ on the note: its sheet (Length, Velocity, Chance, Slide, Delete note)", pop.on == POP_SHEET &&
                  pop.rows == SHEET_NOTE && !memcmp(pop.title, "Note ", 5));
-    turn(EN_K1, 1);
-    bad += check("..KNOB 1 on Length snaps to 1.25 steps", notes_selected(t)<RECORD_MAX && recording[notes_selected(t)].duration*(1u<<(recording[notes_selected(t)].owner>>5))==5u*RECORD_UNIT/4u && pop.on == POP_SHEET);
-    turn(EN_K2, 1); turn(EN_K2, 1); turn(EN_K1, -10);
+    turn(EN_K2, 1);
+    bad += check("..KNOB 2 on Length snaps to 1.25 steps", notes_selected(t)<RECORD_MAX && recording[notes_selected(t)].duration*(1u<<(recording[notes_selected(t)].owner>>5))==5u*RECORD_UNIT/4u && pop.on == POP_SHEET);
+    turn(EN_K1, 1); turn(EN_K1, 1); turn(EN_K2, -10);
     bad += check("..Chance: 90 %", step_chance(&t->step[4]) == 90u);
     sheet_do("Slide");
     bad += check("..Slide: on, the sheet closed", (t->step[4].flags & SF_SLIDE) && !pop.on);
@@ -2390,10 +2390,10 @@ static int test_mod_rows(void)
     int bad = 0;
     ui_power_on();
     go_title("MOD"); frame();
-    turn(EN_K2, 1);
-    bad += check("MOD: KNOB 2 the route (2)", mod_ui_slot == 1u);
     turn(EN_K1, 1);
-    bad += check("..KNOB 1 its source (LFO), its picker under KNOB 1", TSEL->p[P_M2SRC] == MS_LFO && pop.on == POP_PICK &&
+    bad += check("MOD: KNOB 1 the route (2) (Hookology: left picks)", mod_ui_slot == 1u);
+    turn(EN_K2, 1);
+    bad += check("..KNOB 2 its source (LFO), its picker under KNOB 2", TSEL->p[P_M2SRC] == MS_LFO && pop.on == POP_PICK &&
                  pop.col == 0u && !TSEL->p[P_M1SRC]);
     turn(EN_K3, 2);
     bad += check("..KNOB 3 its destination", TSEL->p[P_M2DST] == 2 && !TSEL->p[P_M1DST]);
@@ -2470,9 +2470,9 @@ static int test_popups(void)
     bad += check("POPUPS: OCT- closes it, the page stays", !pop.on && !ui.home && song.octave == o);
     hold(B_OCTUP);
     bad += check("POPUPS: OCT+ held: the sheet too, no octave", pop.on == POP_SHEET && song.octave == o);
-    turn(EN_K2, 1); turn(EN_K2, 1);
+    turn(EN_K1, 1); turn(EN_K1, 1);
     press(B_OCTUP);
-    bad += check("POPUPS: KNOB 2 the row, OCT+ does it (Favourite) and closes", !pop.on && preset_favorite());
+    bad += check("POPUPS: KNOB 1 the row, OCT+ does it (Favourite) and closes", !pop.on && preset_favorite());
     hold(B_OCTUP); press(B_OCTDN);
     bad += check("POPUPS: OCT- closes the sheet", !pop.on && !ui.confirm);
     hold(B_OCTUP); press(B_OCTUP);
@@ -2534,11 +2534,11 @@ static int test_popups(void)
     {   /* list pages (ui_list.c): KNOB 2 the row, KNOB 1 its value, OCT+ its list (SCL's Scale: SCALES), OCT- Stage */
         ui_power_on(); go_title("VOICE"); frame();
         o = TSEL->p[P_DETUNE];
-        turn(EN_K2, 5); turn(EN_K1, 3);
-        bad += check("LISTS: VOICE 1-3 one list; KNOB 2 to row 6 (VOICE 2's DETUNE), KNOB 1 edits it",
+        turn(EN_K1, 5); turn(EN_K2, 3);
+        bad += check("LISTS: VOICE 1-3 one list; KNOB 1 to row 6 (VOICE 2's DETUNE), KNOB 2 edits it",
                      TSEL->p[P_DETUNE] == o + 3 && !page_visible(page_titled("VOICE 2")));
-        turn(EN_K2, 4); turn(EN_K1, 3);
-        bad += check("LISTS: VOICE's last row is VOICES (Hookology), KNOB 1 sets the track's limit", TSEL->p[P_VMAX] == 3);
+        turn(EN_K1, 4); turn(EN_K2, 3);
+        bad += check("LISTS: VOICE's last row is VOICES (Hookology), KNOB 2 sets the track's limit", TSEL->p[P_VMAX] == 3);
         {
             const lrow_t q = {"VOICE 3", 2};
             uint32_t e = TSEL->eng_req;
@@ -2551,15 +2551,15 @@ static int test_popups(void)
             set_engine_of(TSEL, e);
         }
         TSEL->p[P_VMAX] = 0;
-        turn(EN_K2, -4);
-        turn(EN_K2, -5);
+        turn(EN_K1, -4);
+        turn(EN_K1, -5);
         press(B_OCTUP);
         bad += check("LISTS: OCT+ on a list value (VOICE): its whole list", pop.on == POP_LIST);
         o = TSEL->p[P_VOICE];
         turn(EN_K2, 1); press(B_OCTUP);
         bad += check("LISTS: KNOB 2 the next name, OCT+ takes it", !pop.on && TSEL->p[P_VOICE] == o + 1);
         go_title("SCL"); frame();
-        turn(EN_K2, 1); press(B_OCTUP);
+        turn(EN_K1, 1); press(B_OCTUP);
         bad += check("LISTS: SCL's Scale row, OCT+: the SCALES page", str_eq(cur_page()->title, "SCALES"));
         go_title("SCL"); frame();
         press(B_OCTDN);
@@ -2890,17 +2890,17 @@ static int test_product_ux(void)
             ok &= !page_visible(i);
     bad += check("DIGITAL retired: engine 1 asked for loads FM6; the OP ENV / OP LEVEL pages never show", ok);
     ui_power_on(); track_defaults_steps(TSEL); go_title("NOTES"); cursor_set(0); frame();
-    press(B_OCTUP); press(B_OCTUP); turn(EN_K2, 1); turn(EN_K2, 1); turn(EN_K1, -35);   /* (a note placed; its sheet: Chance) */
+    press(B_OCTUP); press(B_OCTUP); turn(EN_K1, 1); turn(EN_K1, 1); turn(EN_K2, -35);   /* (a note placed; its sheet: Chance) */
     bad += check("CHANCE (the note's sheet) is per step and starts at backward-compatible 100 percent", step_chance(&TSEL->step[0]) == 65 && step_chance(&TSEL->step[1]) == 100);
-    turn(EN_K1, -1000); ok = step_chance(&TSEL->step[0]) == 0;
-    turn(EN_K1, 1000); ok &= step_chance(&TSEL->step[0]) == 100;
+    turn(EN_K2, -1000); ok = step_chance(&TSEL->step[0]) == 0;
+    turn(EN_K2, 1000); ok &= step_chance(&TSEL->step[0]) == 100;
     bad += check("CHANCE controls clamp to 0..100 without changing adjacent steps", ok);
     ui_power_on(); song.rec = 1; seq_start(); go_home();
     int16_t baseline = TSEL->p[P_E0]; turn(EN_K1, 1);
     bad += check("REC plus a sound knob records motion through the UI", motion_count(TSEL) == 1 && motion_enabled(TSEL));
     press(B_PLAY); events_block(32);
     bad += check("stopping returns the original sound after a recorded knob gesture", TSEL->p[P_E0] == baseline);
-    go_page(GR_MOTION); turn(EN_K1, -1);
+    go_page(GR_MOTION); turn(EN_K2, -1);
     bad += check("MOTION playback OFF preserves its stored events", !motion_enabled(TSEL) && motion_count(TSEL) == 1);
     sheet_do("Clear all motion");
     bad += check("MOTION: the lane's sheet, Clear all motion always asks confirmation", ui.confirm == CF_CLEAR_MOTION &&
@@ -2942,9 +2942,9 @@ static int test_product_ux(void)
         fm1_in.buttons = 0; frame();
         bad += check("MOTION: SEQ + K4 deletes only the selected point and consumes navigation",
             motion.count == 5 && !mo_value(P_PAN, 2, &value) && motion_page() && msg_is("POINT CLEARED"));
-        fm1_in.buttons |= 1u << panel.btn[B_SEQ]; frame(); turn(EN_K2, 1);
+        fm1_in.buttons |= 1u << panel.btn[B_SEQ]; frame(); turn(EN_K1, 1);
         fm1_in.buttons = 0; frame();
-        bad += check("MOTION: SEQ + K2 clears only this lane, preserving the other bank and track",
+        bad += check("MOTION: SEQ + K1 clears only this lane, preserving the other bank and track",
             motion.count == 3 && !mo_events(P_PAN) && mo_events(P_DETUNE) == 1 && motion_page());
         hold(B_EDIT);
         bad += check("MOTION: undo restores the gesture's automation without changing other tracks",
@@ -3049,7 +3049,7 @@ static int test_layer(void)
      * replug, usb_audio_driver_test.c); the settings keep what the host got */
     ui_power_on();
     ua_off = ua_off_want = 0;
-    hold(B_HOME); ui.menu_sel = MI_USB; turn(EN_K1, 1); turn(EN_K1, 1);
+    hold(B_HOME); ui.menu_sel = MI_USB; turn(EN_K2, 1); turn(EN_K2, 1);
     ok = ua_off_want == UA_OFF_IN && !ua_off;
     hold(B_HOME);
     ua_off = ua_off_want;                            /* (ua_off_apply) */
@@ -3057,16 +3057,16 @@ static int test_layer(void)
         persist_t p = {0};
         p.magic = PERSIST_MAGIC; p.panel = panel;
         settings_export(&p); ua_off = ua_off_want = 0;
-        bad += check("menu USB AUDIO (KNOB 1 twice: OUT only): wanted at once, the settings keep it",
+        bad += check("menu USB AUDIO (KNOB 2 twice: OUT only): wanted at once, the settings keep it",
                      ok && p.ext.usb_off == UA_OFF_IN && settings_import(&p, sizeof p) && ua_off == UA_OFF_IN &&
                      ua_off_want == UA_OFF_IN);
     }
     ua_off = ua_off_want = 0;
     ua_tracks = ua_tracks_want = 0;
-    ui_power_on(); hold(B_HOME); ui.menu_sel = MI_USB_INPUT; turn(EN_K1, 1);
+    ui_power_on(); hold(B_HOME); ui.menu_sel = MI_USB_INPUT; turn(EN_K2, 1);
     ok = ua_tracks_want && !ua_tracks && ui.menu;
     press(B_OCTUP); ok &= !ua_tracks_want && ui.menu;
-    turn(EN_K1, 1); hold(B_HOME); ua_tracks = ua_tracks_want;
+    turn(EN_K2, 1); hold(B_HOME); ua_tracks = ua_tracks_want;
     {
         persist_t p = {.magic = PERSIST_MAGIC, .panel = panel};
         settings_export(&p); ua_tracks = ua_tracks_want = 0;
@@ -3947,8 +3947,8 @@ static int test_fm6_pages(void)
     bad += check("  .. and on again", (fm6_on[tr] & FM6_ON_ALL) == FM6_ON_ALL);
     go_title("FM BEND"); frame();                        /* (FM6's controllers: one list, ui_list.c) */
     fm6_fn_reset();
-    turn(EN_K2, 7); turn(EN_K1, 1);                      /* PORTA ENGINE: row 8 */
-    turn(EN_K2, -2); turn(EN_K1, 9);                     /* PORTA TIME: row 6 */
+    turn(EN_K1, 7); turn(EN_K2, 1);                      /* PORTA ENGINE: row 8 */
+    turn(EN_K1, -2); turn(EN_K2, 9);                     /* PORTA TIME: row 6 */
     bad += check("FM PORTA ENGINE, TIME: the track's own (another FM6 track keeps Dexed's)",
                  fm6_fn[tr][FN_ENGINE] == FM6_MARK1 + 1u && fm6_fn[tr][FN_PTIME] == 9u &&
                  fm6_fn[(tr + 1u) % NROWS][FN_ENGINE] == FM6_MARK1 && !fm6_fn[(tr + 1u) % NROWS][FN_PTIME]);
@@ -5139,13 +5139,13 @@ static int test_capture(void)
         stop_transport();
         project_save(1);
         hold(B_HOME); ui.menu_sel = MI_AUTOSAVE;
-        turn(EN_K1, -1); turn(EN_K1, -1);
-        bad += check("HOME menu AUTOSAVE: KNOB 1 left disables and clamps OFF", ui.menu == 1 && !settings_autosave);
+        turn(EN_K2, -1); turn(EN_K2, -1);
+        bad += check("HOME menu AUTOSAVE: KNOB 2 left disables and clamps OFF", ui.menu == 1 && !settings_autosave);
         press(B_OCTUP);
         bad += check("HOME menu AUTOSAVE: OCT+ toggles ON without leaving the menu", ui.menu == 1 && settings_autosave);
-        press(B_OCTUP); turn(EN_K1, 1); turn(EN_K1, 1);
-        bad += check("HOME menu AUTOSAVE: KNOB 1 right enables and clamps ON", ui.menu == 1 && settings_autosave);
-        turn(EN_K1, -1); hold(B_HOME);
+        press(B_OCTUP); turn(EN_K2, 1); turn(EN_K2, 1);
+        bad += check("HOME menu AUTOSAVE: KNOB 2 right enables and clamps ON", ui.menu == 1 && settings_autosave);
+        turn(EN_K2, -1); hold(B_HOME);
         TSEL->p[P_LEVEL] = 55;
         for (i = 0; i < 400u; i++) frame();
         bad += check("autosave OFF: changed, stopped, untouched project stays unsaved", stored_param(1, 0, P_LEVEL) != 55);

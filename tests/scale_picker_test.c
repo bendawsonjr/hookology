@@ -7,17 +7,17 @@
 static void open_picker(void)
 {
     assert(scale_settings_page(cur_page()));
-    turn(EN_K2, -100); frame();
-    turn(EN_K2, 1); frame();
+    turn(EN_K1, -100); frame();
+    turn(EN_K1, 1); frame();
     press(B_OCTUP); assert(cur_page()->graph == GR_SCALE_PICKER);
 }
 
 static void mark(int on)
 {
     press(B_SCL); frames(400); assert(scale_settings_page(cur_page()));
-    turn(EN_K2, -100); frame();
-    turn(EN_K2, 4); frame();                       /* (SCL is a list: Favourite its 5th row, KNOB 1 its value) */
-    turn(EN_K1, on ? 1 : -1); frame();
+    turn(EN_K1, -100); frame();
+    turn(EN_K1, 4); frame();                       /* (SCL is a list: Favourite its 5th row, KNOB 2 its value) */
+    turn(EN_K2, on ? 1 : -1); frame();
     open_picker();
 }
 

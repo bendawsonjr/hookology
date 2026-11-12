@@ -61,14 +61,15 @@ static uint32_t pv_kind(void)
 
 /* MOD (docs/design: mock/r6_pages MOD; large type): the matrix's four routes as rows: its number, "LFO -> Cutoff" in
  * words (the text face; the label face when they do not fit: never cut), under them the amount's bar (from the
- * middle) and the amount ("+62 %") at the right; the route KNOB 2 is on outlined in the track's colour and tinted;
- * unused routes dim. KNOB 1 its source, 3 its destination, 4 its amount: the word turning in the track's colour */
+ * middle) and the amount ("+62 %") at the right; the route KNOB 1 is on (Hookology; KNOB 2 before) outlined in the
+ * track's colour and tinted; unused routes dim. KNOB 2 its source, 3 its destination, 4 its amount: the word turning in
+ * the track's colour */
 #define PV_MOD_Y Y_LABEL                                /* the rows: 50 px each from y 32 */
 #define PV_MOD_H 50
 static void pv_mod_rows(void)
 {
     static uint32_t sig;
-    uint32_t k, hot = ui.hot_t ? ui.hot_col + 1u : 0u;
+    uint32_t k, hot = ui.hot_t ? knob_slot(ui.hot_col) + 1u : 0u;   /* (the card's slot: KNOB 1 the route, Hookology) */
     uint32_t sg = mod_ui_slot * 7u + ux.gen * 977u + ux.pal * 31u + song.sel * 13u + TSEL->eng_req * 613u + hot * 101u;
     for (k = 0; k < NMSLOT * 3u; k++)
         sg = (sg ^ (uint16_t)TSEL->p[P_M1SRC + k]) * 16777619u;
@@ -120,12 +121,14 @@ static void pv_mod_rows(void)
     }
 }
 
-/* FX's racks (README "FX rack"): under the knobs' strip (KNOB 1 FX, 2 SLOT, 4 the amount: what the row picked gets; SHARED's 3 ROUTE),
+/* FX's racks (README "FX rack"): under the knobs' strip (KNOB 1 SLOT, 2 FX since Hookology beta30, 4 the amount: what the
+ * row picked gets; SHARED's 3 ROUTE),
  * a row a slot. FX: the track's three slots and the shared FX; SHARED: its three slots and RETURN. A row: its number
  * (A-C on SHARED; the shared FX an arrow, RETURN the four tracks' colours), the effect ("--" none; the shared row:
  * "Shared" and the shared effects in order), under them the amount's bar and value (a slot's MIX, the track's SEND;
  * SPLIT: SHARED's slots the track's send to each, FX's shared row none). The row picked wears the colours of the knobs
- * that edit it: outlined and tinted in KNOB 2's, its effect in KNOB 1's, its amount in KNOB 4's; empty slots dim */
+ * that edit it: outlined and tinted in the row knob's, its effect in the effect knob's, its amount in KNOB 4's; empty
+ * slots dim */
 #define PV_RACK_H 39                                    /* the rows: 39 px each under the strip, y 84 .. 239 */
 static void pv_rack_rows(void)
 {
@@ -133,7 +136,8 @@ static void pv_rack_rows(void)
     const page_t *pg = cur_page();
     uint32_t sh = pg->scope == SC_GLOBAL, k, j, keep = fx_rack_row[sh];
     const int16_t *fx = sh ? song.g + G_MFXTYPE : TSEL->p + P_FXTYPE, *bus = song.g + G_MFXTYPE;
-    uint16_t k1 = T_KNOB(0), k2 = T_KNOB(1), k4 = T_KNOB(3);
+    uint16_t k1 = T_KNOB(knob_slot(0)), k2 = T_KNOB(knob_slot(1)), k4 = T_KNOB(3);   /* (the effect's knob, the row's:
+                                                         * KNOB 2 and 1 since Hookology beta30) */
     uint32_t sg = keep * 7u + ux.gen * 977u + ux.pal * 31u + song.sel * 13u + sh * 5003u + (uint32_t)song.g[G_FXMODE] * 7907u;
     for (k = 0; k < FX_SLOTS * FX_PARAMS; k++)
         sg = (sg ^ (uint16_t)fx[k] ^ (uint32_t)(uint16_t)bus[k] << 16) * 16777619u;

@@ -271,13 +271,13 @@ static void designer_feat_set(uint32_t f,uint32_t s)
 }
 /* A build that cannot sound: said when it is made (a header notice) */
 static const char *designer_silent(void);
-/* FEATURES: KNOB 2 the row, KNOB 1 its value */
+/* FEATURES: KNOB 1 the row, KNOB 2 its value (Hookology: left picks, right changes) */
 static void designer_feat_knob(uint32_t k,int32_t s)
 {
     uint32_t n,f,st;const uint8_t *fs=designer_feats(&n);
     if(!n)return;
-    if(k==1u){ds.row=(uint8_t)clamp((int32_t)ds.row+s,0,(int32_t)n-1);return;}
-    if(k)return;
+    if(k==0u){ds.row=(uint8_t)clamp((int32_t)ds.row+s,0,(int32_t)n-1);return;}
+    if(k!=1u)return;
     f=fs[ds.row%n];st=designer_feat_get(f);
     st=designer_feat_states(f)>2u?(uint32_t)clamp((int32_t)st+(s>0?1:-1),0,(int32_t)designer_feat_states(f)-1):s>0;
     fm1_irq_off();designer_feat_set(f,st);fm1_irq_on();

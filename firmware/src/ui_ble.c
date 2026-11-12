@@ -26,9 +26,9 @@ static void ble_page_open(void)
 
 static void ble_page_input(uint32_t oct)
 {
-    int32_t delta = panel_enc(EN_PRESET) + panel_enc(EN_K2);
+    int32_t delta = panel_enc(EN_PRESET) + panel_enc(EN_K1);   /* KNOB 1 the row, KNOB 2 its value (Hookology) */
     ble_row = (uint8_t)clamp((int32_t)ble_row + delta, 0, (int32_t)ble_found_n() + 4);
-    int32_t turn = panel_enc(EN_K1), link = panel_enc(EN_K4);
+    int32_t turn = panel_enc(EN_K2), link = panel_enc(EN_K4);
     if (oct & 1u) { mel_ble_scan(0); ui.menu = 1; ui.force = 1; return; }
     if ((oct & 2u) || turn || link) {
         if (ble_row == 0) {
@@ -81,7 +81,7 @@ static void draw_ble_page(void)
             }
             row_draw(34 + (int32_t)(r - first) * 36, name, value, T_TEXT, r == ble_row, 0, r);
         }
-        cv_text(8, 188, TY_LB, mel_ble_code() != BLE_NO_PASSKEY ? "ENTER CODE ON PEER" : "K2 PICK   SAVE LINK", T_MID);
+        cv_text(8, 188, TY_LB, mel_ble_code() != BLE_NO_PASSKEY ? "ENTER CODE ON PEER" : "K1 PICK   SAVE LINK", T_MID);
         cv_text(8, 212, TY_LB, "OCT- BACK", T_MID);
         cv_oy = 0; cv_blit_band(0, 30);
     }

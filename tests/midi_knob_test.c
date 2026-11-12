@@ -164,11 +164,11 @@ static int page_and_local_controls(void)
     bad += check("MIDI native edits record through the existing motion path", motion.count && motion.event[0].param == MO_NATIVE + P5_CUTOFF);
     seq_stop();
     knob_reset(MK_MINILAB, MK_ABSOLUTE);
-    go_page(GR_FXRACK);
-    knob_cc(1, 93, 64); knob_cc(1, 93, 127);
+    go_page(GR_FXRACK);                                 /* (the racks' effect: KNOB 2 since Hookology beta30, CC 18) */
+    knob_cc(1, 18, 64); knob_cc(1, 18, 127);
     d = page_desc(cur_page(), 0, &vp);
     bad += check("absolute note FX selection reaches NOTE ECHO", d && *vp == FX_MIDIDELAY && enum_rows(d) == 3);
-    knob_cc(1, 93, 0); d = page_desc(cur_page(), 0, &vp);
+    knob_cc(1, 18, 0); d = page_desc(cur_page(), 0, &vp);
     bad += check("absolute FX selection returns to OFF across nonnumeric effect IDs", d && !*vp);
     knob_reset(MK_OFF, MK_ABSOLUTE);
     ui.menu = 1; ui.menu_sel = MI_MIDI_KNOBS;

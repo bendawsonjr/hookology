@@ -552,6 +552,9 @@ static void draw_column(uint32_t c, const char *label0, const char *val0, const 
         fmt_named = 0;
         return;
     }
+    c = knob_slot(c);                                   /* (MOD, the racks: the row's card over KNOB 1; ui.c) */
+    hot = c == ui.hot_col && ui.hot_t;
+    lc = vc == T_DIM ? T_DIM : card_tc[c & 3u] ? card_tc[c & 3u] : T_KNOB(c);
     fmt_named = 0;                                      /* (params.c: a name, for this card only) */
     pv_words(label0, val0, unit0, label, val, unit);    /* (the words as the pages write them: "Saw", "ms") */
     if (str_eq(unit0, label0))

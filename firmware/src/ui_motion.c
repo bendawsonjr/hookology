@@ -2,9 +2,9 @@
  * Copyright (C) 2026 Kerem Kilic (Ellic Studio) */
 /* SEQ > MOTION (docs/design: mock/r6_pages MOTION, mock/r6_popups): the selected track's recorded motion as lanes, one
  * per parameter it moves on the pattern playing: the value step by step (held from one event to the next, the sound's
- * own before the first), the playhead over them. No chips: KNOB 2 the lane, KNOB 1 Play on / off, OCT+ the lane's
+ * own before the first), the playhead over them. No chips: KNOB 1 the lane, KNOB 2 Play on / off (Hookology), OCT+ the lane's
  * sheet (Play, Clear <lane>, Clear all motion), KNOB 3 the step, KNOB 4 its value;
- * SEQ + KNOB 2/4 clears the lane/point. OCT- Stage. Included by ui_draw.c */
+ * SEQ + KNOB 1/4 clears the lane/point. OCT- Stage. Included by ui_draw.c */
 #define MO_MAX 8                                        /* lanes (parameters) at most */
 #define MO_Y0 Y_LABEL                                   /* the lanes: 60 px each, 3 shown, from y 32 to the sound bar */
 #define MO_H 60
@@ -164,16 +164,16 @@ static void motion_enter(void)                          /* OCT+ on a lane: its s
     sheet_open(t, sub, SHEET_MOTION, NELEM(SHEET_MOTION));
 }
 /* KNOB 3 picks a step; KNOB 4 edits its held value or inserts a point.
- * SEQ + KNOB 2 clears the selected lane; SEQ + KNOB 4 deletes one point. */
+ * SEQ + KNOB 1 clears the selected lane; SEQ + KNOB 4 deletes one point. */
 static void motion_knob(uint32_t k, int32_t s)
 {
     uint16_t ids[MO_MAX];
     uint32_t n = mo_lanes(ids), len = (uint32_t)clamp(TSEL->p[P_SLEN], 1, NSTEP);
-    int clear = (fm1_in.buttons & (1u << panel.btn[B_SEQ])) && (k == 1u || k == 3u);
+    int clear = (fm1_in.buttons & (1u << panel.btn[B_SEQ])) && (k == 0u || k == 3u);
     if (clear) ui.seq_t0 |= 2u;                       /* consume SEQ's tap and hold */
-    if (k == 1u && n && !clear)
+    if (k == 0u && n && !clear)                        /* (KNOB 1 the lane, 2 Play: Hookology, left picks) */
         mo.lane = (uint8_t)clamp((int32_t)mo.lane + (s > 0 ? 1 : -1), 0, (int32_t)n - 1);
-    else if (k == 0u && mo_free())
+    else if (k == 1u && mo_free())
         motion_set_enabled(TSEL, s > 0);
     else if (k == 2u) {
         mo.step = (uint8_t)clamp((int32_t)mo.step + s, 0, (int32_t)len - 1);
@@ -181,7 +181,7 @@ static void motion_knob(uint32_t k, int32_t s)
     } else if (n && (k == 3u || clear) && mo_free()) {
         uint32_t id = ids[mo.lane % n], step = mo.step % len;
         int16_t v = mo_base(id);
-        if (clear && k == 1u) {
+        if (clear && k == 0u) {                       /* (SEQ + the lane knob: the lane) */
             mo_cell = (int16_t)id;
             mo_clear_lane();
         } else if (clear) {

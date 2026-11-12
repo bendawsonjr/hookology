@@ -406,14 +406,14 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
             menu_close();
         return;
     }
-    if ((s = panel_enc(EN_K2)) != 0 && ui.menu == 1)  /* KNOB 2 the row (the standard; PRESETS too) */
+    if ((s = panel_enc(EN_K1)) != 0 && ui.menu == 1)  /* KNOB 1 the row (Hookology: left picks; PRESETS too) */
         ui.menu_sel = (uint8_t)clamp((int32_t)ui.menu_sel + s, 0, (int32_t)MI_COUNT - 1);
     if ((s = panel_enc(EN_PRESET)) != 0 && ui.menu == 1)
         ui.menu_sel = (uint8_t)((ui.menu_sel + (s > 0 ? 1u : MI_COUNT - 1u)) % MI_COUNT);
     else if (s != 0 && ui.menu >= 2) {             /* bounded document scrolling */
         ui.menu_scroll = (uint16_t)clamp((int32_t)ui.menu_scroll + clamp(s, -128, 128) * 18, 0, menu_scroll_max());
     }
-    s = panel_enc(EN_K1);
+    s = panel_enc(EN_K2);                               /* KNOB 2 the row's value (Hookology: right changes) */
     if ((s || ok) && ui.menu == 1 && (ui.menu_sel == MI_MIDI_KNOBS || ui.menu_sel == MI_MIDI_MODE)) {
         volatile uint8_t *p = ui.menu_sel == MI_MIDI_KNOBS ? &settings_midi_knobs : &settings_midi_knob_mode;
         uint32_t n = ui.menu_sel == MI_MIDI_KNOBS ? MK_PROFILES : MK_MODES, v = *p % n;

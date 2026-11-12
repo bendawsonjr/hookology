@@ -406,15 +406,16 @@ static int cf_refused(uint32_t cf)
     return 1;
 }
 
-/* KNOB 2 the row, KNOB 1 its value; OCT+ does it (its question first), OCT- closes (oct: bit 0 OCT-, bit 1 OCT+) */
+/* KNOB 1 the row, KNOB 2 its value (Hookology: left picks, right changes); OCT+ does it (its question first), OCT-
+ * closes (oct: bit 0 OCT-, bit 1 OCT+) */
 static void sheet_input(int32_t k1, int32_t k2, uint32_t oct)
 {
     const sheet_row_t *r;
-    if (k2)
-        pop.sel = (uint8_t)clamp((int32_t)pop.sel + (k2 > 0 ? 1 : -1), 0, (int32_t)pop.n - 1);
+    if (k1)
+        pop.sel = (uint8_t)clamp((int32_t)pop.sel + (k1 > 0 ? 1 : -1), 0, (int32_t)pop.n - 1);
     r = &pop.rows[pop.sel % pop.n];
-    if (k1 && r->turn)
-        r->turn(k1);
+    if (k2 && r->turn)
+        r->turn(k2);
     if (oct & 1u) {
         pop_close();
     } else if (oct & 2u) {
@@ -525,6 +526,8 @@ static void vlist_input(int32_t k1, int32_t k2, uint32_t oct)
     }
     if (k1 && fx_names(d))                              /* (the effects: KNOB 1 the family, KNOB 2 the effect) */
         vl.sel = (int16_t)fxl_family_step(d, vl.sel, k1);
+    else if (k1 && !k2)                                 /* (another list: KNOB 1 steps it too, Hookology) */
+        k2 = k1;
     if (k2)
         vl.sel = (int16_t)(fx_names(d) ? fx_step(d, vl.sel, k2 > 0 ? 1 : -1) :
                            enum_step(d,vl.sel,clamp(vl.sel + (k2 > 0 ? 1 : -1), d->min, d->max)));
@@ -752,7 +755,8 @@ static void pick_draw(void)
     int fx = fx_names(d);                               /* (the effects: wider, each its family's square, a rule
                                                          * between families) */
     int32_t pw = fx ? POP_FX_W : POP_PICK_W, tx = fx ? 26 : 10;
-    x = CARD_X(pop.col < 3u ? pop.col : 2u);            /* its column and the next (the last: the two last), whole:
+    uint32_t at = knob_slot(pop.col);                   /* (its card's place: MOD's source under KNOB 2, Hookology) */
+    x = CARD_X(at < 3u ? at : 2u);            /* its column and the next (the last: the two last), whole:
                                                          * a neighbour's value is under it entirely or not at all */
     for (uint32_t band = 0; band < (uint32_t)((uint32_t)h); band += CV_MAX / ((uint32_t)pw)) {
         cv_begin_band((uint32_t)pw,(uint32_t)h,T_BG,band);
