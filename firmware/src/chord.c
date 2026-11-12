@@ -17,7 +17,9 @@
  * leave nothing hanging. A note several sources hold sounds once and ends with the last of them. */
 /* Append modes: these values are stored in songs, presets and editor files. */
 enum { CH_OFF, CH_DIA3, CH_DIA7, CH_MAJ, CH_MIN, CH_DOM7, CH_MAJ7, CH_MIN7, CH_SUS4, CH_POW, CH_AUTO, CH_MELODY, CH_HERA = CHRD_HERA };
-enum { VC_CLOSE, VC_OPEN, VC_INV1, VC_INV2, VC_BASS };
+enum { VC_CLOSE, VC_OPEN, VC_INV1, VC_INV2, VC_BASS, VC_LEAD };
+/* EXTRA (P_CHEXT, Hookology): a colour on a DIA3 / DIA7 / fixed-shape chord (chord_extra) */
+enum { EX_OFF, EX_6, EX_9, EX_69, EX_SUS2, EX_SUS4 };
 #define CHORD_MAX 4u
 _Static_assert(CH_HERA == CH_MELODY + 1, "CHRD: stored values");
 #include "melodee_hera.h"                /* tools/gen_hera_chords.py */
@@ -39,6 +41,9 @@ static mchord_t mchord[MCHORD_N];
 /* the last chord played per track (the CHORD page shows it): its root, notes, and the shape's tones above the
  * root (bit i = i semitones, 0..11) */
 static struct { uint8_t root, n, note[CHORD_MAX]; uint16_t mask; uint8_t gen, hera, set; } chord_last[NTRK];
+/* VOIC LEAD (Hookology): chord_last[k] is the chord to lead from; 0 after PLAY, STOP and panic (root position) */
+static uint8_t chord_lead_ok[NTRK];
+static void chord_lead_forget(void) { memset(chord_lead_ok, 0, sizeof chord_lead_ok); }
 
 /* 1 = the track's keys are a kit: no chords */
 static int chord_kit(const track_t *t)
@@ -77,6 +82,60 @@ static int hera_name(char *b, uint32_t set, uint32_t key)
 }
 static const char *hera_genre(uint32_t set) { return RES_OK() ? HERA_GENRES + HERA_GENRE_OFF[HERA_GENRE[set]] : ""; }
 
+/* EXTRA applies: CHRD DIA3, DIA7 or a fixed shape, a 12-note scale, not a kit (CHORD 2 shows) */
+static int chord_extra_on(const track_t *t)
+{
+    return t->p[P_CHRD] >= CH_DIA3 && t->p[P_CHRD] <= CH_POW && !chord_kit(t) && !micro_active(t);
+}
+
+/* EXTRA ex on the tones iv[0..n) (ascending, iv[0] = 0, iv[1] the third when it is 3 or 4) -> their number.
+ * x: the 2nd, 4th, 6th and 9th to use (the scale's on DIA, 2 5 9 14 on a shape). At most CHORD_MAX: 6 or 9 on a
+ * seventh drops the fifth (the 6th then an octave up, a 13th); 6/9 keeps the root and the third. A tone already in
+ * the chord (a scale without it: the note below is one of the chord's) is not added; SUS without a third does nothing */
+static int chord_has_pc(const int32_t *iv, uint32_t n, uint32_t skip, int32_t v)
+{
+    for (uint32_t i = 0; i < n; i++)
+        if (i != skip && (iv[i] - v) % 12 == 0) return 1;
+    return 0;
+}
+static uint32_t chord_extra(int32_t *iv, uint32_t n, uint32_t ex, const int32_t *x)
+{
+    uint32_t i, j;
+    int third = n >= 2u && (iv[1] == 3 || iv[1] == 4);
+    switch (ex) {
+    case EX_SUS2:
+    case EX_SUS4:
+        if (third && !chord_has_pc(iv, n, 1u, x[ex == EX_SUS2 ? 0 : 1])) iv[1] = x[ex == EX_SUS2 ? 0 : 1];
+        break;
+    case EX_6:
+    case EX_9: {
+        int32_t v = x[ex == EX_6 ? 2 : 3];
+        if (chord_has_pc(iv, n, 99u, v)) break;
+        if (n >= CHORD_MAX) {                           /* a seventh: the fifth goes */
+            iv[2] = iv[3];
+            n--;
+            if (ex == EX_6) v += 12;
+        }
+        iv[n++] = v;
+        break;
+    }
+    case EX_69:
+        if (n > 2u) n = 2u;                             /* the root and the third (or the shape's second tone) */
+        if (!chord_has_pc(iv, n, 99u, x[2])) iv[n++] = x[2];
+        if (!chord_has_pc(iv, n, 99u, x[3])) iv[n++] = x[3];
+        break;
+    default:
+        break;
+    }
+    for (i = 1; i < n; i++)                             /* ascending */
+        for (j = i; j > 0 && iv[j - 1u] > iv[j]; j--) {
+            int32_t y = iv[j];
+            iv[j] = iv[j - 1u];
+            iv[j - 1u] = y;
+        }
+    return n;
+}
+
 #include "chord_auto.c"
 #include "chord_melody.c"
 
@@ -104,9 +163,10 @@ static uint32_t chord_tones(const track_t *t, uint32_t mode, int32_t *root, int3
         return n;
     }
     if (mode >= CH_MAJ) {
+        static const int32_t X_SHAPE[4] = {2, 5, 9, 14};
         for (i = 0; i < CHORD_MAX && CHORD_SHAPE[mode - CH_MAJ][i] >= 0; i++)
             iv[n++] = CHORD_SHAPE[mode - CH_MAJ][i];
-        return n;
+        return chord_extra_on(t) ? chord_extra(iv, n, (uint32_t)t->p[P_CHEXT], X_SHAPE) : n;
     }
     {
         uint32_t mask = scale_mask(t), deg[12], c = 0, at = 0, guard = 12;
@@ -125,8 +185,54 @@ static uint32_t chord_tones(const track_t *t, uint32_t mode, int32_t *root, int3
             uint32_t k = at + 2u * i;
             iv[n++] = (int32_t)deg[k % c] + 12 * (int32_t)(k / c) - (int32_t)deg[at];
         }
+        if (chord_extra_on(t) && t->p[P_CHEXT]) {      /* EXTRA: the 2nd 4th 6th 9th, each the scale's note at or below */
+            static const int8_t X_STD[4] = {2, 5, 9, 14};
+            int32_t x[4];
+            for (i = 0; i < 4u; i++) {
+                int32_t v = X_STD[i], g = 12;
+                while (g-- && !((mask >> (uint32_t)((*root - r + v + 1200) % 12)) & 1u))
+                    v--;
+                x[i] = v;
+            }
+            n = chord_extra(iv, n, (uint32_t)t->p[P_CHEXT], x);
+        }
         return n;
     }
+}
+
+/* VOIC LEAD: of the chord's inversions, an octave down, in place or up, the one closest to the track's last chord
+ * (after fm1-chord's voice leading: the distance of the sorted notes, the shorter list padded with its top note,
+ * +6 when the lowest note moves more than a fifth; ties: root position, no octave). None to lead from: as it is */
+static void chord_lead(const track_t *t, int32_t r, int32_t *iv, uint32_t n, int32_t period)
+{
+    uint32_t k = trk_index(t), np = chord_lead_ok[k] ? chord_last[k].n : 0u, inv, i, j;
+    const uint8_t *prev = chord_last[k].note;
+    int32_t o, best = 0x7FFFFFFF, c[CHORD_MAX + 1u], keep[CHORD_MAX + 1u];
+    if (!np || !n) return;
+    for (i = 0; i < n; i++) keep[i] = iv[i];
+    for (o = -period; o <= period; o += period)
+        for (inv = 0; inv < n; inv++) {
+            int32_t cost = 0, d;
+            for (i = 0; i < n; i++)                     /* the lowest inv tones an octave up */
+                c[i] = iv[i] + (i < inv ? period : 0) + o;
+            for (i = 1; i < n; i++)
+                for (j = i; j > 0 && c[j - 1u] > c[j]; j--) {
+                    d = c[j]; c[j] = c[j - 1u]; c[j - 1u] = d;
+                }
+            if (c[0] < -period || c[0] >= period) continue;   /* the lowest note within an octave of the key: no drift */
+            for (i = 0; i < (n > np ? n : np); i++) {
+                d = r + c[i < n ? i : n - 1u] - (int32_t)prev[i < np ? i : np - 1u];
+                cost += d < 0 ? -d : d;
+            }
+            d = r + c[0] - (int32_t)prev[0];
+            if (d > 7 || d < -7) cost += 6;
+            cost = cost * 4 + (int32_t)inv + (o ? 2 : 0);
+            if (cost < best) {
+                best = cost;
+                for (i = 0; i < n; i++) keep[i] = c[i];
+            }
+        }
+    for (i = 0; i < n; i++) iv[i] = keep[i];
 }
 
 /* the chord on note `root` as track t plays it now -> out (ascending), the number of notes (1..CHORD_MAX);
@@ -172,7 +278,14 @@ static uint32_t chord_make(const track_t *t, uint32_t root, uint8_t *out, int32_
             iv[n - 1u] = x;
         }
         break;
+    case VC_LEAD:
+        chord_lead(t, r, iv, n, period);
+        break;
     case VC_BASS:                                       /* the root an octave down; a seventh drops its fifth */
+        if (n == CHORD_MAX && chord_extra_on(t) && t->p[P_CHEXT] && !(iv[2] >= 6 && iv[2] <= 8)) {
+            iv[0] -= period;                            /* EXTRA's four, no fifth: the root goes down, no tone lost */
+            break;
+        }
         if (n == CHORD_MAX) {
             iv[2] = iv[3];
             n--;
@@ -220,6 +333,7 @@ static uint32_t chord_build(track_t *t, uint32_t root, uint8_t *out)
         for (i = 0; i < CHORD_MAX; i++)
             chord_last[k].note[i] = i < m ? out[i] : 0u;
         chord_last[k].gen++;
+        chord_lead_ok[k] = 1;
         chord_last[k].hera = 0;
         if (t->p[P_CHRD] == CH_HERA) {
             int32_t octave;
@@ -236,6 +350,7 @@ static void chord_name(char *b, uint32_t root, uint32_t mask)
 {
     uint32_t mi = (mask >> 3) & 1u, ma = (mask >> 4) & 1u, b5 = (mask >> 6) & 1u, p5 = (mask >> 7) & 1u;
     uint32_t s5 = (mask >> 8) & 1u, d7 = (mask >> 9) & 1u, m7 = (mask >> 10) & 1u, M7 = (mask >> 11) & 1u;
+    uint32_t n9 = (mask >> 2) & 1u, b9 = (mask >> 1) & 1u;   /* with a third: the 9th, the b9 (EXTRA, Hookology) */
     const char *q, *x = "";
     str_cpy(b, N_NOTE[root % 12u], 12);
     if (mi && !ma && b5 && !p5)
@@ -243,9 +358,11 @@ static void chord_name(char *b, uint32_t root, uint32_t mask)
     else if (ma && !mi && s5 && !p5)
         q = m7 ? "+7" : M7 ? "+M7" : "aug";
     else if (ma && !mi)
-        q = m7 ? "7" : M7 ? "maj7" : d7 ? "6" : "";
+        q = m7 ? (d7 ? "13" : n9 ? "9" : "7") : M7 ? (d7 ? "maj13" : n9 ? "maj9" : "maj7") :
+            d7 ? (n9 ? "6/9" : "6") : n9 ? "add9" : "";
     else if (mi)
-        q = m7 ? "m7" : M7 ? "mM7" : d7 ? "m6" : "m";
+        q = m7 ? (d7 ? "m13" : n9 ? "m9" : "m7") : M7 ? (n9 ? "mM9" : "mM7") : d7 ? (n9 ? "m6/9" : "m6") :
+            n9 ? "madd9" : "m";
     else if ((mask >> 5) & 1u) {                        /* no third: suspended */
         q = m7 ? "7" : "";
         x = "sus4";
@@ -254,6 +371,8 @@ static void chord_name(char *b, uint32_t root, uint32_t mask)
         x = "sus2";
     } else
         q = "5";
+    if ((ma || mi) && b9 && !n9)
+        x = m7 || M7 ? "b9" : "addb9";
     str_cpy(b + str_len(b), q, 12 - str_len(b));
     str_cpy(b + str_len(b), x, 12 - str_len(b));
 }
@@ -283,6 +402,7 @@ static int mchord_held(uint32_t id, uint32_t note)
 static void mchord_forget(uint32_t track)               /* panic: the track's MIDI chords are gone */
 {
     chord_auto_forget(track);
+    chord_lead_ok[track] = 0;
     uint32_t i;
     for (i = 0; i < MCHORD_N; i++)
         if (mchord[i].id == track + 1u)

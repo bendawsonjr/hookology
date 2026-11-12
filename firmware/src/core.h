@@ -257,12 +257,14 @@ static int param_master_fx(uint32_t id){return id>=G_MFXTYPE && id<=G_MFX3CHAR;}
 /* QUALITY (Hookology): a Prophet, CZ-1 or FM6 track's FULL (0) or LIGHT (1, half rate: eng_prophet_test.c p5_samples_light, fm6_core.c fm6_run_light,
  * cz_native.c cz_native_render) */
 #define P_P5Q P_RESERVED46
+/* EXTRA (Hookology): the colour added to a DIA3 / DIA7 / fixed-shape chord (chord.c EX_*), the last retired slot of 45..48 */
+#define P_CHEXT P_RESERVED45
 /* a track at QUALITY LIGHT: its own setting, or the project's ECONOMY */
 #define trk_light(t) ((t)->p[P_P5Q]==1 || song.g[G_ECO]==1)
 #define CHRD_HERA 12                           /* P_CHRD's chord.c CH_HERA: scale_map needs it before chord.c */
 static int param_retired(uint32_t id)
 { return (id>=P_RESERVED33 && id<=P_RESERVED36) || (id>=P_RESERVED45 && id<=P_RESERVED48); }
-static int param_reserved(uint32_t id) { return param_retired(id) && id != P_CHSET && id != P_VMAX && id != P_P5Q; }
+static int param_reserved(uint32_t id) { return param_retired(id) && id != P_CHSET && id != P_VMAX && id != P_P5Q && id != P_CHEXT; }
 static int global_reserved(uint32_t id)
 { return ((id>=G_RESERVED4 && id<=G_RESERVED11) && id!=G_ECO) || (id>=G_RESERVED24 && id<=G_RESERVED26); }
 

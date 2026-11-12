@@ -494,9 +494,132 @@ static int strum_storage(void)
     return bad;
 }
 
+
+/* EXTRA (Hookology, P_CHEXT on CHORD 2): 6 9 6/9 SUS2 SUS4 on DIA3 / DIA7 and the shapes, in key, at most 4 notes */
+static int extras(void)
+{
+    int bad = 0, ok;
+    track_t *t = &trk[0];
+    reset();
+    t->p[P_CHRD] = CH_DIA3; t->p[P_CHEXT] = EX_9;
+    bad += check("EXTRA 9, DIA3 on C: C E G D (Cadd9)", chord_is(60, (const uint8_t[]){60, 64, 67, 74}) && name_is(60, "Cadd9"));
+    bad += check("EXTRA 9, DIA3 on D: D F A E (Dmadd9)", chord_is(62, (const uint8_t[]){62, 65, 69, 76}) && name_is(62, "Dmadd9"));
+    t->p[P_CHRD] = CH_DIA7;
+    bad += check("EXTRA 9, DIA7 on C: C E B D, no 5th (Cmaj9)", chord_is(60, (const uint8_t[]){60, 64, 71, 74}) && name_is(60, "Cmaj9"));
+    bad += check("EXTRA 9, DIA7 on D: D F C E (Dm9); on G: G B F A (G9)", chord_is(62, (const uint8_t[]){62, 65, 72, 76}) &&
+                 name_is(62, "Dm9") && chord_is(67, (const uint8_t[]){67, 71, 77, 81}) && name_is(67, "G9"));
+    t->p[P_CHEXT] = EX_6; t->p[P_CHRD] = CH_DIA3;
+    bad += check("EXTRA 6, DIA3 on F: F A C D (F6)", chord_is(65, (const uint8_t[]){65, 69, 72, 74}) && name_is(65, "F6"));
+    t->p[P_CHRD] = CH_DIA7;
+    bad += check("EXTRA 6, DIA7 on F: F A E and D an octave up (Fmaj13); on G: G13",
+                 chord_is(65, (const uint8_t[]){65, 69, 76, 86}) && name_is(65, "Fmaj13") && name_is(67, "G13"));
+    t->p[P_CHEXT] = EX_69;
+    bad += check("EXTRA 6/9 on C, DIA3 and DIA7: C E A D (C6/9)", chord_is(60, (const uint8_t[]){60, 64, 69, 74}) && name_is(60, "C6/9") &&
+                 (t->p[P_CHRD] = CH_DIA3, chord_is(60, (const uint8_t[]){60, 64, 69, 74})));
+    t->p[P_CHEXT] = EX_SUS4;
+    bad += check("EXTRA SUS4, DIA3 on G: G C D (Gsus4)", chord_is(67, (const uint8_t[]){67, 72, 74, 0}) && name_is(67, "Gsus4"));
+    t->p[P_CHRD] = CH_DIA7;
+    bad += check("EXTRA SUS4, DIA7 on G: G C D F (G7sus4)", chord_is(67, (const uint8_t[]){67, 72, 74, 77}) && name_is(67, "G7sus4"));
+    t->p[P_CHEXT] = EX_SUS2;
+    bad += check("EXTRA SUS2, DIA7 on A: A B E G (A7sus2); DIA3: A B E (Asus2)", chord_is(69, (const uint8_t[]){69, 71, 76, 79}) &&
+                 name_is(69, "A7sus2") && (t->p[P_CHRD] = CH_DIA3, chord_is(69, (const uint8_t[]){69, 71, 76, 0})) && name_is(69, "Asus2"));
+    t->p[P_CHRD] = CH_DOM7; t->p[P_CHEXT] = EX_9;
+    bad += check("EXTRA 9 on the DOM7 shape: C E Bb D (C9)", chord_is(60, (const uint8_t[]){60, 64, 70, 74}) && name_is(60, "C9"));
+    t->p[P_CHRD] = CH_DIA7; t->p[P_VOIC] = VC_BASS;
+    bad += check("+OCT with DIA7 + 9 (no 5th): the root goes down, C under E B D", chord_is(60, (const uint8_t[]){48, 64, 71, 74}));
+    t->p[P_CHRD] = CH_DIA3;
+    bad += check("+OCT with DIA3 + 9: the 5th goes, C C E D", chord_is(60, (const uint8_t[]){48, 60, 64, 74}));
+    t->p[P_VOIC] = VC_CLOSE; t->p[P_SCALE] = 5; t->p[P_CHEXT] = EX_SUS4;   /* C major pentatonic: no F */
+    bad += check("pentatonic: SUS4 with no 4th in the scale leaves C E A", chord_is(60, (const uint8_t[]){60, 64, 69, 0}));
+    {
+        uint32_t s, r, x, note, n, k;
+        uint8_t out[CHORD_MAX];
+        ok = 1;
+        for (x = EX_6; x <= EX_SUS4; x++)
+            for (s = 1; s <= 15u; s++)
+                for (r = 0; r < 12u; r += 5)
+                    for (note = 48; note < 72u; note++) {
+                        t->p[P_SCALE] = (int16_t)s; t->p[P_ROOT] = (int16_t)r; t->p[P_CHEXT] = (int16_t)x;
+                        t->p[P_CHRD] = (int16_t)(note & 1u ? CH_DIA3 : CH_DIA7);
+                        n = chord_build(t, note, out);
+                        ok &= n >= 2u && n <= CHORD_MAX;
+                        for (k = 0; k < n; k++)
+                            ok &= ((scale_mask(t) >> ((out[k] + 120u - r) % 12u)) & 1u) && (!k || out[k] > out[k - 1u]);
+                    }
+        bad += check("EXTRA on DIA3 / DIA7, the 12-note scales and several roots: 2..4 notes, ascending, every one in key", ok);
+    }
+    t->p[P_SCALE] = 1; t->p[P_ROOT] = 0; t->p[P_CHEXT] = EX_9;
+    t->p[P_CHRD] = CH_HERA;
+    {
+        uint8_t a[CHORD_MAX], b[CHORD_MAX];
+        uint32_t na = chord_build(t, 60, a);
+        t->p[P_CHEXT] = 0;
+        uint32_t nb = chord_build(t, 60, b);
+        bad += check("HERA ignores EXTRA", na == nb && !memcmp(a, b, na));
+    }
+    {
+        uint32_t pg = page_titled("CHORD 2");
+        int on[4];
+        t->p[P_CHRD] = CH_DIA7; on[0] = page_visible(pg);
+        t->p[P_CHRD] = CH_POW; on[1] = page_visible(pg);
+        t->p[P_CHRD] = CH_HERA; on[2] = page_visible(pg);
+        t->p[P_CHRD] = CH_AUTO; on[3] = page_visible(pg) || (t->p[P_CHRD] = CH_OFF, page_visible(pg));
+        bad += check("CHORD 2 (EXTRA) shows for DIA3 / DIA7 / the shapes only", pg < NPAGES && on[0] && on[1] && !on[2] && !on[3]);
+    }
+    bad += check("EXTRA is the track's: kept when a sound loads", param_kept(P_CHEXT) && !param_reserved(P_CHEXT));
+    {
+        project_t p;
+        t->p[P_CHRD] = CH_DIA7; t->p[P_CHEXT] = EX_69; t->p[P_VOIC] = VC_LEAD;
+        project_capture(&p);
+        t->p[P_CHEXT] = 0; t->p[P_VOIC] = 0;
+        p.sum = proj_sum(&p);
+        bad += check("EXTRA and VOIC LEAD come back with the project", !project_restore_runtime(&p) &&
+                     trk[0].p[P_CHEXT] == EX_69 && trk[0].p[P_VOIC] == VC_LEAD);
+    }
+    return bad;
+}
+
+/* VOIC LEAD (Hookology): the inversion closest to the last chord; root position after PLAY / STOP */
+static int leading(void)
+{
+    int bad = 0;
+    track_t *t = &trk[0];
+    reset();
+    chord_lead_forget();
+    t->p[P_CHRD] = CH_DIA3; t->p[P_VOIC] = VC_LEAD;
+    bad += check("LEAD: C F G C plays C E G, C F A, B D G, C E G",
+                 chord_is(60, (const uint8_t[]){60, 64, 67, 0}) && chord_is(65, (const uint8_t[]){60, 65, 69, 0}) &&
+                 chord_is(67, (const uint8_t[]){59, 62, 67, 0}) && chord_is(60, (const uint8_t[]){60, 64, 67, 0}));
+    bad += check("LEAD: the names stay the chords' (F, G)", name_is(65, "F") && name_is(67, "G"));
+    chord_is(65, (const uint8_t[]){60, 65, 69, 0});
+    seq_stop();
+    bad += check("LEAD: after STOP the next chord is in root position (G B D)", chord_is(67, (const uint8_t[]){67, 71, 74, 0}));
+    {
+        uint32_t i, n, k, ok = 1;
+        uint8_t out[CHORD_MAX];
+        static const uint8_t walk[] = {60, 72, 65, 77, 62, 74, 69, 81, 67, 79, 64, 76, 71, 83, 60, 48, 53, 41};
+        t->p[P_CHRD] = CH_DIA7;
+        for (i = 0; i < sizeof walk; i++) {
+            n = chord_build(t, walk[i], out);
+            ok &= n == 4u && out[0] + 12u >= walk[i] && out[0] < walk[i] + 12u && out[3] < walk[i] + 36u;
+        }
+        bad += check("LEAD: on any walk the lowest note stays within an octave of the key played, all four notes", ok);
+    }
+    t->p[P_CHEXT] = EX_9;
+    chord_lead_forget();
+    {
+        uint8_t g[CHORD_MAX];
+        int first = chord_is(62, (const uint8_t[]){62, 65, 72, 76});
+        uint32_t n = chord_build(t, 67, g);
+        bad += check("LEAD with EXTRA 9: Dm9 (D F C E), then G9 moves by step: F A B... within a 4th of it",
+                     first && n == 4u && g[0] >= 58u && g[3] <= 80u);
+    }
+    return bad;
+}
+
 int main(void)
 {
-    int bad = theory() + shapes_voicings() + keys() + arp_rec() + midi_in() + kits() + strumming() + strum_storage();
+    int bad = theory() + shapes_voicings() + keys() + arp_rec() + midi_in() + kits() + strumming() + strum_storage() + extras() + leading();
     printf("%s\n", bad ? "CHORD TEST FAILED" : "chord keys test passed");
     return bad != 0;
 }

@@ -55,7 +55,8 @@ static const char *const N_QUANT[] = {"OFF", "SNAP", "WHITE", "ALL", "MPC"};   /
 static const char *const N_CHRD[] = {"OFF", "DIA3", "DIA7", "MAJ", "MIN", "DOM7", "MAJ7", "MIN7", "SUS4", "POW", "AUTO", "AUTO2", "HERA"};
 static const char *const N_STRUM[] = {"OFF", "1/8", "1/16", "1/32", "1/64", "1/128", "16T", "32T"};
 static const char *const N_STROKE[] = {"DOWN", "UP", "ALT"};
-static const char *const N_VOIC[] = {"CLOSE", "OPEN", "INV1", "INV2", "+OCT"};   /* VC_CLOSE .. VC_BASS */
+static const char *const N_VOIC[] = {"CLOSE", "OPEN", "INV1", "INV2", "+OCT", "LEAD"};   /* VC_CLOSE .. VC_LEAD */
+static const char *const N_CHEXT[] = {"OFF", "6", "9", "6/9", "SUS2", "SUS4"};   /* P_CHEXT: EX_OFF .. EX_SUS4 (Hookology) */
 static const char *const N_VOICE[] = {"POLY", "MONO", "LEG", "UNI"};   /* V_POLY .. V_UNISON */
 static const char *const N_VMAX[] = {"ALL", "1", "2", "3", "4", "5", "6", "7", "8"};   /* P_VMAX: VOICES */
 static const char *const N_P5Q[] = {"FULL", "LIGHT"};
@@ -247,7 +248,7 @@ static const param_desc_t TP[P_COUNT] = {
     [P_DETUNE] = PD("DTUNE", F_INT, 0, 127, 40),
     [P_PAN] = PD("PAN", F_BIPCT, -64, 63, 0),
     [P_MUTE] = PE("MUTE", N_ONOFF, 0),
-    [P_RESERVED45] = PD("", F_INT, 0, 127, 0),
+    [P_CHEXT] = PE("EXTRA", N_CHEXT, 0),   /* (Hookology: chord.c chord_extra) */
     [P_P5Q] = PE("QUALITY", N_P5Q, 0),   /* (Hookology: a Prophet at half rate, LIGHT) */
     [P_VMAX] = PE("VOICES", N_VMAX, 0),   /* (Hookology: the track's voice limit, voice.c trk_vlimit) */
     [P_CHSET] = PD("SET", F_INT, 0, 99, 0),   /* shown 1..100 (param_format); 0, the old slot's value, is set 1 */
@@ -637,6 +638,7 @@ static const page_t PAGES[] = {
     {"SCALES", FAM_SCL, SC_TRACK, GR_SCALE_PICKER, {0xFF, P_SCALE, P_ROOT, P_QUANT}},
     {"SCL", FAM_SCL, SC_TRACK, GR_SCALE, {P_ROOT, 0xFF, P_QUANT, P_TRANS}}, /* K2: scale favorite */
     {"CHORD", FAM_SCL, SC_TRACK, GR_CHORD, {P_CHRD, P_VOIC, P_STRUM, P_STROKE}},   /* SCL again: the chord keys (chord.c) */
+    {"CHORD 2", FAM_SCL, SC_TRACK, GR_CHORD, {P_CHEXT, 0xFF, 0xFF, 0xFF}},   /* DIA3 / DIA7 / a shape only (page_visible): EXTRA */
     {"CHORD SET", FAM_SCL, SC_TRACK, GR_HERA, {P_CHSET, P_VOIC, P_STRUM, P_STROKE}},   /* CHRD HERA only (page_visible): the map */
     {"MPC", FAM_SCL, SC_TRACK, GR_NONE, {P_MPCDEG, 0xFF, 0xFF, 0xFF}},   /* the degree of each bank's pad 02: a row of SCL's list
                                                                           * (QNT MPC only), not a page of its own */
@@ -940,5 +942,5 @@ static const param_desc_t *page_desc(const page_t *pg, uint32_t slot, int16_t **
 static int param_kept(uint32_t i)
 {
     return i == P_LEVEL || i == P_PAN || i == P_MUTE || (i >= P_AMODE && i <= P_SGATE) ||
-           i == P_CHRD || i == P_CHSET || i == P_VMAX || i == P_P5Q || i == P_VOIC || i == P_STRUM || i == P_STROKE || i == P_MPCDEG || i == P_RECQ || param_fx(i) || param_fx_send(i);
+           i == P_CHRD || i == P_CHSET || i == P_VMAX || i == P_P5Q || i == P_CHEXT || i == P_VOIC || i == P_STRUM || i == P_STROKE || i == P_MPCDEG || i == P_RECQ || param_fx(i) || param_fx_send(i);
 }

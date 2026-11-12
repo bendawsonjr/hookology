@@ -955,6 +955,7 @@ static void seq_start(void)
 {
     cin_left = 0; /* MIDI Start also cancels a pending local count-in. */
     seq_started = 1;
+    chord_lead_forget();                           /* VOIC LEAD: a song starts the same way every time */
     int_clock_rem = 0;                             /* every start from the same place: a take repeats exactly */
     uint32_t i;
     seq_erase_request = 0;
@@ -1088,6 +1089,7 @@ static void recording_quantize(track_t *t)
 static void seq_stop(void)
 {
     for (uint32_t k = 0; k < NTRK; k++) chord_auto_forget(k);
+    chord_lead_forget();                              /* VOIC LEAD: the next chord in root position */
     punch.req=-1; punch.keybit=0;
     for (uint32_t t = 0; t < NTRK; t++) midi_insert_cancel(t);
     kb_strum_pending = midi_strum_pending = 0; /* STOP cancels the unplayed part of live sweeps. */

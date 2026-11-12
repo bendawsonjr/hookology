@@ -268,11 +268,11 @@ async function editorMock() {
     "editor: INFO");
   let descs = 0;
   for (let i = 0; i < info.pcount; i++) if (E.parse[E.CMD.DESC](await rq(E.req.desc(0, i))).label) descs++;
-  ok(descs === info.pcount-5, "editor: DESC for every parameter");
+  ok(descs === info.pcount-4, "editor: DESC for every parameter");
   {
     const v=E.parse[E.CMD.DESC](await rq(E.req.desc(0,47)));
-    ok(v.label==="VOICES" && E.parse[E.CMD.DESC](await rq(E.req.desc(0,46))).label==="QUALITY","editor: 47 is VOICES, 46 a Prophet's QUALITY (Hookology)");
-    for(const id of [33,34,35,36,45]){
+    ok(v.label==="VOICES" && E.parse[E.CMD.DESC](await rq(E.req.desc(0,46))).label==="QUALITY" && E.parse[E.CMD.DESC](await rq(E.req.desc(0,45))).label==="EXTRA","editor: 47 is VOICES, 46 a Prophet's QUALITY (Hookology)");
+    for(const id of [33,34,35,36]){
       const d=E.parse[E.CMD.DESC](await rq(E.req.desc(0,id)));
       const r=E.parse[E.CMD.SET](await rq(E.req.set(0,id,127)));
       ok(!d.label && r.value===0,"editor: removed effect parameter is inert "+id);
@@ -301,7 +301,7 @@ async function editorMock() {
     const c0 = E.parse[E.CMD.DESC](await rq(E.req.desc(0, 81)));
     const c1 = E.parse[E.CMD.DESC](await rq(E.req.desc(0, 82)));
     ok(c0.label === "CHRD" && c0.names.join() === "OFF,DIA3,DIA7,MAJ,MIN,DOM7,MAJ7,MIN7,SUS4,POW,AUTO,AUTO2,HERA" && c0.def === 0 &&
-       c1.label === "VOIC" && c1.names.join() === "CLOSE,OPEN,INV1,INV2,+OCT" && c1.def === 0,
+       c1.label === "VOIC" && c1.names.join() === "CLOSE,OPEN,INV1,INV2,+OCT,LEAD" && c1.def === 0,
       "editor: the chord keys 81, 82 over DESC");
     for (const mode of [10, 11]) {
       await rq(E.req.set(0, 81, mode));

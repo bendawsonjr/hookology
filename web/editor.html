@@ -1634,7 +1634,7 @@ async function czBankRead(rq,index){const r=parse[CMD.CZ_BANK](await rq(req.czBa
 /* the track's own parameters, which no sound load changes (ui.c param_kept): LEVEL, the ARP and ARP 2 pages,
    SCL, LEN DIV SWING GATE (17..32), PAN, MUTE; with P_E0 83 the chord keys CHRD VOIC (81, 82:
    E0 E1 of the 89-parameter firmware); with P_E0 84 the MPC degree (83: E0 of 1.0) */
-const TRACK_OWN = new Set([0, 8, 39, 40, 46, 47, ...Array.from({ length: 16 }, (_, i) => 17 + i)]);
+const TRACK_OWN = new Set([0, 8, 39, 40, 45, 46, 47, ...Array.from({ length: 16 }, (_, i) => 17 + i)]);
 const P_CHORD = [81, 82];                          /* core.h P_CHRD, P_VOIC (since P_COUNT 91, P_E0 83) */
 const P_MPCDEG = 83;                               /* core.h P_MPCDEG (since P_COUNT 92, P_E0 84) */
 const trackOwn = (i, pe0) => TRACK_OWN.has(i) || (pe0 >= 83 && P_CHORD.includes(i)) || (pe0 >= 84 && i === P_MPCDEG) || (pe0 >= 100 && i >= 96 && i < Math.min(pe0,114)) || (pe0 >= 116 && (i === 114 || i === 115));
@@ -2058,7 +2058,8 @@ function makeMockDevice(opt = {}) {
     ...Array.from({length:4},()=>D("",F.INT,0,127,0)),
     E("VCE", ["POLY", "MONO", "LEG", "UNI"], 0), D("GLD", F.TIME, 0, 127, 0), D("PAN", F.BIPCT, -64, 63, 0), E("MUTE", NONOFF, 0),
     E("GLMOD", ["RATE", "TIME"], 0), E("PRIO", ["LAST", "LOW", "HIGH"], 0), E("ALLOC", ["ROT", "REUSE"], 0), D("DTUNE", F.INT, 0, 127, 40),
-    D("",F.INT,0,127,0), E("QUALITY", ["FULL", "LIGHT"], 0),   /* 46: a Prophet's QUALITY (Hookology) */
+    E("EXTRA", ["OFF", "6", "9", "6/9", "SUS2", "SUS4"], 0),   /* 45: a chord's EXTRA (Hookology) */
+    E("QUALITY", ["FULL", "LIGHT"], 0),   /* 46: a Prophet's QUALITY (Hookology) */
     E("VOICES", ["ALL", "1", "2", "3", "4", "5", "6", "7", "8"], 0),   /* 47: the track's voice limit (Hookology) */
     D("SET", F.INT, 0, 99, 0),   /* 48: HERA chord set - 1 */
     ...[1, 2, 3, 4].flatMap((k) => [E("SRC" + k, MSRC, 0), E("DST" + k, MDST, 0), D("AMT" + k, F.BIPCT, -64, 63, 0)]),   /* the matrix */
@@ -2158,7 +2159,7 @@ function makeMockDevice(opt = {}) {
   ];
   for (let op = 0; op < 4; op++) TP.push(D("ATK", F.TIME, 0, 127, 0), D("DEC", F.TIME, 0, 127, 0), D("SUS", F.PCT, 0, 127, 127), D("REL", F.TIME, 0, 127, 0), D("LVL", F.PCT, 0, 127, 127));
   TP.push(E("CHRD", ["OFF", "DIA3", "DIA7", "MAJ", "MIN", "DOM7", "MAJ7", "MIN7", "SUS4", "POW", "AUTO", "AUTO2", "HERA"], 0),   /* the chord keys 81, 82 */
-    E("VOIC", ["CLOSE", "OPEN", "INV1", "INV2", "+OCT"], 0),
+    E("VOIC", ["CLOSE", "OPEN", "INV1", "INV2", "+OCT", "LEAD"], 0),
     D("DEG", F.INT, 1, 12, 1));                      /* 83: QNT MPC, the degree of each bank's pad 02 */
   TP.push(...["KICK","SNARE","CLAP","HATCL","HATOP","TOM","RIM","BELL"].map(n=>D(n,F.PCT,0,127,127)));
   TP.push(E("SYNC", ["OFF","4BAR","2BAR","1/1","1/2","1/4","1/8","8T","1/16","16T","1/32"],0), E("TRIG",["NOTE","FREE"],0), E("POL",["BI","UNI"],0), D("SPRD",F.PCT,0,127,0));
