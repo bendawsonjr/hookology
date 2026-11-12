@@ -1173,8 +1173,8 @@ async function editorFm6() {
   ok(bank.length === 4104 && bank[0] === 0xF0 && bank[3] === 9 && bank[4103] === 0xF7 && one.length === 163 && one[5] === 0x1B,
     "FM6: a 32-voice bank SysEx is 4104 bytes, a single voice 163");
   let r = F6.parseSysex(bank);
-  ok(r.voices.length === 32 && !r.badSum && r.voices.slice(0, 24).every((x, k) => eq(F6.pack(x.v), F6.FACTORY_PK[k])) &&
-     r.voices[24].name === "INIT VOICE" && r.voices[1].name === "GLASS BELL" && r.voices[9].name === "BRASS SECT",
+  ok(r.voices.length === 32 && !r.badSum && r.voices.slice(0, 25).every((x, k) => eq(F6.pack(x.v), F6.FACTORY_PK[k])) &&
+     r.voices[24].name === "MELLOW TRM" && r.voices[25].name === "INIT VOICE" && r.voices[1].name === "GLASS BELL" && r.voices[9].name === "BRASS SECT",
      "FM6: bank SysEx round trip (names, checksum)");
   r = F6.parseSysex(Uint8Array.from([...one, ...one]));
   ok(r.voices.length === 2 && eq(F6.pack(r.voices[1].v), F6.FACTORY_PK[3]), "FM6: two single-voice messages in one file");
@@ -1206,9 +1206,9 @@ async function editorFm6() {
   [...m.access.inputs.values()][0].onmidimessage = (e) => link.receive(e.data);
   const rq = (x) => link.request(x), C = E.CMD;
   const info = E.parse[C.INFO](await rq(E.req.info()));
-  ok(info.fm6 && info.fm6.factory === 24 && info.fm6.bank === 0, "FM6: INFO tag (24 factory, no patch bank)");
+  ok(info.fm6 && info.fm6.factory === 25 && info.fm6.bank === 0, "FM6: INFO tag (25 factory, no patch bank)");
   const list = E.parse[C.FM6_LIST](await rq(E.req.fm6List()));
-  ok(list.slots.length === 24 && list.slots[0].name === "TINE EP" && list.slots[9].name === "BRASS SECT", "FM6: factory voice list");
+  ok(list.slots.length === 25 && list.slots[24].name === "MELLOW TRM" && list.slots[0].name === "TINE EP" && list.slots[9].name === "BRASS SECT", "FM6: factory voice list");
   let p = E.parse[C.FM6_PUT](await rq(E.req.fm6Put(1,4,F6.INIT_PK)));
   ok(p.rc === 3, "FM6: retired bank writes report no bank");
   const mine = F6.setName(F6.factory(2), "my bass");

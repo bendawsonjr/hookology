@@ -40,7 +40,7 @@ typedef struct {
 #include "eng_fm6_rom.h"         /* FM6_ROM[FM6_NROM]: F9.. */
 
 #define ENGI_FM6 12u             /* engines.c ENGINES[] (append-only) */
-#define FM6_NFAC (FM6_NFACTORY + FM6_NROM)        /* F1..F24: the factory patches */
+#define FM6_NFAC (FM6_NFACTORY + FM6_NROM)        /* F1..F25: the factory patches */
 #define FM6_PACKED 128u
 #define FM6_ON_ALL 0x3Fu
 
@@ -173,7 +173,7 @@ static void fm6_rom_patch(const fm6_rom_t *r, uint8_t *v)   /* a Melodee factory
     fm6_sanitize(v);
 }
 
-/* factory patch k (F1..F24) as a packed record */
+/* factory patch k (F1..F25) as a packed record */
 static void fm6_factory(uint32_t k, uint8_t *pk)
 {
     uint8_t v[FP_SIZE + 1u];
@@ -231,7 +231,7 @@ static void fm6_track_loaded(const track_t *t)
         uint8_t pk[FM6_PACKED], v[FP_SIZE + 1u];
         if (t->preset < FM6_NFAC)
             fm6_factory(t->preset, pk);
-        fm6_unpack(t->preset < FM6_NFAC ? pk : FM6_INIT, v);   /* (past F24: INIT VOICE) */
+        fm6_unpack(t->preset < FM6_NFAC ? pk : FM6_INIT, v);   /* (past F25: INIT VOICE) */
         fm6_put_patch(tr, v, 1);
     }
 }
@@ -1210,12 +1210,13 @@ static const preset_t FM6_PRESETS[] = {
     FM6_PR("STEEL DRUM", 0),
     FM6_PR("SAW BASS", 1),
     FM6_PR("TUBULAR", 0),
-    FM6_PR("INIT VOICE", 0),          /* the DX7's init voice, dry (after F24: the stores keep the
+    FM6_PR("MELLOW TRM", 0),          /* (Hookology: F25, a warm tine piano with tremolo) */
+    FM6_PR("INIT VOICE", 0),          /* the DX7's init voice, dry (after F25: the stores keep the
                                                          * factory's numbers) */
 };
 #undef FM6_PR
-_Static_assert(FM6_NROM == 16u, "FM6: the presets name F9..F24");
-_Static_assert(NELEM(FM6_PRESETS) == FM6_NFAC + 1u, "FM6: F1..F24, then INIT VOICE");
+_Static_assert(FM6_NROM == 17u, "FM6: the presets name F9..F25");
+_Static_assert(NELEM(FM6_PRESETS) == FM6_NFAC + 1u, "FM6: F1..F25, then INIT VOICE");
 
 static const engine_t ENG_FM6 = {
     .name = "FM6",

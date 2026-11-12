@@ -96,6 +96,14 @@ static int checks(void)
         printf("%s ECONOMY: a FULL track renders as LIGHT  %s\n",k==3u?"SID":k==2u?"FM6":k?"CZ-1":"Prophet",ok?"ok":"FAIL");
         bad+=!ok;
     }
+    {   /* FM6 F25 MELLOW TRM (Hookology) is exactly the voice designed and auditioned (the DX7 dump sent to the FM-1) */
+        static const uint8_t SENT[155]={95,40,30,60,99,80,0,0,39,0,0,0,0,0,0,3,42,0,1,0,7,95,28,20,60,99,90,0,0,39,0,0,0,0,0,3,1,78,0,1,0,6,97,62,40,60,99,60,0,0,39,0,20,0,0,3,0,6,58,0,14,0,7,95,18,20,50,99,95,0,0,39,0,0,0,0,2,3,2,90,0,1,0,8,95,50,35,78,99,75,0,0,39,0,20,0,0,3,0,7,48,0,1,0,7,96,22,25,67,99,78,0,0,39,0,0,0,0,3,3,2,98,0,1,0,7,99,99,99,99,50,50,50,50,4,3,1,30,0,0,45,0,4,0,24,77,69,76,76,79,87,32,84,82,77};
+        uint8_t v[FP_SIZE+1u],pk[FM6_PACKED];
+        fm6_factory(FM6_NFACTORY+16u,pk);fm6_unpack(pk,v);
+        int ok=!memcmp(v,SENT,155) && str_eq(FM6_PRESETS[FM6_NFACTORY+16u].name,"MELLOW TRM") && str_eq(FM6_PRESETS[FM6_NFAC].name,"INIT VOICE");
+        printf("FM6 F25 MELLOW TRM: the auditioned voice, INIT VOICE after it  %s\n",ok?"ok":"FAIL");
+        bad+=!ok;
+    }
     {   /* the shared budget counts a LIGHT voice as FULL (beta27: cheaper let a six-track mix overload) */
         track_t *t=&trk[0];host_preset(t,ENGI_PROPHET,23u);
         t->p[P_P5Q]=0;uint32_t full=voice_units(t);

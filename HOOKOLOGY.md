@@ -41,6 +41,7 @@ Custom firmware for the M-VAVE FM-1, built on [Melodee](https://github.com/kerem
 - **No LIGHT for DRUM (v1.1-beta34/35):** on the FM-1 Bop's two kits cause about half its busy moments, but half-rate playback of the recorded kits gained nothing there (beta34, removed in beta35); the drums' cost on the FM-1 is not the per-sample work the host measures. Next step if wanted: time the drum code on the FM-1 itself.
 - **FX page names its track (v1.1-beta36):** a track's FX rack shows the track's sound name in the header, in the track's colour, where it said FX (ui_draw.c head_chip_text). SHARED and the effect pages are unchanged.
 - **Chord view hidden (v1.1-beta37):** the circle of fifths leaves HOME as Stage did; HOME turns TRACKS > MIXER (ui.c home_view_on; HOOKOLOGY_VIEW_PAGE=1 brings it back).
+- **FM6 F25 MELLOW TRM (v1.1-beta38):** a warm Rhodes-style electric piano with a ~5 Hz tremolo, made from TINE EP (tine, bark and thump lower, the top keys darker, a longer body; carriers AMS 3, AMD 45). Added before INIT VOICE (now F26's place, its sound unchanged), category Keys; the web editor's factory list and tests follow. The resource region is now 20 of 21 sectors.
 - **SAFETY on by default:** when the FM-1 nears its limit, GUARD fades the quietest release tails, starting at 80% load. Held notes go only in an emergency: 97% load for 8 audio blocks in a row, about 23 ms, with no tails left. On GLO > WEIGHTS 2, shown as GUARD.
 - **Bluetooth removed:** to make room. Build with `MELODEE_BLE=1` to bring it back.
 

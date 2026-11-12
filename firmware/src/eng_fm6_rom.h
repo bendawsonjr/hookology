@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Kerem Kilic (Ellic Studio) */
-/* FM6 factory voices (PTCH F9..F24): Melodee's own DX7 voices; SEND puts any of them out
+/* FM6 factory voices (PTCH F9..F25): Melodee's own DX7 voices; SEND puts any of them out
  * as a DX7 single-voice dump.
  *
  * OP(EG rates 1-4, EG levels 1-4, key level scaling: break point, left / right depth,
@@ -143,6 +143,15 @@ static const fm6_rom_t FM6_ROM[] MELODEE_RES = {
           OP(99, 30, 22, 34, 99, 70, 0, 0, 39, 0, 0, 0, 0, 1, 0, 2, 60, 2, 0, 0),
           OP(99, 50, 30, 34, 99, 30, 0, 0, 39, 0, 0, 0, 0, 1, 0, 4, 48, 1, 41, 0),
           PEG_FLAT, 5, 0, 1, NO_LFO, "TUBULAR   "),
+    /* MELLOW TRM (Hookology): TINE EP's three pairs mellowed (tine, bark and thump 10 lower, the top keys darker),
+     * a longer body and a ~5 Hz tremolo on the carriers (AMS 3, AMD 45) */
+    VOICE(OP(96, 22, 25, 67, 99, 78, 0, 0, 39, 0, 0, 0, 0, 3, 3, 2, 98, 1, 0, 0),
+          OP(95, 50, 35, 78, 99, 75, 0, 0, 39, 0, 20, 0, 0, 3, 0, 7, 48, 1, 0, 0),
+          OP(95, 18, 20, 50, 99, 95, 0, 0, 39, 0, 0, 0, 0, 2, 3, 2, 90, 1, 0, 1),
+          OP(97, 62, 40, 60, 99, 60, 0, 0, 39, 0, 20, 0, 0, 3, 0, 6, 58, 14, 0, 0),
+          OP(95, 28, 20, 60, 99, 90, 0, 0, 39, 0, 0, 0, 0, 0, 3, 1, 78, 1, 0, -1),
+          OP(95, 40, 30, 60, 99, 80, 0, 0, 39, 0, 0, 0, 0, 0, 0, 3, 42, 1, 0, 0),
+          PEG_FLAT, 5, 3, 1, LFO(30, 0, 0, 45, 0, 4, 0), "MELLOW TRM"),
 };
 #define FM6_NROM (sizeof FM6_ROM / sizeof FM6_ROM[0])
 
