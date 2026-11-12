@@ -1295,6 +1295,8 @@ static void edit_param(uint32_t slot, int32_t steps)
             v = w == v ? *vp : w;
         }
     }
+    if (vp == &TSEL->p[P_CHBOR] && v == 0 && TSEL->p[P_QUANT] != Q_OFF)   /* (Hookology) every key is moved onto the scale */
+        ui_message("BORROW NEEDS QNT OFF");
     if (pg->scope == SC_TRACK && pg->graph == GR_FXRACK && slot == 0u && *vp != v && fx_is_midi(v)) {
         /* Note effects have their own useful starting controls. */
         if (!vp[1]) vp[1] = 64;

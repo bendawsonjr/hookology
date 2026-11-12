@@ -382,7 +382,7 @@ static int test_sound_loads(void)
     t->p[P_SCALE] = 2;
     t->p[P_TRANS] = 5;
     t->p[P_RESERVED34] = 1;
-    t->p[P_RESERVED33] = 4;
+    t->p[P_RESERVED35] = 4;
     t->p[P_P5Q] = 1; t->p[P_VMAX] = 3;            /* (Hookology: QUALITY and VOICES are the track's) */
     t->p[P_SDIV] = 1;
     t->p[P_LEVEL] = 90;
@@ -391,7 +391,7 @@ static int test_sound_loads(void)
     bad += check("PRESETS on HOME loads the sound: steps, LEN, DIV untouched", t->preset == (uint8_t)((before.preset + 1u) % ENGINES[3]->npresets) &&
                  !memcmp(t->step, before.step, sizeof t->step) && t->p[P_SLEN] == 32 && t->p[P_SDIV] == 1);
     bad += check("..ARP, SCL, the SLICER and the mix stay the track's", t->p[P_AMODE] == 2 && t->p[P_AOCT] == 3 && t->p[P_SCALE] == 2 &&
-                 t->p[P_TRANS] == 5 && !t->p[P_RESERVED34] && !t->p[P_RESERVED33] && t->p[P_LEVEL] == 90 &&
+                 t->p[P_TRANS] == 5 && !t->p[P_RESERVED34] && !t->p[P_RESERVED35] && t->p[P_LEVEL] == 90 &&
                  t->p[P_P5Q] == 1 && t->p[P_VMAX] == 3);
     bad += check("..and no warning about the sequence", !msg_is("T1 SEQ REPLACED"));
     for (i = 0; i < ENGINES[3]->npresets; i++)
@@ -4696,7 +4696,7 @@ static int test_bughunt_ui2(void)
         }
     }
     {   /* 2. STEP entry with CHRD on writes what the key sounds, as live recording does */
-        static const uint32_t KEY[2] = {7u, 8u};                      /* C4, C#4 (out of C major) */
+        static const uint32_t KEY[2] = {7u, 8u};                      /* C4, C#4 (out of C major: BORROW's Db) */
         uint32_t v, j, ok = 1;
         for (v = 0; v < 2u; v++)
             for (j = 0; j < 2u; j++) {
@@ -4707,7 +4707,8 @@ static int test_bughunt_ui2(void)
                 key_down(KEY[j]); frame();
                 e = t->step[0];
                 key_up(KEY[j]); frame();
-                ok &= e.n == (v ? 1u : 3u) && e.note[0] == 60u && (v || (e.note[1] == 64u && e.note[2] == 67u));
+                ok &= e.n == (v ? 1u : 3u) && e.note[0] == (j ? 61u : 60u) &&   /* (C#: BORROW's Db, Hookology) */
+                      (v || (e.note[1] == (j ? 65u : 64u) && e.note[2] == (j ? 68u : 67u)));
                 ui_power_on(); t = TSEL; t->p[P_VOICE] = v ? V_MONO : V_POLY; t->p[P_CHRD] = CH_DIA3; t->p[P_SCALE] = 1;
                 track_defaults_steps(t); go_home(); frame();
                 song.rec = 1; song.playing = 1; t->seq_idx = 3; t->seq_pos = 0;

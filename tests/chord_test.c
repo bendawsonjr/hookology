@@ -97,8 +97,9 @@ static int theory(void)
     t->p[P_SCALE] = 3; t->p[P_ROOT] = 2; t->p[P_CHRD] = CH_DIA3;   /* D dorian */
     bad += check("D dorian DIA3 on D: Dm, on G: G (the major IV)", name_is(62, "Dm") && name_is(67, "G") &&
                  chord_is(67, (const uint8_t[]){67, 71, 74, 0}));
-    t->p[P_SCALE] = 1; t->p[P_ROOT] = 0;
-    bad += check("a key outside the scale: the scale note below (C# in C major: C)", chord_is(61, (const uint8_t[]){60, 64, 67, 0}));
+    t->p[P_SCALE] = 1; t->p[P_ROOT] = 0; t->p[P_CHBOR] = 1;
+    bad += check("BORROW OFF: a key outside the scale plays the scale note below (C# in C major: C)", chord_is(61, (const uint8_t[]){60, 64, 67, 0}));
+    t->p[P_CHBOR] = 0;
     t->p[P_SCALE] = 0; t->p[P_ROOT] = 7;                           /* CHR: the major scale of G */
     bad += check("CHR: the major scale of ROOT (G: on A, Am; on F#, F#dim)", name_is(69, "Am") && name_is(66, "F#dim"));
     t->p[P_SCALE] = 5; t->p[P_ROOT] = 0;                           /* C major pentatonic: every other note */
@@ -110,7 +111,7 @@ static int theory(void)
         for (s = 1; s <= (uint32_t)TP[P_SCALE].max; s++)
             for (r = 0; r < 12u; r++)
                 for (note = 36; note < 96u; note++) {
-                    t->p[P_SCALE] = (int16_t)s; t->p[P_ROOT] = (int16_t)r;
+                    t->p[P_SCALE] = (int16_t)s; t->p[P_ROOT] = (int16_t)r; t->p[P_CHBOR] = 1;   /* (BORROW OFF) */
                     t->p[P_CHRD] = (int16_t)(note & 1u ? CH_DIA3 : CH_DIA7);
                     n = chord_build(t, note, out);
                     ok &= n == (note & 1u ? 3u : 4u);
@@ -118,6 +119,7 @@ static int theory(void)
                         ok &= (scale_mask(t) >> ((out[k] + 120u - r) % 12u)) & 1u;
                 }
         bad += check("DIA3 / DIA7 of every scale and root: 3 / 4 notes, every one in key", ok);
+        t->p[P_CHBOR] = 0;
     }
     return bad;
 }
@@ -199,8 +201,8 @@ static int keys(void)
     key_up(K_E4);
     bad += check("  E up: nothing left, MIDI OUT balanced", !ngated(t) && mo_w == 8u);
     t->p[P_VOICE] = V_MONO;
-    key_down(K_C4 + 1u);                                           /* C#: DIA snaps to C */
-    bad += check("MONO: the root alone (C# in C major: C)", ngated(t) == 1u && gate_note(t, 60));
+    key_down(K_C4 + 1u);                                           /* C#: BORROW's Db (OFF: DIA snaps to C) */
+    bad += check("MONO: the root alone (C# in C major with BORROW: Db, C#)", ngated(t) == 1u && gate_note(t, 61));
     t->p[P_VOICE] = V_POLY;
     key_up(K_C4 + 1u);
     bad += check("  released (MONO switched off meanwhile)", !ngated(t));
@@ -539,7 +541,7 @@ static int extras(void)
             for (s = 1; s <= 15u; s++)
                 for (r = 0; r < 12u; r += 5)
                     for (note = 48; note < 72u; note++) {
-                        t->p[P_SCALE] = (int16_t)s; t->p[P_ROOT] = (int16_t)r; t->p[P_CHEXT] = (int16_t)x;
+                        t->p[P_SCALE] = (int16_t)s; t->p[P_ROOT] = (int16_t)r; t->p[P_CHEXT] = (int16_t)x; t->p[P_CHBOR] = 1;
                         t->p[P_CHRD] = (int16_t)(note & 1u ? CH_DIA3 : CH_DIA7);
                         n = chord_build(t, note, out);
                         ok &= n >= 2u && n <= CHORD_MAX;
@@ -548,7 +550,7 @@ static int extras(void)
                     }
         bad += check("EXTRA on DIA3 / DIA7, the 12-note scales and several roots: 2..4 notes, ascending, every one in key", ok);
     }
-    t->p[P_SCALE] = 1; t->p[P_ROOT] = 0; t->p[P_CHEXT] = EX_9;
+    t->p[P_SCALE] = 1; t->p[P_ROOT] = 0; t->p[P_CHEXT] = EX_9; t->p[P_CHBOR] = 0;
     t->p[P_CHRD] = CH_HERA;
     {
         uint8_t a[CHORD_MAX], b[CHORD_MAX];
@@ -617,9 +619,61 @@ static int leading(void)
     return bad;
 }
 
+
+/* BORROW (Hookology, P_CHBOR 0 = ON, the default): DIA3 / DIA7 keys outside the scale play borrowed chords */
+static int borrowed(void)
+{
+    int bad = 0;
+    track_t *t = &trk[0];
+    reset();
+    bad += check("BORROW is ON by default (stored 0), the track's, a value of CHORD 2",
+                 TP[P_CHBOR].def == 0 && t->p[P_CHBOR] == 0 && param_kept(P_CHBOR) && !param_reserved(P_CHBOR) &&
+                 PAGES[page_titled("CHORD 2")].id[1] == P_CHBOR);
+    t->p[P_CHRD] = CH_DIA3;
+    bad += check("C major DIA3: C# Db (Neapolitan), D# Eb, F# F#dim, G# Ab, A# Bb",
+                 chord_is(61, (const uint8_t[]){61, 65, 68, 0}) && name_is(61, "C#") &&
+                 chord_is(63, (const uint8_t[]){63, 67, 70, 0}) && name_is(63, "D#") &&
+                 chord_is(66, (const uint8_t[]){66, 69, 72, 0}) && name_is(66, "F#dim") &&
+                 chord_is(68, (const uint8_t[]){68, 72, 75, 0}) && name_is(68, "G#") &&
+                 chord_is(70, (const uint8_t[]){70, 74, 77, 0}) && name_is(70, "A#"));
+    bad += check("..the keys in the scale are as before (D: Dm, B: Bdim)", name_is(62, "Dm") && name_is(71, "Bdim"));
+    t->p[P_CHRD] = CH_DIA7;
+    bad += check("C major DIA7: Dbmaj7, Ebmaj7, F#dim7, Abmaj7, Bb7 (the backdoor dominant)",
+                 chord_is(61, (const uint8_t[]){61, 65, 68, 72}) && name_is(61, "C#maj7") &&
+                 chord_is(63, (const uint8_t[]){63, 67, 70, 74}) && name_is(63, "D#maj7") &&
+                 chord_is(66, (const uint8_t[]){66, 69, 72, 75}) && name_is(66, "F#dim7") &&
+                 chord_is(68, (const uint8_t[]){68, 72, 75, 79}) && name_is(68, "G#maj7") &&
+                 chord_is(70, (const uint8_t[]){70, 74, 77, 80}) && name_is(70, "A#7"));
+    t->p[P_SCALE] = 2; t->p[P_ROOT] = 9; t->p[P_CHRD] = CH_DIA3;   /* A minor: borrows from A major */
+    bad += check("A minor DIA3: C# C#m, F# F#m, G# G#dim, Bb (Neapolitan), D# D#dim",
+                 chord_is(61, (const uint8_t[]){61, 64, 68, 0}) && name_is(61, "C#m") &&
+                 chord_is(66, (const uint8_t[]){66, 69, 73, 0}) && name_is(66, "F#m") &&
+                 chord_is(68, (const uint8_t[]){68, 71, 74, 0}) && name_is(68, "G#dim") &&
+                 chord_is(70, (const uint8_t[]){70, 74, 77, 0}) && name_is(70, "A#") &&
+                 chord_is(63, (const uint8_t[]){63, 66, 69, 0}) && name_is(63, "D#dim"));
+    t->p[P_SCALE] = 1; t->p[P_ROOT] = 0; t->p[P_CHEXT] = EX_9;
+    bad += check("EXTRA on a borrowed chord: Ab + 9 takes C minor's Bb (G#add9)",
+                 chord_is(68, (const uint8_t[]){68, 72, 75, 82}) && name_is(68, "G#add9"));
+    t->p[P_CHEXT] = 0; t->p[P_CHRD] = CH_MAJ;
+    bad += check("the fixed shapes ignore BORROW (MAJ on C#: C# F G#)", chord_is(61, (const uint8_t[]){61, 65, 68, 0}));
+    t->p[P_CHRD] = CH_DIA3; t->p[P_CHBOR] = 1;
+    bad += check("BORROW OFF: Ab key plays G (the scale note below)", chord_is(68, (const uint8_t[]){67, 71, 74, 0}));
+    track_select(0); t->p[P_QUANT] = Q_SNAP; t->p[P_CHBOR] = 1;
+    ui.home = 0; ui.page = (uint8_t)page_titled("CHORD 2"); ui.force = 1;
+    turn(EN_K2, -1);
+    bad += check("BORROW turned ON while QNT is SNAP: BORROW NEEDS QNT OFF", t->p[P_CHBOR] == 0 && msg_is("BORROW NEEDS QNT OFF"));
+    t->p[P_QUANT] = Q_OFF;
+    t->p[P_CHBOR] = 0; t->p[P_VOIC] = VC_LEAD;
+    chord_lead_forget();
+    bad += check("LEAD into borrowed chords: C, Ab, Bb as C E G, C Eb Ab, Bb D F",
+                 chord_is(60, (const uint8_t[]){60, 64, 67, 0}) && chord_is(68, (const uint8_t[]){60, 63, 68, 0}) &&
+                 chord_is(70, (const uint8_t[]){58, 62, 65, 0}));
+    return bad;
+}
+
 int main(void)
 {
-    int bad = theory() + shapes_voicings() + keys() + arp_rec() + midi_in() + kits() + strumming() + strum_storage() + extras() + leading();
+    int bad = theory() + shapes_voicings() + keys() + arp_rec() + midi_in() + kits() + strumming() + strum_storage() + extras() + leading() + borrowed();
     printf("%s\n", bad ? "CHORD TEST FAILED" : "chord keys test passed");
     return bad != 0;
 }

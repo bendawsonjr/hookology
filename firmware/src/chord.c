@@ -139,6 +139,7 @@ static uint32_t chord_extra(int32_t *iv, uint32_t n, uint32_t ex, const int32_t 
 #include "chord_auto.c"
 #include "chord_melody.c"
 
+static const int32_t X_SHAPE[4] = {2, 5, 9, 14};     /* EXTRA's 2nd 4th 6th 9th on a shape */
 /* the tones of the chord (semitones above *root, ascending, iv[0] = 0) -> their number; DIA may move *root
  * down onto the scale */
 static uint32_t chord_tones(const track_t *t, uint32_t mode, int32_t *root, int32_t *iv)
@@ -163,7 +164,6 @@ static uint32_t chord_tones(const track_t *t, uint32_t mode, int32_t *root, int3
         return n;
     }
     if (mode >= CH_MAJ) {
-        static const int32_t X_SHAPE[4] = {2, 5, 9, 14};
         for (i = 0; i < CHORD_MAX && CHORD_SHAPE[mode - CH_MAJ][i] >= 0; i++)
             iv[n++] = CHORD_SHAPE[mode - CH_MAJ][i];
         return chord_extra_on(t) ? chord_extra(iv, n, (uint32_t)t->p[P_CHEXT], X_SHAPE) : n;
@@ -173,6 +173,22 @@ static uint32_t chord_tones(const track_t *t, uint32_t mode, int32_t *root, int3
         int32_t r = t->p[P_ROOT];
         if (mask == 0xFFFu)
             mask = SCALE_MASK[1];                       /* CHR: no key of its own, the major scale of ROOT */
+        {   /* BORROW (Hookology, P_CHBOR 0 = ON): a key outside the scale plays a borrowed chord. b2: the Neapolitan
+             * (major / maj7); #4: a passing diminished (dim / dim7); else the parallel key's chord on it (a scale with
+             * a major 3rd borrows from the natural minor, one without from the major); none of these: as before */
+            static const int8_t BOR[2][4] = {{0, 4, 7, 11}, {0, 3, 6, 9}};
+            uint32_t rel = (uint32_t)((*root - r + 120) % 12);
+            if (!((mask >> rel) & 1u) && t->p[P_CHBOR] == 0) {
+                if (rel == 1u || rel == 6u) {
+                    n = mode == CH_DIA7 ? 4u : 3u;
+                    for (i = 0; i < n; i++) iv[i] = BOR[rel == 6u][i];
+                    return chord_extra_on(t) && t->p[P_CHEXT] ? chord_extra(iv, n, (uint32_t)t->p[P_CHEXT], X_SHAPE) : n;
+                }
+                uint32_t par = (mask >> 4) & 1u ? SCALE_MASK[2] : SCALE_MASK[1];
+                if ((par >> rel) & 1u)
+                    mask = par;                         /* (EXTRA below then takes the parallel scale's notes too) */
+            }
+        }
         while (guard-- && !((mask >> (uint32_t)((*root - r + 120) % 12)) & 1u))
             (*root)--;                                  /* outside the scale: the scale note below */
         for (i = 0; i < 12u; i++)
