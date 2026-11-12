@@ -398,7 +398,7 @@ static int explicit_rec(void)
         track_t *t = TSEL;
         uint32_t loop = recording_loop(t, seq_div_samples(t->p[P_SDIV]));
         seq_advance(100); press(B_REC);
-        bad += check("explicit REC queues latched recording at the next loop", song.rec_latch == 1 && song.rec_wait == 1 && !rec_on(t));
+        bad += check("explicit REC records at once, latched (Hookology, as SLOOP)", song.rec_latch == 1 && !song.rec_wait && rec_on(t));
         seq_advance(loop - 100u);
         seq_advance(loop - 500u); input_on(t, 60, 93);
         seq_advance(1000);
@@ -470,9 +470,35 @@ static int exclusive_recording(void)
     /* Reasserting the same arm must retain its latch and waiting state. */
     pass_begin(0, 4, 0); seq_advance(100); press(B_REC);
     rec_set(TSEL, 1);
-    bad += check("arming the same track again preserves its pending latched take",
-        song.rec == 1 && song.rec_wait == 1 && song.rec_latch == 1 && !song.rec_pass);
+    bad += check("arming the same track again preserves its latched take, recording at once",
+        song.rec == 1 && !song.rec_wait && song.rec_latch == 1 && song.rec_pass == 1);
     rec_set(TSEL, 0); seq_stop(); led_pos_init();
+    return bad;
+}
+
+
+/* Hookology (as SLOOP): REC while playing records at once, mid-loop, on the step heard; a note held at the press too */
+static int rec_at_once(void)
+{
+    int bad = 0;
+    pass_begin(0, 16, 0);
+    track_t *t = TSEL;
+    t->p[P_SSWING] = 0;
+    uint32_t step = seq_div_samples(t->p[P_SDIV]);
+    seq_advance(step * 5u + 10u);
+    input_on(t, 67, 90);                                /* held before REC */
+    press(B_REC);
+    bad += check("REC mid-loop: recording now, no wait", rec_on(t) && !song.rec_wait && song.rec_latch == 1);
+    seq_advance(step * 2u);
+    input_on(t, 64, 100);
+    bad += check("..a note played at step 7 is written to step 7; the held one from step 5",
+                 t->step[7].time == ST_NOTE && t->step[7].note[0] == 64 && t->step[5].time == ST_NOTE && t->step[5].note[0] == 67);
+    input_off(t, 64); input_off(t, 67);
+    seq_advance(step * 16u);
+    bad += check("..and it keeps recording past the loop end until REC again", rec_on(t));
+    press(B_REC);
+    bad += check("..REC again: the take ends, playback goes on", !song.rec && song.playing);
+    seq_stop(); led_pos_init();
     return bad;
 }
 
@@ -745,7 +771,7 @@ static int project_recording_quantization(void)
 #ifndef RECORDING_NO_MAIN
 int main(void)
 {
-    int bad=project_recording_quantization()+exclusive_recording()+explicit_rec()+take_quantization()+first_note_start()+pattern_passes()+control_tick_precision()+repeated_hits()+independent_lengths()+raw_loop()+raw_storage()+raw_capacity()+copy_and_edit()+slow_precision()+replace_during_replay()+doubles_replaced()+standalone_and_template()+full_recording_replay();
+    int bad=project_recording_quantization()+exclusive_recording()+explicit_rec()+rec_at_once()+take_quantization()+first_note_start()+pattern_passes()+control_tick_precision()+repeated_hits()+independent_lengths()+raw_loop()+raw_storage()+raw_capacity()+copy_and_edit()+slow_precision()+replace_during_replay()+doubles_replaced()+standalone_and_template()+full_recording_replay();
     printf("%s\n",bad?"RAW RECORDING TEST FAILED":"Raw recording tests passed");return !!bad;
 }
 #endif

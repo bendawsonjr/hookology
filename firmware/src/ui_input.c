@@ -699,7 +699,8 @@ static void tracks_knob(uint32_t k, int32_t s)
 }
 
 /* REC latches recording; SEQ's pattern shortcuts arm only one pass. During
- * playback both wait for loop zero; another tap cancels or finishes the take.
+ * playback REC records at once (Hookology, as SLOOP: seq.c rec_set 2), the one-pass
+ * shortcuts wait for loop zero; another tap cancels or finishes the take.
  * On STEP, armed keys audition/record instead of writing the cursor step. */
 static void rec_toggle(uint32_t latch)
 {
@@ -709,8 +710,7 @@ static void rec_toggle(uint32_t latch)
         return;
     }
     fm1_irq_off();
-    rec_set(TSEL, !(song.rec & bit));
-    if (latch && (song.rec & bit)) song.rec_latch |= bit;
+    rec_set(TSEL, (song.rec & bit) ? 0u : latch ? 2u : 1u);
     fm1_irq_on();
     ui.force = 1;                                     /* also refresh the status on MENU / ABOUT */
     if (song.rec_wait & bit)
@@ -740,8 +740,7 @@ static void rec_play(void)
         return;
     }
     fm1_irq_off();
-    rec_set(TSEL, 1);
-    song.rec_latch |= bit;
+    rec_set(TSEL, 2);
     fm1_irq_on();
     if (!song.playing && !seq_counting())
         transport_req = 1;

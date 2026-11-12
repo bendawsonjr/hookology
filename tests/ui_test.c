@@ -573,17 +573,29 @@ static int test_rec(void)
     return bad;
 }
 
-/* Waiting is persistent transport state, confined to the header. */
+/* Waiting is persistent transport state, confined to the header (the one-pass arm: SEQ's shortcuts). REC tapped
+ * or REC + PLAY while playing record at once (Hookology, as SLOOP): no waiting. */
 static int test_recording_header(void)
 {
     int bad = 0;
     uint16_t screen[240 * 240];
+    for (uint32_t page = 0; page < 2u; page++) for (uint32_t chord = 0; chord < 2u; chord++) {
+        ui_power_on();
+        if (page) open_family(FAM_SEQ);
+        seq_start(); seq_advance(0); seq_advance(1);
+        if (chord) rec_play(); else rec_tap();
+        frame();
+        bad += check("REC (or REC + PLAY) while playing records at once: no waiting, latched",
+                     rec_on(TSEL) && !song.rec_wait && song.rec_latch == 1u && !head_waiting());
+        rec_tap();
+        seq_stop();
+    }
     for (uint32_t page = 0; page < 2u; page++) for (uint32_t chord = 0; chord < 2u; chord++)
     for (uint32_t cancel = 0; cancel < 2u; cancel++) {
         ui_power_on();
         if (page) open_family(FAM_SEQ);
         seq_start(); seq_advance(0); seq_advance(1);
-        if (chord) rec_play(); else rec_tap();
+        rec_toggle(0);                                   /* (one pass: waits for the loop start) */
         frame();
         bad += check("queued recording uses the header without a toast or timed message",
                      song.rec_wait == 1u && head_waiting() && !toast_shown && !ui.msg_t);

@@ -683,6 +683,9 @@ static void rec_disarm(track_t *t)
     song.rec_latch &= (uint8_t)~bit;
     recording_undo_finish(t);
 }
+static void rec_begin_held(track_t *t);
+/* on: 1 arms (one pass, while playing from the next loop start), 2 latches (Hookology: while playing, at once, as
+ * SLOOP: REC tapped or REC + PLAY records from that moment, pass after pass, until REC again; held notes from now) */
 static void rec_set(track_t *t, uint32_t on)
 {
     uint8_t bit = (uint8_t)(1u << trk_index(t));
@@ -691,7 +694,11 @@ static void rec_set(track_t *t, uint32_t on)
             if ((song.rec & (1u << k)) && &trk[k] != t) rec_disarm(&trk[k]);
         if (song.rec & bit) return;
         song.rec |= bit;
-        if (song.playing && free_mode) song.rec_pass |= bit;   /* FREE: at once */
+        if (on == 2u) song.rec_latch |= bit;
+        if (song.playing && (free_mode || on == 2u) && t->seq_pos < 0x7FFFFFFFu) {
+            song.rec_pass |= bit;                       /* at once */
+            rec_begin_held(t);
+        } else if (song.playing && free_mode) song.rec_pass |= bit;
         else if (song.playing && t->seq_pos < 0x7FFFFFFFu) song.rec_wait |= bit;
         else if (song.playing) song.rec_pass |= bit;
     } else rec_disarm(t);
