@@ -24,7 +24,7 @@ enum { MI_COLOR, MI_FONT, MI_HOLD, MI_LIGHTS,
        MI_BLE,
 #endif
        MI_MIDI_OUT, MI_MIDI_KNOBS, MI_MIDI_MODE, MI_MIDI_LEARN,
-       MI_CLICK, MI_CLICK_LEVEL, MI_COUNTIN, MI_REC_MODE, MI_PREVIEW, MI_ADD, MI_AUTOSAVE, MI_PICKER, MI_ACCEL, MI_HOME_SEL, MI_GLO_SEL, MI_TRACKS, MI_SCREEN, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
+       MI_CLICK, MI_CLICK_LEVEL, MI_CLICK_SOUND, MI_COUNTIN, MI_REC_MODE, MI_PREVIEW, MI_ADD, MI_AUTOSAVE, MI_PICKER, MI_ACCEL, MI_HOME_SEL, MI_GLO_SEL, MI_TRACKS, MI_SCREEN, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
        MI_COUNT };
 static const char *const MI_NAME[MI_COUNT] = {"COLOR", "FONT", "HOLD", "LIGHTS",
 #if MELODEE_USB_AUDIO
@@ -37,7 +37,7 @@ static const char *const MI_NAME[MI_COUNT] = {"COLOR", "FONT", "HOLD", "LIGHTS",
                                               "BLUETOOTH",
 #endif
                                               "MIDI OUT", "MIDI KNOBS", "MIDI MODE", "MIDI LEARN",
-                                              "AUDIO CLICK", "CLICK LEVEL", "COUNT-IN", "REC MODE", "NOTE PREVIEW", "CHORD ENTRY",
+                                              "AUDIO CLICK", "CLICK LEVEL", "CLICK SOUND", "COUNT-IN", "REC MODE", "NOTE PREVIEW", "CHORD ENTRY",
                                               "AUTOSAVE", "PICKER POPUPS", "KNOB ACCEL", "HOME SELECT", "GLO SELECT", "UNUSED TRACKS", "SCREEN OFF", "CALIBRATION", "ABOUT", "SOUND DESIGNER", "BACK"};
 #if MELODEE_USB_AUDIO
 /* USB AUDIO's four settings, as ua_off_want (UA_OFF_OUT | UA_OFF_IN) */
@@ -310,6 +310,8 @@ static void draw_menu(void)
                 if (i >= MI_CLICK && i <= MI_ADD)
                     value = i==MI_CLICK?(const char *const[]){"OFF","REC","ON"}[settings_click%3u]:
                       i==MI_CLICK_LEVEL?(fmt_int(b,settings_click_level),str_cpy(b+str_len(b),"%",4),b):
+                      i==MI_CLICK_SOUND?(settings_click_soft?"SOFT":"BRIGHT"):
+                      i==MI_REC_MODE?0:
                       i==MI_COUNTIN?(const char *const[]){"OFF","1 BAR","2 BARS"}[settings_countin%3u]:
                       i==MI_PREVIEW?(settings_preview?"ON":"OFF"):(settings_chord_add?"ADD":"HOLD");
                 if (i == MI_ACCEL) value = PREF_BITS & PREF_ACCEL_OFF ? "OFF" : "ON";
@@ -487,11 +489,16 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
         settings_click_level=(uint8_t)(s?clamp(v+s*5,0,100):v+5>100?0:v+5);
         ok=0;ui.force=1;
     }
-    if((s || ok) && ui.menu==1 && ui.menu_sel>=MI_CLICK && ui.menu_sel<=MI_ADD && ui.menu_sel!=MI_CLICK_LEVEL){
-        uint32_t id=ui.menu_sel-MI_CLICK,top=id<3?2:1;
-        uint32_t value=id==0?settings_click:id==2?settings_countin:id==3?settings_preview:settings_chord_add;
+    /* AUDIO CLICK, CLICK SOUND, COUNT-IN, NOTE PREVIEW, CHORD ENTRY: each by its name (Hookology: REC MODE between them
+     * used to shift the rows below it onto the wrong setting) */
+    if((s || ok) && ui.menu==1 && (ui.menu_sel==MI_CLICK || ui.menu_sel==MI_CLICK_SOUND || ui.menu_sel==MI_COUNTIN ||
+                                   ui.menu_sel==MI_PREVIEW || ui.menu_sel==MI_ADD)){
+        uint32_t m=ui.menu_sel,top=m==MI_CLICK || m==MI_COUNTIN?2:1;
+        uint32_t value=m==MI_CLICK?settings_click:m==MI_CLICK_SOUND?settings_click_soft:m==MI_COUNTIN?settings_countin:
+                       m==MI_PREVIEW?settings_preview:settings_chord_add;
         value=s>0?(value<top?value+1:value):s<0?(value?value-1:0):(value+1)%(top+1);
-        if(id==0)settings_click=value;else if(id==2)settings_countin=value;else if(id==3)settings_preview=value;else settings_chord_add=value;
+        if(m==MI_CLICK)settings_click=value;else if(m==MI_CLICK_SOUND)settings_click_soft=value;
+        else if(m==MI_COUNTIN)settings_countin=value;else if(m==MI_PREVIEW)settings_preview=value;else settings_chord_add=value;
         ok=0;ui.force=1;
     }
     if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_AUTOSAVE) {

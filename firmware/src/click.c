@@ -2,13 +2,16 @@
  * Copyright (C) 2026 Kerem Kilic (Ellic Studio) */
 /* Adapted from Felucca's metronome (1.1). Quarter notes in 4/4, with an
  * accented downbeat. A decaying sine at 1760/1320 Hz sounds only at the DAC,
- * after effects and USB capture, at its own level (CLICK LEVEL 0..100 %, apart from MASTER and the mixer).
+ * after effects and USB capture, at its own level (CLICK LEVEL 0..100 %, apart from MASTER and the mixer). Hookology:
+ * the level is a loudness curve (the gain its square: 50 % -12 dB, 10 % -40 dB) and CLICK SOUND SOFT sounds 1000 / 800 Hz.
  * Preferences are device settings; seq.c requests the regular and count-in beats. */
 enum { CLICK_OFF, CLICK_REC, CLICK_ON };
 static volatile uint8_t click_req;          /* seq.c: 1 a beat, 2 the bar's first; the next block starts it */
 /* the magic circle (s, c: a sine and its quadrature) at k = 2 sin(pi f / FS), Q15; env Q15, decaying 1/256 a sample */
 #define CLICK_K_DOWN 8195                    /* 1760 Hz */
 #define CLICK_K_BEAT 6154                    /* 1320 Hz */
+#define CLICK_K_SOFT_DOWN 4667               /* SOFT: 1000 Hz */
+#define CLICK_K_SOFT_BEAT 3734               /* SOFT: 800 Hz */
 #define CLICK_AMP 16384                      /* the circle's amplitude */
 #define CLICK_GAIN_FULL 8192                 /* Q12 at 100 %: the downbeat's peak at DAC full scale (Q15) */
 static struct { int32_t s, c, k, env, g; } clk;
@@ -22,9 +25,11 @@ static __attribute__((noinline)) void click_render(int32_t *out, uint32_t n)
         uint32_t down = click_req == 2u;
         clk.s = 0;                                  /* (from 0: no step at the start) */
         clk.c = CLICK_AMP;
-        clk.k = down ? CLICK_K_DOWN : CLICK_K_BEAT;
+        clk.k = settings_click_soft ? (down ? CLICK_K_SOFT_DOWN : CLICK_K_SOFT_BEAT) : down ? CLICK_K_DOWN : CLICK_K_BEAT;
         clk.env = 32767;
-        clk.g = (int32_t)((settings_click_level > 100u ? 100u : settings_click_level) * CLICK_GAIN_FULL / 100u) >> (down ? 0 : 1);
+        uint32_t lv = settings_click_level > 100u ? 100u : settings_click_level;
+        int32_t g = (int32_t)(lv * lv * CLICK_GAIN_FULL / 10000u) >> (down ? 0 : 1);   /* (the loudness curve) */
+        clk.g = lv && g < 1 ? 1 : g;                /* (1 %: just audible, not rounded away) */
                                                     /* Q12: the downbeat x1, a beat x0.5 (-6 dB) */
         click_req = 0;
     }

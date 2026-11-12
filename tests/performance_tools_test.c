@@ -121,14 +121,15 @@ static void test_compatibility(void)
     reset_tools();settings_click=2;settings_click_level=15;settings_countin=2;settings_preview=settings_chord_add=1;
     persist_t p={0};settings_export(&p);settings_click=settings_countin=settings_preview=settings_chord_add=0;settings_click_level=CLICK_LEVEL_DEFAULT;
     assert(settings_import(&p,sizeof p));assert(settings_click==2 && settings_click_level==15 && settings_countin==2 && settings_preview && settings_chord_add);
-    /* older builds read the nearest LOW/MID/HIGH from the zoom word: 15 % is MID (0) */
-    assert(((p.zoom>>10)&3u)==0u);
+    /* older builds read the nearest LOW/MID/HIGH from the zoom word: 15 % on the loudness curve is LOW (1), 35 % MID (0) */
+    assert(((p.zoom>>10)&3u)==1u);
+    settings_click_level=35;settings_export(&p);assert(((p.zoom>>10)&3u)==0u);settings_click_level=15;settings_export(&p);
     settings_click_level=0;settings_export(&p);assert(((p.zoom>>10)&3u)==1u);
     settings_click_level=100;settings_export(&p);assert(((p.zoom>>10)&3u)==2u);
-    /* records from before the percentage: LOW/MID/HIGH become 6/12/25 %, as heard at the default MASTER */
+    /* records from before the percentage: LOW/MID/HIGH become 25/35/50 % (Hookology's loudness curve: as heard before) */
     for(uint32_t old=0;old<3;old++) {
         memset(p.favorites.factory[1]+24,0,4);p.zoom=0x52500000u|((old<<2)|1u)<<8;
-        assert(settings_import(&p,sizeof p));assert(settings_click_level==(old==1u?6u:old==2u?25u:12u));
+        assert(settings_import(&p,sizeof p));assert(settings_click_level==(old==1u?25u:old==2u?50u:35u));
     }
     p.zoom=1;assert(settings_import(&p,sizeof p));assert(!settings_click && settings_click_level==CLICK_LEVEL_DEFAULT && !settings_countin && !settings_preview && !settings_chord_add);
     project_t q,back;project_store_t current;project_capture(&q);q.t[0].p[P_E4]=53;
@@ -147,8 +148,38 @@ static void test_compatibility(void)
         TSEL->eng_req=3;TSEL->p[P_RESERVED35]=77;apply_preset_to(TSEL,8);assert(TSEL->p[P_RESERVED35]==0 && TSEL->p[P_RESERVED36]==0);
     }
 }
+/* Hookology: CLICK LEVEL on a loudness curve, CLICK SOUND SOFT lower, both kept as device settings */
+static uint32_t click_peak(uint32_t level, uint32_t soft, uint32_t *crossings)
+{
+    int32_t out[2*CTL];uint32_t peak=0,cross=0;int32_t last=0;
+    settings_click_level=(uint8_t)level;settings_click_soft=(uint8_t)soft;clk.env=0;click_req=2;
+    for(uint32_t b=0;b<16u;b++){
+        memset(out,0,sizeof out);click_render(out,CTL);
+        for(uint32_t i=0;i<CTL;i++){int32_t v=out[2*i];uint32_t a=(uint32_t)abs(v);if(a>peak)peak=a;if((v>0&&last<0)||(v<0&&last>0))cross++;if(v)last=v;}
+    }
+    if(crossings)*crossings=cross;
+    return peak;
+}
+static void test_click_curve_soft(void)
+{
+    reset_tools();
+    uint32_t c_bright,c_soft,p100=click_peak(100,0,&c_bright),p50=click_peak(50,0,0),p10=click_peak(10,0,0),p5=click_peak(5,0,0),p1=click_peak(1,0,0);
+    double r50=(double)p50/p100,r10=(double)p10/p100,r5=(double)p5/p100;
+    assert(r50>0.22 && r50<0.28);                       /* 50 %: about -12 dB */
+    assert(r10>0.007 && r10<0.013);                     /* 10 %: about -40 dB */
+    assert(r5>0.001 && r5<0.004 && p1>0 && p1<p5);      /* 5 %: about -52 dB; 1 % still sounds */
+    uint32_t ps=click_peak(100,1,&c_soft);
+    assert(c_soft*100u<c_bright*65u && c_soft*100u>c_bright*45u);   /* SOFT: 1000 Hz against 1760 */
+    assert(ps>p100*8u/10u);                             /* (the same level) */
+    persist_t p={0};settings_click_level=20;settings_click_soft=1;settings_export(&p);
+    settings_click_level=CLICK_LEVEL_DEFAULT;settings_click_soft=0;
+    assert(settings_import(&p,sizeof p) && settings_click_level==20u && settings_click_soft==1u);
+    settings_click_level=CLICK_LEVEL_DEFAULT;settings_click_soft=1;settings_export(&p);settings_click_soft=0;
+    assert(settings_import(&p,sizeof p) && settings_click_level==CLICK_LEVEL_DEFAULT && settings_click_soft==1u);
+    settings_click_level=CLICK_LEVEL_DEFAULT;settings_click_soft=0;clk.env=click_req=0;
+}
 int main(void)
 {
-    test_recording_tools();test_click_volume();test_editing_tools();test_midi_and_levels();test_compatibility();
+    test_recording_tools();test_click_volume();test_click_curve_soft();test_editing_tools();test_midi_and_levels();test_compatibility();
     puts("performance tools: count-in, click, additive entry, audition, momentary restore/keep, MIDI, drum levels and inert legacy effect values passed");return 0;
 }

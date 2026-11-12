@@ -976,6 +976,22 @@ static int test_track_count(void)
                  (GLO_SELECT & TRACKS_HIDE) && stage_rows() == 1u && st_row_h() == ST_ROWS_H);
     hold(B_HOME); ui.menu_sel = MI_TRACKS; turn(EN_K2, -1); hold(B_HOME);
     bad += check("  KNOB 2 left: SHOW again", !(GLO_SELECT & TRACKS_HIDE) && stage_rows() == NROWS && ui.home);
+    {   /* Hookology: each menu row changes its own setting (REC MODE once shifted NOTE PREVIEW onto CHORD ENTRY); CLICK SOUND */
+        uint8_t pv = settings_preview, ca = settings_chord_add, so = settings_click_soft;
+        uint32_t rm = GLO_SELECT & REC_MODE_FREE;
+        hold(B_HOME); ui.menu_sel = MI_REC_MODE; turn(EN_K2, rm ? -1 : 1); hold(B_HOME);
+        int ok = (GLO_SELECT & REC_MODE_FREE) != rm && settings_preview == pv && settings_chord_add == ca;
+        hold(B_HOME); ui.menu_sel = MI_REC_MODE; turn(EN_K2, rm ? 1 : -1); hold(B_HOME);
+        hold(B_HOME); ui.menu_sel = MI_PREVIEW; turn(EN_K2, pv ? -1 : 1); hold(B_HOME);
+        ok &= settings_preview != pv && settings_chord_add == ca;
+        hold(B_HOME); ui.menu_sel = MI_ADD; turn(EN_K2, ca ? -1 : 1); hold(B_HOME);
+        ok &= settings_chord_add != ca;
+        hold(B_HOME); ui.menu_sel = MI_CLICK_SOUND; turn(EN_K2, 1); hold(B_HOME);
+        ok &= settings_click_soft == 1u && settings_preview != pv;
+        settings_preview = pv; settings_chord_add = ca; settings_click_soft = so;
+        if ((GLO_SELECT & REC_MODE_FREE) != rm) GLO_SELECT ^= REC_MODE_FREE;
+        bad += check("  menu: REC MODE, NOTE PREVIEW, CHORD ENTRY and CLICK SOUND each change only their own setting", ok);
+    }
     bad += check("  no pattern at all: Stage's card shows no pattern pill, no steps (a synth)", stage_seq_idle(0));
     one_note(&trk[0], 3, 60);
     ok = !stage_seq_idle(0);

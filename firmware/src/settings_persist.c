@@ -116,8 +116,10 @@ static int settings_import(persist_t *p, int n)
     {
         const uint8_t *q = p->favorites.factory[CLICK_PREF_ROW] + CLICK_PREF_BYTE;
         uint32_t level = (rp >> 2) & 3u;
-        settings_click_level = q[0] == 'C' && q[1] == 'K' && q[2] == 1u && q[3] <= 100u ? q[3] :
-                               (uint8_t)(level == 1u ? 6u : level == 2u ? 25u : CLICK_LEVEL_DEFAULT);
+        uint32_t tagged = q[0] == 'C' && q[1] == 'K' && (q[2] == 1u || q[2] == 2u) && q[3] <= 100u;   /* (2: SOFT) */
+        settings_click_level = tagged ? q[3] : (uint8_t)(level == 1u ? 25u : level == 2u ? 50u : CLICK_LEVEL_DEFAULT);
+                                                    /* (untagged LOW / MID / HIGH: as loud on the curve as they were) */
+        settings_click_soft = (uint8_t)(tagged && q[2] == 2u);
     }
 #if MELODEE_USB_AUDIO
     {
@@ -152,7 +154,7 @@ static void settings_export(persist_t *p)
     p->magic = PERSIST_MAGIC;
     p->palette = palette_to_stored(settings.palette);
     p->lowcut = 0;
-    uint32_t rp = settings_click % 3u | (settings_click_level < 9u ? 1u : settings_click_level >= 19u ? 2u : 0u) << 2 |
+    uint32_t rp = settings_click % 3u | (settings_click_level < 30u ? 1u : settings_click_level >= 44u ? 2u : 0u) << 2 |
                   (settings_countin % 3u) << 4 | (settings_preview != 0u) << 6 | (settings_chord_add != 0u) << 7;
     p->zoom = (settings.zoom & 0xFFu) | (rp ? RECORD_PREF_TAG | rp << 8 : 0u);
     p->panel = panel;
@@ -172,8 +174,8 @@ static void settings_export(persist_t *p)
     {
         uint8_t *q = p->favorites.factory[CLICK_PREF_ROW] + CLICK_PREF_BYTE;
         memset(q, 0, 4);
-        if (settings_click_level != CLICK_LEVEL_DEFAULT) {
-            q[0] = 'C'; q[1] = 'K'; q[2] = 1u; q[3] = settings_click_level > 100u ? 100u : settings_click_level;
+        if (settings_click_level != CLICK_LEVEL_DEFAULT || settings_click_soft) {
+            q[0] = 'C'; q[1] = 'K'; q[2] = settings_click_soft ? 2u : 1u; q[3] = settings_click_level > 100u ? 100u : settings_click_level;
         }
     }
 #if MELODEE_USB_AUDIO
