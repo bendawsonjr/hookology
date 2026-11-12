@@ -163,7 +163,8 @@ static uint32_t voice_units(const track_t *t)
 }
 
 /* A shared effect's cost in units, off the budget: about 200 us, REVERB 377; REVERB LIGHT (ECO, Hookology) 5: on the
- * user's Bop its share of busy blocks fell 78 % (52 -> 11 per 10,000 jobs), counted a third, rounded up */
+ * user's Bop its share of busy blocks fell 78 % (52 -> 11 per 10,000 jobs), counted a third, rounded up; DELAY 4, with
+ * ECO 3: its kernel 0.26 / 0.18 of REVERB's on the host (the host overstated REVERB LIGHT's cost), rounded up */
 static uint32_t voice_fx_units(void)
 {
 #if MELODEE_ADMISSION
@@ -172,7 +173,8 @@ static uint32_t voice_fx_units(void)
     uint32_t u = 0;
     for (uint32_t k = 0; k < FX_SLOTS; k++) {
         int32_t type = song.g[G_MFXTYPE + k * FX_PARAMS];
-        u += type == FX_REVERB ? (song.g[G_ECO] == 1 ? 5u : 15u) : type != FX_OFF ? 8u : 0u;
+        u += type == FX_REVERB ? (song.g[G_ECO] == 1 ? 5u : 15u) : type == FX_DELAY ? (song.g[G_ECO] == 1 ? 3u : 4u) :
+             type != FX_OFF ? 8u : 0u;
     }
     return u;
 #endif

@@ -738,6 +738,19 @@ static void pv_fx(int32_t h)
             x += step;
             n++;
         }
+    } else if (type == FX_DELAY) {                      /* (Hookology) the sound and its echoes at TIME, fading by FDBK */
+        int32_t step = 52 * FX_DTIME_12[clamp(rate, 0, 7)] / 12, x = 18, v = 127, n = 0, base = (low >> 4) - 6, hgt = ((low - top) >> 4) - 6;
+        for (k = 0; k < 5u; k++)                        /* the beats */
+            cv_rect(18 + (int32_t)k * 51, base + 5, 2, 4, k % 4u ? T_LINE : T_DIM);
+        if (step < 3) step = 3;
+        while (x < 222 && v > 2 && n < 24) {
+            int32_t b = hgt * v / 127, w = step * 40 / 100 < 3 ? 3 : step * 40 / 100;
+            if (b > 0)
+                cv_rrect(x, base - b, w, b, w > 5 ? 3 : 1, n ? ux_mix(T_PANEL, th, 95 - (n < 7 ? n : 7) * 9) : gh, T_PANEL);
+            v = n ? v * clamp(cha, 0, 127) * 85 / (127 * 100) : 127 * clamp(mix, 0, 127) / 127;
+            x += step;
+            n++;
+        }
     } else {
         int ghost = fx_sloop_type((int32_t)type);       /* (the older effects: their curve alone) */
         for (k = ghost ? 0u : 1u; k < (type == FX_PEDAL_CHORUS ? 3u : 2u); k++) {   /* the dry trace (dim), the

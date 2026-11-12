@@ -278,6 +278,7 @@ core && t "Retired Echo: reserved ID and reclaimed tanks; SLOOP Reverb and maste
 sound && t "Master audio punch: 27 effects, history, freeze, transitions and key ownership" punch_master_test -O1 $FW
 sound && t "SLOOP FX: compact stereo reverb, eight inserts, shared returns and controls" sloop_fx_test -O1 $FW
 sound && t "REVERB LIGHT: ECONOMY's half-rate reverb against FULL, memory, switching" reverb_light_test -O1 $FW
+sound && t "DELAY: timing, feedback, bounded, slow tempos, ECONOMY, knobs, one in the rack" delay_test -O1 $FW
 core && t "MIDI inserts: native release tails, timed note repeats, ownership, UI and persistence" midi_insert_test -O1 $FW
 core && t "MIDI Track: USB notes, TRS routing, song/recording, cleanup, silent mixer and persistence" midi_track_test -O1 $FW
 core && t "MIDI Track: host output, reconnect cleanup and USB input loss" midi_track_host_test:midi_track_test -O1 -DMELODEE_USB_HOST=1 $FW

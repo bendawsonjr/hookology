@@ -1288,14 +1288,16 @@ static void edit_param(uint32_t slot, int32_t steps)
         v = accel(EN_K1 + slot, steps, desc_range(d));
         v = fx_names(d) ? fx_step(d, *vp, v) : enum_step(d, *vp, clamp(*vp + v, d->min, d->max));
     }
-    if (pg->scope == SC_GLOBAL && !fx_list_take && fx_names(d) && v == FX_REVERB && *vp != FX_REVERB &&
+    if (pg->scope == SC_GLOBAL && !fx_list_take && fx_names(d) && fx_single(v) && *vp != v &&
         vp >= song.g + G_MFXTYPE && vp <= song.g + G_MFX3TYPE && ((uint32_t)(vp - song.g) - G_MFXTYPE) % FX_PARAMS == 0u) {
-        /* Hookology: a shared slot turning past REVERB while another slot has it skips it (one reverb: landing on it
-         * would take it from that slot); the effects' list (OCT+) still moves it on purpose */
-        uint32_t me = ((uint32_t)(vp - song.g) - G_MFXTYPE) / FX_PARAMS, other = 0;
-        for (uint32_t k = 0; k < FX_SLOTS; k++)
-            other |= k != me && song.g[G_MFXTYPE + k * FX_PARAMS] == FX_REVERB;
-        if (other) {
+        /* Hookology: a shared slot turning past REVERB (or DELAY) while another slot has it skips it (one each:
+         * landing on it would take it from that slot); the effects' list (OCT+) still moves it on purpose */
+        uint32_t me = ((uint32_t)(vp - song.g) - G_MFXTYPE) / FX_PARAMS;
+        for (uint32_t pass = 0; pass < 2u && fx_single(v) && v != *vp; pass++) {
+            uint32_t other = 0;
+            for (uint32_t k = 0; k < FX_SLOTS; k++)
+                other |= k != me && song.g[G_MFXTYPE + k * FX_PARAMS] == v;
+            if (!other) break;
             int32_t w = fx_step(d, v, steps > 0 ? 1 : -1);
             v = w == v ? *vp : w;
         }

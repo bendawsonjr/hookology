@@ -156,8 +156,10 @@ enum {                          /* per-track parameters */
 #define FX_SLOTS 3u
 #define FX_PARAMS 4u
 /* Append-only effect IDs; shared pickers leave MIDI-only IDs empty. */
-enum { FX_OFF, FX_PHASER, FX_WIDTH, FX_FORMANT, FX_TAPE, FX_SPIT, FX_ECHO, FX_ROOM, FX_REVERB, FX_CHORUS, FX_AUDIO_COUNT, FX_MIDIVERB = FX_AUDIO_COUNT, FX_MIDIDELAY, FX_SOFT, FX_HARD, FX_FOLD, FX_FUZZ, FX_CRUSH, FX_FLANGER, FX_PEDAL_PHASER, FX_PEDAL_CHORUS, FX_COUNT };
-/* Slot 6 stays retired. Slot 8 is the SLOOP reverb replacement. */
+enum { FX_OFF, FX_PHASER, FX_WIDTH, FX_FORMANT, FX_TAPE, FX_SPIT, FX_ECHO, FX_ROOM, FX_REVERB, FX_CHORUS, FX_AUDIO_COUNT, FX_MIDIVERB = FX_AUDIO_COUNT, FX_MIDIDELAY, FX_SOFT, FX_HARD, FX_FOLD, FX_FUZZ, FX_CRUSH, FX_FLANGER, FX_PEDAL_PHASER, FX_PEDAL_CHORUS, FX_DELAY, FX_COUNT };
+/* Slot 6 stays retired. Slot 8 is the SLOOP reverb replacement. FX_DELAY (Hookology): the shared audio delay (fx.c). */
+/* one of each in the shared rack: their memory (REVERB's tank, DELAY's line) */
+static int fx_single(int32_t t){return t==FX_REVERB || t==FX_DELAY;}
 static int fx_retired(int32_t type) { return type == FX_ECHO; }
 static int fx_sloop_type(int32_t t){return t>=FX_SOFT && t<=FX_PEDAL_CHORUS;}
 static int fx_sloop_swept(int32_t t){return t>=FX_FLANGER && t<=FX_PEDAL_CHORUS;}
@@ -172,7 +174,7 @@ static void track_fx_normalize(int16_t *p)
     for(uint32_t slot=0;slot<FX_SLOTS;slot++)p[P_FXTYPE+slot*FX_PARAMS]=(int16_t)fx_track_type(p[P_FXTYPE+slot*FX_PARAMS]);
 }
 static int param_fx_tone(uint32_t id) { return id>=P_FXTONE && id<=P_FX3TONE; }
-static int fx_has_tone(int32_t type) { return type==FX_ROOM || type==FX_REVERB; }   /* fx.c FX_ECHO, FX_ROOM, FX_REVERB */
+static int fx_has_tone(int32_t type) { return type==FX_ROOM || type==FX_REVERB || type==FX_DELAY; }   /* fx.c FX_ECHO, FX_ROOM, FX_REVERB */
 static int param_fx(uint32_t id) { return (id>=P_FXTYPE && id<=P_FX3CHAR) || param_fx_tone(id); }
 /* TONE -63..63 -> the cut it sets (Hz), 0 = FULL (none but the effect's own floor, fx_floor_hz): below 0 a high cut,
  * 2640 Hz at -1 down to 120 Hz at -63; above 0 a low cut, 150 Hz at 1 up to 1280 Hz at 63 (squared: fine steps where
@@ -187,7 +189,7 @@ static int32_t fx_tone_hz(int32_t v)
 #define FX_FLOOR_ECHO 100
 #define FX_FLOOR_SPACE 150
 static int32_t fx_floor_hz(int32_t type) {
-    return type==FX_REVERB ? 0 : FX_FLOOR_SPACE;
+    return type==FX_REVERB ? 0 : type==FX_DELAY ? FX_FLOOR_ECHO : FX_FLOOR_SPACE;
 }
 static int32_t fx_low_cut_hz(int32_t type, int32_t v)   /* an ECHO / ROOM / REVERB slot's low cut at TONE v */
 {
@@ -221,17 +223,21 @@ enum {                          /* global parameters */
  * selected slot. Values and parameter IDs keep their existing wire layout. */
 static void shared_fx_normalize(int16_t *g)
 {
-    uint32_t reverb=0;
+    uint32_t reverb=0,delay=0;
     for(uint32_t slot=0;slot<FX_SLOTS;slot++){
         int16_t *type=g+G_MFXTYPE+slot*FX_PARAMS;
-        if(fx_retired(*type) || fx_is_midi(*type)) *type=FX_OFF;
+        if(fx_retired(*type) || fx_is_midi(*type) || *type<0 || *type>=FX_COUNT) *type=FX_OFF;
         if(*type==FX_REVERB){if(reverb)*type=FX_OFF;else reverb=1;}
+        if(*type==FX_DELAY){if(delay)*type=FX_OFF;else delay=1;}
     }
 }
 static void shared_fx_select(int16_t *g,uint32_t slot,int32_t type)
 {
-    if(type==FX_REVERB)for(uint32_t k=0;k<FX_SLOTS;k++)
-        if(k!=slot && g[G_MFXTYPE+k*FX_PARAMS]==FX_REVERB)g[G_MFXTYPE+k*FX_PARAMS]=FX_OFF;
+    if(fx_single(type))for(uint32_t k=0;k<FX_SLOTS;k++)
+        if(k!=slot && g[G_MFXTYPE+k*FX_PARAMS]==type)g[G_MFXTYPE+k*FX_PARAMS]=FX_OFF;
+    if(type==FX_DELAY && g[G_MFXTYPE+slot*FX_PARAMS]!=FX_DELAY){   /* (Hookology) DELAY starts at 1/4, feedback 40 % */
+        g[G_MFXRATE+slot*FX_PARAMS]=5;g[G_MFXCHAR+slot*FX_PARAMS]=50;
+    }
     g[G_MFXTYPE+slot*FX_PARAMS]=(int16_t)type;
     shared_fx_normalize(g);
 }
