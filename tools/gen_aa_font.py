@@ -9,6 +9,8 @@ tools/build.py generate() with --preset rubik).
   gen_aa_font.py OUT.h --face NAME=FONT[#index]:PX:FIRST-LAST[+0xNN,...] ...   (explicit faces)
 
 The preset's faces, the large type's roles (docs/design/README.md "Large type"):
+  figtree     (Hookology, the default) assets/fonts/Figtree[wght].ttf (SIL OFL 1.1), the design system's UI face: Figtree
+              600 at the same four sizes and roles, and the same Melodee Pixel faces
   rubik       assets/fonts/Rubik[wght].ttf (SIL OFL 1.1, Google Fonts), Melodee's face: Rubik 500 at 16 / 20 / 28 / 48
               px (LB labels, TX text, VL values, HR the hero; VL and HR one phase, HR the characters a value or a name
               needs), and the same roles in Melodee Pixel (assets/fonts/melodee_pixel.txt: a 5 x 7 1-bit face drawn at
@@ -64,6 +66,13 @@ def preset(name):
                 ("TX", v + "@500", 20, (32, 126), EXTRAS, 0.0, PHASES),
                 ("VL", v + "@500", 28, (32, 126), EXTRAS, 0.0, 1),
                 ("HR", v + "@500", 48, (32, 32), [ord(c) for c in HR_CHARS[1:]], 0.0, 1),
+                ("PIX", str(PIXEL), 0, (32, 126), EXTRAS, None, 1, [("LB", 2, 1), ("TX", 2, 0), ("VL", 3, 0), ("HR", 5, 0)])]
+    if name == "figtree":                                                   # (Hookology) the design system's UI face
+        v = str(FONTS.parent / "assets" / "fonts" / "Figtree[wght].ttf")     # SIL OFL 1.1, Google Fonts
+        return [("LB", v + "@600", 16, (32, 126), EXTRAS, 0.0, PHASES),
+                ("TX", v + "@600", 20, (32, 126), EXTRAS, 0.0, PHASES),
+                ("VL", v + "@600", 28, (32, 126), EXTRAS, 0.0, PHASES),   # (two phases: Figtree's 28 px gaps in one are 1 px out)
+                ("HR", v + "@600", 48, (32, 32), [ord(c) for c in HR_CHARS[1:]], 0.0, 1),
                 ("PIX", str(PIXEL), 0, (32, 126), EXTRAS, None, 1, [("LB", 2, 1), ("TX", 2, 0), ("VL", 3, 0), ("HR", 5, 0)])]
     raise SystemExit(f"unknown preset {name}")
 
@@ -362,7 +371,7 @@ def emit_pixel(face, metrics):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("out")
-    ap.add_argument("--preset", choices=["rubik"])
+    ap.add_argument("--preset", choices=["rubik", "figtree"])
     ap.add_argument("--face", action="append", default=[])
     ap.add_argument("--tracking", type=float, default=0.0, help="extra advance per glyph in em")
     ap.add_argument("--gamma", type=float, default=1.0, help="coverage curve; <1 thickens light-on-dark text")

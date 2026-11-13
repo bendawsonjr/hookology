@@ -6,7 +6,8 @@
 
   gen_ui_palettes.py OUT.h [--report]
 
-Melodee's palettes: NIGHT (the default: warm ink), DAY (light) and CONTRAST (black and white). A palette is BG
+Hookology's STAGE (the default: the design system's dark) and DAYLIGHT (its light), then Melodee's palettes: CONTRAST
+(black and white) .. LO-FI, NIGHT (warm ink) and DAY (light). A palette is BG
 (background), SURF (surface: cards, dialogs, menu rows), TEXT, ACCENT (the one active thing: hot knob, cursor,
 playhead) and four track colours: the selected track's is THEME (values, curves, gauges, selection), so the screen
 takes the colour of the track ALGORITHM picks (src/gfx.c palette_track). The firmware derives the rest with fixed
@@ -30,11 +31,13 @@ import sys
 from pathlib import Path
 
 # name, bg, surf, text, accent, (track 1, 2, 3, 4) (8-bit RGB; stored as RGB565)
+# (Hookology) STAGE (the default) and DAYLIGHT, the Hookology design system's two themes, take the first two places
+# (their stored ids: a device that had NIGHT or DAY gets them); Melodee's NIGHT and DAY follow the others
 PALETTES = [
-    ("NIGHT",    (23, 20, 31),    (36, 32, 46),    (243, 238, 248), (255, 255, 255),
-     ((255, 122, 92), (255, 193, 69), (70, 217, 176), (157, 140, 255))),
-    ("DAY",      (246, 242, 234), (231, 224, 212), (30, 26, 38),    (20, 16, 28),
-     ((160, 42, 22), (116, 68, 0), (0, 92, 72), (78, 56, 184))),
+    ("STAGE",    (21, 33, 43),    (30, 46, 57),    (241, 244, 242), (255, 255, 255),
+     ((255, 90, 54), (255, 194, 61), (31, 163, 156), (143, 128, 242))),
+    ("DAYLIGHT", (241, 244, 242), (255, 255, 255), (21, 33, 43),    (21, 33, 43),
+     ((194, 57, 26), (150, 102, 0), (14, 127, 121), (102, 85, 214))),
     ("CONTRAST", (0, 0, 0),       (34, 34, 34),    (255, 255, 255), (255, 255, 255),
      ((255, 128, 96), (255, 214, 0), (0, 236, 188), (176, 160, 255))),
     ("SUNSET",   (34, 16, 34),    (54, 28, 52),    (255, 236, 240), (255, 255, 255),
@@ -47,7 +50,14 @@ PALETTES = [
      ((150, 20, 102), (32, 64, 178), (0, 88, 90), (138, 54, 0))),
     ("LO-FI",    (32, 28, 26),    (48, 42, 38),    (236, 226, 208), (250, 244, 232),
      ((218, 140, 128), (214, 182, 104), (146, 184, 142), (142, 164, 206))),
+    ("NIGHT",    (23, 20, 31),    (36, 32, 46),    (243, 238, 248), (255, 255, 255),
+     ((255, 122, 92), (255, 193, 69), (70, 217, 176), (157, 140, 255))),
+    ("DAY",      (246, 242, 234), (231, 224, 212), (30, 26, 38),    (20, 16, 28),
+     ((160, 42, 22), (116, 68, 0), (0, 92, 72), (78, 56, 184))),
 ]
+# (Hookology) the design system's palettes: the four knobs keep the four brand colours on every track's pages (KNOB 1
+# the coral, 2 the gold, 3 the teal, 4 the violet) instead of shades of the track's
+FIXED_KNOBS = {"STAGE", "DAYLIGHT"}
 TEST_GRAY = ("GRAY", (14, 14, 14), (36, 36, 36), (204, 204, 204), (255, 255, 255),
              ((232, 232, 232), (220, 220, 220), (208, 208, 208), (244, 244, 244)))
 PAL_TAG = 96                       # stored id = PAL_TAG + index (ids below: earlier firmware, read as the default)
@@ -55,7 +65,8 @@ REC_DARK, REC_LIGHT = (255, 72, 72), (190, 24, 40)
 QR_LIGHT, QR_DARK, CRASH_BG, CRASH_INK = (255, 255, 255), (0, 0, 0), (160, 0, 0), (255, 255, 255)
 PCT = {"MID": 70, "DIM": 42, "LINE": 18, "SEL": 80, "TINT": 12, "KEY": 78}
 RAISE_PCT = 12                     # SURF -> TEXT
-LINE_PCT = {"NIGHT": 10}           # a palette's own LINE (else PCT["LINE"]): NIGHT's dividers as faint as the design's
+LINE_PCT = {"NIGHT": 10, "STAGE": 10}
+SEL_PCT = {"STAGE": 100, "DAYLIGHT": 100}   # (Hookology) a palette's own SEL: the design system's solid selection fills           # a palette's own LINE (else PCT["LINE"]): NIGHT's dividers as faint as the design's
 
 
 # the knobs' colours (src/gfx.c T_KNOB): each track colour turned round the hue circle in OKLCH (degrees, and a lightness
@@ -106,6 +117,8 @@ def shades(p):
     name, bg, _, _, _, trk = p
     if name == "GRAY":
         return [[c] * 4 for c in trk]
+    if name in FIXED_KNOBS:
+        return [list(trk) for _ in trk]
     away = -1.0 if sum(bg) > 3 * 128 else 1.0          # (a light background: darker)
     return [[shade(c, dh, away * dl) for dh, dl in SHADES] for c in trk]
 
@@ -163,7 +176,7 @@ def derive(p, t):
     mono = name == "GRAY"
     d = dict(bg=bg, surf=surf, text=text, theme=theme, accent=accent,
              mid=mix(bg, text, PCT["MID"], mono), dim=mix(bg, text, PCT["DIM"], mono),
-             line=mix(bg, text, LINE_PCT.get(name, PCT["LINE"]), mono), sel=mix(bg, theme, PCT["SEL"], mono),
+             line=mix(bg, text, LINE_PCT.get(name, PCT["LINE"]), mono), sel=mix(bg, theme, SEL_PCT.get(name, PCT["SEL"]), mono),
              tint=mix(bg, theme, PCT["TINT"], mono), raise_=mix(surf, text, RAISE_PCT, mono),
              key=mix(bg, text, PCT["KEY"], mono))
     d["ink"] = bg
@@ -195,7 +208,7 @@ def main():
     ap.add_argument("--report", action="store_true")
     a = ap.parse_args()
     fails = []
-    assert PALETTES[0][0] == "NIGHT" and len(PALETTES) <= 31
+    assert PALETTES[0][0] == "STAGE" and len(PALETTES) <= 31
     rows = [derive(p, t) for p in PALETTES + [TEST_GRAY] for t in range(4)]
     for name, d in rows:
         if name.startswith("GRAY"):
@@ -236,7 +249,11 @@ def main():
         out += ["/* each palette's LINE (BG -> TEXT %), in UI_PALETTES' order */",
                 "static const uint8_t UI_LINE_PCTS[] = {" +
                 ", ".join(str(LINE_PCT.get(p[0], PCT["LINE"])) for p in PALETTES) + ",",
-                "#ifdef UI_TEST_PALETTE", f"    {LINE_PCT.get(TEST_GRAY[0], PCT['LINE'])},", "#endif", "};"]
+                "#ifdef UI_TEST_PALETTE", f"    {LINE_PCT.get(TEST_GRAY[0], PCT['LINE'])},", "#endif", "};",
+                "/* each palette's SEL (BG -> THEME %), in UI_PALETTES' order (Hookology) */",
+                "static const uint8_t UI_SEL_PCTS[] = {" +
+                ", ".join(str(SEL_PCT.get(p[0], PCT["SEL"])) for p in PALETTES) + ",",
+                "#ifdef UI_TEST_PALETTE", f"    {SEL_PCT.get(TEST_GRAY[0], PCT['SEL'])},", "#endif", "};"]
         out += [f"#define UI_REC_DARK 0x{to565(REC_DARK):04x}u", f"#define UI_REC_LIGHT 0x{to565(REC_LIGHT):04x}u",
                 f"#define UI_QR_LIGHT 0x{to565(QR_LIGHT):04x}u", f"#define UI_QR_DARK 0x{to565(QR_DARK):04x}u",
                 f"#define UI_CRASH_BG 0x{to565(CRASH_BG):04x}u", f"#define UI_CRASH_INK 0x{to565(CRASH_INK):04x}u", ""]

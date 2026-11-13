@@ -115,7 +115,17 @@ static const menu_credit_t MENU_CREDITS[] = {
     {"Emilie Gillet / MIT", MC_TEXT},
     {"https://github.com/pichenettes/eurorack", MC_URL},
     {"", MC_TEXT},
-    {"RUBIK / FONT", MC_TITLE},
+    {"FIGTREE / UI FONT", MC_TITLE},
+    {"The Figtree Project Authors", MC_TEXT},
+    {"SIL Open Font License 1.1", MC_TEXT},
+    {"https://github.com/erikdkennedy/figtree", MC_URL},
+    {"", MC_TEXT},
+    {"UNBOUNDED / SPLASH", MC_TITLE},
+    {"The Unbounded Project Authors", MC_TEXT},
+    {"SIL Open Font License 1.1", MC_TEXT},
+    {"https://github.com/googlefonts/unbounded", MC_URL},
+    {"", MC_TEXT},
+    {"RUBIK / KEYCAP FONT", MC_TITLE},
     {"The Rubik Project Authors", MC_TEXT},
     {"SIL Open Font License 1.1", MC_TEXT},
     {"https://github.com/googlefonts/rubik", MC_URL},
@@ -326,7 +336,7 @@ static void draw_menu(void)
                     value = n ? v : "NONE";
                 }
                 if (i == MI_PICKER) value = PREF_BITS & PREF_PICK_OFF ? "OFF" : "ON";
-                if (i == MI_FONT) value = TY_PIXEL ? "PIXEL" : "RUBIK";
+                if (i == MI_FONT) value = TY_PIXEL ? "PIXEL" : "FIGTREE";   /* (Hookology: the design system's face) */
                 if (i == MI_AUTOSAVE) value = settings_autosave ? "ON" : "OFF";
                 if (i == MI_CHORD_NAMES) value = settings_sharps ? "SHARP" : "FLAT";   /* (Hookology: Ab or G#) */
                 if (i == MI_HOME_SEL) value = HS_NAME[home_select()];

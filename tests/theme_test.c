@@ -46,11 +46,15 @@ int main(int argc, char **argv)
     static const uint8_t pd[] = {0x08, 0xf0};
     const aafont_t probe = {1, 1, 'A', 'A', 0, 0, pg, pd, 0, 0, 0};
     double worst = 100;
-    assert(NPALETTES == 8u && !strcmp(UI_PALETTES[0].name, "NIGHT") && !strcmp(UI_PALETTES[1].name, "DAY") &&
+    /* (Hookology) STAGE (the default) and DAYLIGHT in the first two places, Melodee's NIGHT and DAY at the end */
+    assert(NPALETTES == 10u && !strcmp(UI_PALETTES[0].name, "STAGE") && !strcmp(UI_PALETTES[1].name, "DAYLIGHT") &&
            !strcmp(UI_PALETTES[2].name, "CONTRAST") && !strcmp(UI_PALETTES[3].name, "SUNSET") &&
            !strcmp(UI_PALETTES[4].name, "OCEAN") && !strcmp(UI_PALETTES[5].name, "NEON") &&
            !strcmp(UI_PALETTES[6].name, "CANDY") && !strcmp(UI_PALETTES[7].name, "LO-FI") &&
+           !strcmp(UI_PALETTES[8].name, "NIGHT") && !strcmp(UI_PALETTES[9].name, "DAY") &&
            !strcmp(UI_PALETTES[UI_GRAY_INDEX].name, "GRAY"));
+    for (unsigned t = 0; t < 4u; t++)                          /* (STAGE: the four knobs the four brand colours) */
+        for (unsigned k = 0; k < 4u; k++) assert(UI_PALETTES[0].knob[t][k] == UI_PALETTES[0].trk[k]);
     for (unsigned pt = 0; pt < UI_PAL_ENTRIES * 4u; pt++) {
         unsigned p = pt / 4u, t = pt % 4u;
         uint16_t *tok = &ux.bg;
@@ -68,7 +72,9 @@ int main(int argc, char **argv)
             {T_INK, T_KEY, 4.5}, {T_KEY, T_BG, 3.0}, {T_KEY, T_SURF, 2.5}, {T_INK, T_DIM, 1.8}, {T_INK, T_ACCENT, 4.5},
             {T_KNOB(0), T_BG, 4.5}, {T_KNOB(1), T_BG, 4.5}, {T_KNOB(2), T_BG, 4.5}, {T_KNOB(3), T_BG, 4.5},
             {T_KNOB(0), T_SURF, 4.5}, {T_KNOB(1), T_SURF, 4.5}, {T_KNOB(2), T_SURF, 4.5}, {T_KNOB(3), T_SURF, 4.5}};
-        assert(T_KNOB(0) == T_THEME);                          /* (knob 1's colour: the track's own) */
+        if (p <= 1u)                                           /* (Hookology: STAGE, DAYLIGHT: the four brand colours) */
+            for (unsigned k = 0; k < 4u; k++) assert(T_KNOB(k) == UI_PALETTES[p].trk[k]);
+        else assert(T_KNOB(0) == T_THEME);                     /* (knob 1's colour: the track's own) */
         double min = 100;
         for (unsigned i = 0; i < sizeof c / sizeof c[0]; i++) {
             double r = contrast(c[i].fg, c[i].bg);
@@ -79,7 +85,7 @@ int main(int argc, char **argv)
         if (min < worst) worst = min;
         printf("%-8s T%u text %.1f:1, labels %.1f:1, track %.1f:1, selection %.1f:1\n", UI_PALETTES[p].name, t + 1,
                contrast(T_TEXT, T_BG), contrast(T_MID, T_BG), contrast(T_THEME, T_BG), contrast(T_INK, T_SEL));
-        assert((p == 1u || p == 6u) == ux.light);              /* DAY and CANDY are the light ones */
+        assert((p == 1u || p == 6u || p == 9u) == ux.light);   /* (DAYLIGHT, CANDY, DAY) */              /* DAY and CANDY are the light ones */
         assert(T_REC == (p == UI_GRAY_INDEX ? T_ACCENT : ux.light ? UI_REC_LIGHT : UI_REC_DARK));
         /* the blend: transparent, solid and an edge between the two, on two backgrounds */
         for (unsigned b = 0; b < 2; b++) {
@@ -138,10 +144,10 @@ int main(int argc, char **argv)
     assert(palette_track(1) && !palette_track(1));             /* (and so does the track: once) */
     cv_begin(3, 1, T_BG); cv_text(0, 0, &probe, "A", T_THEME);
     assert(swap16(cv_px[1]) != night);
-    /* fonts (docs/design README "Large type"): Rubik 500 LB 16, TX 20, VL 28, HR 48 px; Melodee Pixel's faces on the
-     * same line heights and baselines; tabular digits; the ellipsis; HR small letters too */
-    assert(AF_LB.h == 19 && AF_LB.asc == 15 && AF_TX.h == 24 && AF_TX.asc == 19 && AF_VL.h == 34 && AF_VL.asc == 27 &&
-           AF_HR.h == 57 && AF_HR.asc == 45);
+    /* fonts (docs/design README "Large type"; Hookology: Figtree 600): LB 16, TX 20, VL 28, HR 48 px; Melodee Pixel's
+     * faces on the same line heights and baselines; tabular digits; the ellipsis; HR small letters too */
+    assert(AF_LB.h == 20 && AF_LB.asc == 16 && AF_TX.h == 24 && AF_TX.asc == 19 && AF_VL.h == 34 && AF_VL.asc == 27 &&
+           AF_HR.h == 58 && AF_HR.asc == 46);
     assert(AP_LB.h == AF_LB.h && AP_LB.asc == AF_LB.asc && AP_TX.h == AF_TX.h && AP_TX.asc == AF_TX.asc &&
            AP_VL.h == AF_VL.h && AP_VL.asc == AF_VL.asc && AP_HR.h == AF_HR.h && AP_HR.asc == AF_HR.asc);
     assert(text_w(&AF_LB, "0000") == text_w(&AF_LB, "1111") && text_w(&AF_VL, "0000") == text_w(&AF_VL, "1111"));

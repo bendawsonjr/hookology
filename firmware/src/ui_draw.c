@@ -614,9 +614,11 @@ static void draw_column(uint32_t c, const char *label0, const char *val0, const 
         int32_t vw = text_w(vf, val) + uw, vx = COL_W / 2 - (vw < room ? vw : room) / 2;
         (void)icon;                                     /* (the design draws no card icons) */
         if (!strip && label[0]) {
-            const char *ls = cell_label(label, COL_W - 2);
-            cv_text_fit(COL_W / 2 - (text_w(lf, ls) < COL_W - 2 ? text_w(lf, ls) : COL_W - 2) / 2, 3, lf, ls, lc,
-                        cbg, COL_W - 2);
+            /* (Hookology: the whole cell, 57 px: Figtree's GUARD and WAVE1 are a hair over 55; the 3 px between cells
+             * keep neighbours apart) */
+            const char *ls = cell_label(label, COL_W);
+            cv_text_fit(COL_W / 2 - (text_w(lf, ls) < COL_W ? text_w(lf, ls) : COL_W) / 2, 3, lf, ls, lc,
+                        cbg, COL_W);
         }
         if (kid >= 0)                                   /* "[OCT+]": the keycap (accent: it would act; DIM: it would not) */
             x = cv_keycap(COL_W / 2 - kc_w((uint32_t)kid) / 2, 21, (uint32_t)kid,
@@ -1462,4 +1464,20 @@ static void ui_draw_frame(void)
         ui.hot_t--;
     ui.force = 0;
     scr_shown();
+}
+
+/* (Hookology) the boot splash (the design system's): the hook mark in track 1's colour, "hookology" in TEXT, the version,
+ * the four track colours as short stripes along the bottom */
+static void splash_draw(void)
+{
+    lcd_fill(0, 0, 240, 240, T_BG);
+    for (uint32_t band = 0; band < 240u; band += CV_MAX / 240u) {
+        cv_begin_band(240, 240, T_BG, band);
+        cv_rle((240 - (int32_t)BRAND_MARK_W) / 2, 30, BRAND_MARK_W, BRAND_MARK, BRAND_MARK_LEN, T_TRK(0), T_BG);
+        cv_rle((240 - (int32_t)BRAND_WORD_W) / 2, 140, BRAND_WORD_W, BRAND_WORD, BRAND_WORD_LEN, T_TEXT, T_BG);
+        cv_text_c(120, ty_y(190, TY_LB), TY_LB, MELODEE_VERSION, T_MID, T_BG);
+        for (uint32_t k = 0; k < 4u; k++)
+            cv_rrect(36 + (int32_t)k * 44, 214, 36, 6, 3, T_TRK(k), T_BG);
+        cv_blit_band(0, 0);
+    }
 }

@@ -180,7 +180,7 @@ def main():
     a = ap.parse_args()
     RULE[0] = a.rule
     faces = parse(a.header)
-    spec = {n: (font, px) for n, font, px, *_ in gf.preset("rubik")}
+    spec = {n: (font, px) for n, font, px, *_ in gf.preset("figtree")}   # (Hookology: the build's preset)
     bad = 0
     for name, f in faces.items():
         font, px = spec[name]

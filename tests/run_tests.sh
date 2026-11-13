@@ -404,6 +404,7 @@ if core && [ $TABLES = 1 ]; then
     t "Concert pitch: A4 frequency, engines, modulation, held notes and project-independent settings" tuning_test \
         -DMELODEE_LEGACY_EXTRAS=1 -O1 -DMELODEE_USB_AUDIO=1 $FW
     t "themes: contrast, text blending and font metrics" theme_test -O1 $FW
+    t "splash: the hook mark in track 1's colour, the wordmark in TEXT (STAGE, DAYLIGHT)" splash_render -O1 $FW -- "$OUT/splash_render" build/host
     t "text: pens, kerning and pixels equal the reference renderer" text_ref_test -O1 $FW
     if [ $PIL = 1 ]; then
         run "text spacing: glyph gaps against the font's own (16x supersampled), S M <= 0.25 px, L <= 0.5 px" \

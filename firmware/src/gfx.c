@@ -32,6 +32,7 @@ typedef struct { const char *label; } kc_t;
 #include "ui_fonts.h"                   /* the large type's AF_LB 16, AF_TX 20, AF_VL 28, AF_HR 48 px (Rubik 500) and
                                          * Melodee Pixel's AP_* (tools/gen_aa_font.py) */
 #include "ui_palettes.h"
+#include "ui_brand.h"                                  /* (Hookology) the splash's mark and wordmark: tools/gen_brand.py */
 #include "ui_keycaps.h"                 /* KC_*: the keycaps' / badges' labels (tools/gen_aa_keycaps.py) */
 #define ELLIPSIS '\x85'                 /* the ellipsis glyph (every face's extras) */
 /* the type's roles (docs/design/README.md "Large type"): Rubik, or Melodee Pixel as Settings > FONT says (ui.c
@@ -176,7 +177,7 @@ static void palette_theme(void)                    /* THEME and what is mixed fr
 {
     const ui_pal_t *p = &UI_PALETTES[ux.pal];
     ux.theme = p->trk[ux.trk & 3u];
-    ux.sel = ux_mix(p->bg, ux.theme, UI_SEL_PCT);
+    ux.sel = ux_mix(p->bg, ux.theme, UI_SEL_PCTS[ux.pal]);   /* (Hookology: STAGE / DAYLIGHT solid) */
     ux.tint = ux_mix(p->bg, ux.theme, UI_TINT_PCT);
     ux.lane = ux_mix(p->surf, ux.theme, 10);
     ux.gen++;                                    /* the text ramps follow */
@@ -893,6 +894,25 @@ static void cv_alpha(int32_t x, int32_t y, uint32_t w, uint32_t h, const uint8_t
         }
     }
     GFX_HOOK_PIXELS(w * h);
+}
+
+/* (Hookology) a run-length coded 4-bit alpha image (tools/gen_brand.py: value << 4 | run - 1), w wide, fg over bg at
+ * canvas (x, y): the splash's mark and wordmark */
+static void cv_rle(int32_t x, int32_t y, uint32_t w, const uint8_t *d, uint32_t n, uint16_t fg, uint16_t bg)
+{
+    const uint16_t *rv = ramp(fg, bg);
+    uint32_t k = 0;
+    y += cv_oy;
+    for (uint32_t i = 0; i < n; i++) {
+        uint32_t v = d[i] >> 4, run = (d[i] & 15u) + 1u;
+        for (; run; run--, k++) {
+            int32_t px = x + (int32_t)(k % w), py = y + (int32_t)(k / w);
+            if (!v || py < cv_cy0 || py >= cv_cy1 || (uint32_t)py < cv_top || (uint32_t)py >= cv_top + cv_rows ||
+                (uint32_t)px >= cv_w)
+                continue;
+            cv_px[((uint32_t)py - cv_top) * cv_w + (uint32_t)px] = rv[v];
+        }
+    }
 }
 
 /* the same from a glyph's Huffman-coded bit stream (tools/gen_aa_font.py huff_pack): canonical codes, MSB

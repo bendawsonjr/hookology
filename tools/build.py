@@ -119,10 +119,11 @@ def generate():
         (GEN / old).unlink(missing_ok=True)
     tools = SRC / "tools"
     subprocess.run([sys.executable, str(tools / "gen_scales.py"), "--check"], check=True)
-    cmds = [[tools / "gen_aa_font.py", GEN / "ui_fonts.h", "--preset", "rubik"],
+    cmds = [[tools / "gen_aa_font.py", GEN / "ui_fonts.h", "--preset", "figtree"],   # (Hookology: the design system's face)
             [tools / "gen_icons.py", GEN / "ui_icons.h"],
             [tools / "gen_aa_keycaps.py", GEN / "ui_keycaps.h"],
             [tools / "gen_ui_palettes.py", GEN / "ui_palettes.h"],
+            [tools / "gen_brand.py", GEN / "ui_brand.h"],              # (Hookology: the splash's mark and wordmark)
             [tools / "gen_tables.py", GEN / "melodee_tables.h"],
             [tools / "gen_fm6_patches.py", GEN / "melodee_fm6.h"],
             [tools / "gen_cz1_factory.py", GEN / "melodee_cz1.h"],
