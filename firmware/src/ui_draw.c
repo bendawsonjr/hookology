@@ -195,6 +195,7 @@ static void head_chip_text(char *b)
 }
 /* the page's place in its family: (Hookology) "2/7", the page's number in the track's colour, the count in MID (no room:
  * nothing) */
+static void head_count(int32_t x, int32_t x1, uint32_t k, uint32_t n);
 static void head_pages(int32_t x, int32_t x1)          /* (x: after the transport's marks; x1: where the chip, or the
                                                          * battery, starts) */
 {
@@ -220,6 +221,10 @@ static void head_pages(int32_t x, int32_t x1)          /* (x: after the transpor
                 k = n;
             n++;
         }
+    head_count(x, x1, k, n);
+}
+static void head_count(int32_t x, int32_t x1, uint32_t k, uint32_t n)   /* "k/n": the number in THEME, the count in MID */
+{
     if (n < 2u)
         return;
     char a[6], b[6];
@@ -279,6 +284,9 @@ static void ble_head_text(char text[24])
  * dashed; '*' when the tracks play no one section. The tempo again while SELECT turns it (bpm_t) */
 static uint32_t sec_queued(void);                       /* ui_song_sections.c */
 static int head_badge_on(void) { return ui.home && ui.home_pg == HP_TRACKS && !ui.bpm_t; }
+/* the tempo in the header: on MIXER, and a moment after it changes (bpm_t); elsewhere the room is the page's (Hookology
+ * beta59: GLO > TEMPO shows it) */
+static int head_bpm_on(void) { return !head_badge_on() && ((ui.home && ui.home_pg == HP_MIXER) || ui.bpm_t); }
 static uint32_t head_badge_rec(void) { return secs.rec ? 2u : song.playing && (song.rec & ~song.rec_wait) ? 1u : 0u; }
 static uint32_t head_badge_sig(void)
 {
@@ -319,6 +327,10 @@ static void draw_head(void)
     int16_t bpm = song.g[G_BPM];                        /* (read once: what is noted is what is drawn) */
     int32_t octave = input_octave(TSEL);
     head_chip_text(chip);
+    if (bpm != ui.roll_bpm && ui.roll_bpm && !ui.force)   /* (not the first frame, nor a redraw: a load) */
+        ui.bpm_t = 40;                                  /* the tempo changed: shown a moment wherever you are (Hookology
+                                                         * beta59) */
+    int bpm_on = head_bpm_on();
     sig = (uint32_t)ft_on * 4099u + (uint32_t)ft_ready * 8209u + (uint32_t)seq_erase_active(TSEL) * 8191u + (uint32_t)song.playing * 3u + song.rec * 5u + song.rec_wait * 65537u + (uint32_t)(octave + 8) * 11u +
           song.sel * 13131u + (msg ? str_hash(7u, head_msg()) : str_hash(5u, chip)) +
           (ui.bpm_t != 0) * 31u + low * 7777u + (chain.running ? (chain.row + 1u) * 104729u : 0u) + ux.gen * 977u +
@@ -329,7 +341,7 @@ static void draw_head(void)
 #if MELODEE_USB_HOST
     sig += uh.on ? (1u + uh.run) * 6151u : 0u;          /* the HOST tag: waiting, or a controller connected */
 #endif
-    sig += load * 2147483u + (uint32_t)(song.g[G_ECO] == 1) * 92821u + (uint32_t)song_mode_on() * 15485863u;
+    sig += load * 2147483u + (uint32_t)(song.g[G_ECO] == 1) * 92821u + (uint32_t)song_mode_on() * 15485863u + (uint32_t)bpm_on * 3571u;
     if (head_badge_on()) sig += head_badge_sig() * 2654435769u;
     if (bpm != ui.roll_bpm) {
         char a[8];
@@ -343,7 +355,7 @@ static void draw_head(void)
     }
     fmt_int(b, bpm);
     if (!ui.force && sig == ui.head_sig) {
-        if ((ui.roll[ROLL_BPM].from[0] || moved) && !head_badge_on()) {   /* rolling, or snapped: the BPM's strip only */
+        if ((ui.roll[ROLL_BPM].from[0] || moved) && !head_badge_on() && bpm_on) {   /* rolling, or snapped: the BPM's strip only */
             cv_begin(BPM_W, H_HEAD, T_BG);
             roll_text(ROLL_BPM, 0, ty_y(H_HEAD / 2, TY_TX), b, ui.bpm_t ? T_ACCENT : T_TEXT);
             cv_blit(BPM_X, Y_HEAD);
@@ -355,8 +367,8 @@ static void draw_head(void)
     cv_icon_mid(5, H_HEAD / 2, 16, chain.running ? ICON_X_SONG : song.playing ? ICON_X_PLAY : ICON_X_STOP,
                 song.playing ? T_TEXT : T_MID, T_BG);
     if (head_badge_on()) head_badge();                  /* TRACKS: the section (Hookology) */
-    else roll_text(ROLL_BPM, BPM_X, ty_y(H_HEAD / 2, TY_TX), b, ui.bpm_t ? T_ACCENT : T_TEXT);
-    x = BPM_X + BPM_W;                                  /* (past the widest BPM) */
+    else if (bpm_on) roll_text(ROLL_BPM, BPM_X, ty_y(H_HEAD / 2, TY_TX), b, ui.bpm_t ? T_ACCENT : T_TEXT);
+    x = head_badge_on() || bpm_on ? BPM_X + BPM_W : BPM_X - 4;   /* (past the widest BPM; none: past the transport) */
     if (song.rec) {                                     /* (16 px, as the transport) */
         cv_icon_mid(x, H_HEAD / 2, 16, ((song.rec & ~song.rec_wait) >> song.sel) & 1u ? ICON_X_REC : ICON_X_REC_O, T_REC, T_BG);
         x += 18;
@@ -444,14 +456,14 @@ static void draw_head(void)
                 cv_text_on(x + 6, ty_y(H_HEAD / 2, TY_LB), TY_LB, b, T_MID, T_BG);
         } else if (!ui.home) {                          /* a page: where it is in its family */
             head_pages(x + 6, 236 - cw - (low ? 22 : 0) - hw);
-        } else if (x + 6 + 52 <= 236 - cw - (low ? 22 : 0) - hw - 6) {   /* HOME: its four pages, where there is room */
-            uint32_t i;
-            for (i = 0, x += 6; i < 4u; i++) {
-                if (!home_pg_on(HOME_ORDER[i])) continue;   /* (hidden: ui.c) */
-                int32_t w = HOME_ORDER[i] == ui.home_pg ? 16 : 6;
-                cv_rrect(x, H_HEAD / 2 - 3, w, 6, 3, HOME_ORDER[i] == ui.home_pg ? T_THEME : T_LINE, T_BG);
-                x += w + 6;
-            }
+        } else {                                        /* HOME: which of its pages, as the other pages (k/n) */
+            uint32_t i, n = 0, k = 0;
+            for (i = 0; i < 4u; i++)
+                if (home_pg_on(HOME_ORDER[i])) {
+                    if (HOME_ORDER[i] == ui.home_pg) k = n;
+                    n++;
+                }
+            head_count(x + 6, 236 - cw - (low ? 22 : 0) - hw, k, n);
         }
         if (low)                                        /* the battery, only when it runs low */
             cv_icon_mid(236 - cw - 20, H_HEAD / 2, 16, batt_level() ? ICON_X_BAT1 : ICON_X_BAT0, T_REC, T_BG);

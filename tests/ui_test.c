@@ -3549,6 +3549,28 @@ static int test_cz1_factory(void)
     return bad;
 }
 
+/* beta59: the header's tempo on MIXER and a moment after it changes only; HOME's pages as k/n; Settings > MIDI SYNC */
+static int test_head_beta59(void)
+{
+    int bad = 0, ok;
+    uint32_t i;
+    ui_power_on();
+    for (i = 0; i < 60u; i++) frame();                 /* (the power-on change shown a moment, then gone) */
+    go_title("EDIT 1"); frame();
+    bad += check("header: no tempo on a page", !head_bpm_on());
+    go_home(); ui.home_pg = HP_MIXER; ui.force = 1; frame();
+    bad += check("header: the tempo on MIXER", head_bpm_on());
+    go_title("EDIT 1"); frame();
+    song.g[G_BPM] = (int16_t)(song.g[G_BPM] + 1); frame();
+    ok = head_bpm_on();
+    for (i = 0; i < 60u; i++) frame();
+    bad += check("header: a tempo change shows a moment, then goes", ok && !head_bpm_on());
+    hold(B_HOME); ui.menu_sel = MI_MIDI_SYNC; song.g[G_CLOCK] = 0; turn(EN_K2, 1); ok = song.g[G_CLOCK] == 1;
+    turn(EN_K2, -1); ok &= song.g[G_CLOCK] == 0; hold(B_HOME);
+    bad += check("Settings > MIDI SYNC: OUT <-> USB, the same value as GLO > GLOBAL SYNC", ok && str_eq(GP[G_CLOCK].label, "SYNC"));
+    return bad;
+}
+
 static int test_edit_cycle(void)
 {
     static const char *const CYC_A[] = {"EDIT 1", "EDIT 2", "VOICE", "EDIT 1"};   /* (VOICE: VOICE 1-3's list) */
@@ -5992,6 +6014,7 @@ int main(void)
     bad += test_layer();
     bad += test_name();
     bad += test_edit_cycle();
+    bad += test_head_beta59();
     bad += test_cz1_pages();
     bad += test_cz1_factory();
     bad += test_fm6_pages();

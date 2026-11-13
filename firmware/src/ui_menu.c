@@ -24,7 +24,7 @@ enum { MI_CLICK, MI_CLICK_LEVEL, MI_CLICK_SOUND, MI_COUNTIN, MI_COLOR, MI_FONT, 
 #if MELODEE_BLE
        MI_BLE,
 #endif
-       MI_MIDI_OUT, MI_MIDI_KNOBS, MI_MIDI_MODE, MI_MIDI_LEARN,
+       MI_MIDI_OUT, MI_MIDI_SYNC, MI_MIDI_KNOBS, MI_MIDI_MODE, MI_MIDI_LEARN,
        MI_REC_MODE, MI_PREVIEW, MI_ADD, MI_CHORD_NAMES, MI_AUTOSAVE, MI_PICKER, MI_ACCEL, MI_HOME_SEL, MI_GLO_SEL, MI_TRACKS, MI_SCREEN, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
        MI_COUNT };
 static const char *const MI_NAME[MI_COUNT] = {"AUDIO CLICK", "CLICK LEVEL", "CLICK SOUND", "COUNT-IN",
@@ -38,7 +38,7 @@ static const char *const MI_NAME[MI_COUNT] = {"AUDIO CLICK", "CLICK LEVEL", "CLI
 #if MELODEE_BLE
                                               "BLUETOOTH",
 #endif
-                                              "MIDI OUT", "MIDI KNOBS", "MIDI MODE", "MIDI LEARN",
+                                              "MIDI OUT", "MIDI SYNC", "MIDI KNOBS", "MIDI MODE", "MIDI LEARN",
                                               "REC MODE", "NOTE PREVIEW", "CHORD ENTRY",
                                               "CHORD NAMES",
                                               "AUTOSAVE", "PICKER POPUPS", "KNOB ACCEL", "HOME SELECT", "GLO SELECT", "UNUSED TRACKS", "SCREEN OFF", "CALIBRATION", "ABOUT", "SOUND DESIGNER", "BACK"};
@@ -346,6 +346,7 @@ static void draw_menu(void)
                 if (i == MI_TRACKS) value = GLO_SELECT & TRACKS_HIDE ? "HIDE" : "SHOW";
                 if (i == MI_REC_MODE) value = GLO_SELECT & REC_MODE_FREE ? "FREE" : "GRID";
                 if (i == MI_MIDI_OUT) value = GLO_SELECT & MIDI_OUT_ALL ? "ALL" : "KEYS";
+                if (i == MI_MIDI_SYNC) value = N_CLOCK[(uint32_t)song.g[G_CLOCK] % NELEM(N_CLOCK)];   /* (GLO > GLOBAL SYNC) */
                 if (i == MI_SCREEN) value = (const char *const[]){"NEVER", "5 MIN", "15 MIN", "30 MIN", "60 MIN"}[scr_get()];
                 if (i == MI_LIGHTS) value = LIGHTS_NAME[settings_lights % LIGHTS_N];
 #if MELODEE_USB_AUDIO
@@ -559,6 +560,12 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
     if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_MIDI_OUT) {   /* KNOB 1 right ALL, left KEYS; OCT+ toggles */
         GLO_SELECT = (uint8_t)(s > 0 ? GLO_SELECT | MIDI_OUT_ALL : s < 0 ? GLO_SELECT & ~MIDI_OUT_ALL : GLO_SELECT ^ MIDI_OUT_ALL);
         midi_out_all = (GLO_SELECT & MIDI_OUT_ALL) != 0u;
+        ui.force = 1; ok = 0;
+    }
+    if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_MIDI_SYNC) {   /* the device's SYNC (GLO > GLOBAL), kept by glo_poll */
+        int32_t v = song.g[G_CLOCK], top = GP[G_CLOCK].max;
+        v = s > 0 ? (v < top ? v + 1 : v) : s < 0 ? (v > 0 ? v - 1 : 0) : (v < top ? v + 1 : 0);
+        song.g[G_CLOCK] = (int16_t)v;
         ui.force = 1; ok = 0;
     }
     if ((s || ok) && ui.menu==1 && ui.menu_sel==MI_SCREEN) {

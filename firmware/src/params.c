@@ -94,7 +94,7 @@ static const char *const N_GLMODE[] = {"RATE", "TIME"};
 static const char *const N_PRIO[] = {"LAST", "LOW", "HIGH"};
 static const char *const N_ALLOC[] = {"ROT", "REUSE"};
 static const char *const N_ORDER[] = {"NOTE", "PLAY"};
-static const char *const N_CLOCK[] = {"INT", "USB", "TRS"
+static const char *const N_CLOCK[] = {"OUT", "USB", "TRS"   /* SYNC: OUT the FM-1 leads (sends clock); else it follows */
 #if MELODEE_BLE
     , "BLE"
 #endif
@@ -315,7 +315,7 @@ static const param_desc_t TP[P_COUNT] = {
 static const param_desc_t GP[G_COUNT] = {
     [G_BPM] = PD("BPM", F_BPM, 40, 240, 120),
     [G_SWING] = PD("SWG", F_PCT, 0, 100, 0),
-    [G_CLOCK] = PE("CLK", N_CLOCK, 0),
+    [G_CLOCK] = PE("SYNC", N_CLOCK, 0),   /* (was CLK: Hookology beta59) */
     [G_TUNE] = PD("TUNE", F_INT, -50, 50, 0),
     [G_RESERVED4] = PD("", F_INT, 0, 127, 0),
     [G_RESERVED5] = PD("", F_INT, 0, 127, 0),
