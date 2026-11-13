@@ -317,7 +317,8 @@ static uint32_t layer_btn(void);
  * a SLICE track's (ui_slice.c) */
 static int list_gone(uint32_t i);                        /* ui_list.c: a page in another's list */
 /* ENV / LFO on the engines with envelopes and LFOs of their own (Prophet, FM6, CZ-1: engine_t.ownenv, the track's
- * ADSR and ENV DEST do nothing there): their own pages (FAM_EDIT, by title). ENV: only those; LFO: those first, then
+ * ADSR and ENV DEST do nothing there): their own pages, by title (ENV / LFO pages; FM6 operator and CZ-1 envelopes
+ * EDIT pages, ENV a shortcut to them). ENV: only those; LFO: those first, then
  * the track LFO's pages and MOD (the track LFO modulates any engine through LFO DEST and is the matrix's source) */
 static const char *const *native_titles(uint32_t fam)
 {
@@ -379,7 +380,8 @@ static int page_visible(uint32_t i)
     if (PAGES[i].graph == GR_MOTION)                   /* MOTION: once there is motion (Kerem: an empty page; the one
                                                          * shown stays until it is left) */
         return motion_has_lanes(TSEL) || (!ui.home && ui.page == i);
-    if (PAGES[i].fam == FAM_ENV && native_titles(FAM_ENV))   /* (the track's ADSR, ENV DEST: nothing there) */
+    if (PAGES[i].fam == FAM_ENV && PAGES[i].scope == SC_TRACK && native_titles(FAM_ENV))   /* (the track's ADSR, ENV
+                                                                     * DEST: nothing there) */
         return 0;
     if(PAGES[i].scope==SC_DRUM || PAGES[i].scope==SC_DRUMHIT)return drum_track(TSEL);
     if (PAGES[i].scope == SC_TRACK && PAGES[i].id[0] >= P_LN0 && PAGES[i].id[0] <= P_LN7)

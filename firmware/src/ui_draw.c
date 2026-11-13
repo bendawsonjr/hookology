@@ -203,7 +203,17 @@ static void head_pages(int32_t x, int32_t x1)          /* (x: after the transpor
     uint32_t i, n = 0, k = 0, sc = sec_on() ? sec_of(ui.page) + 1u : 0u;
     if (designer_on() && !name_on())                    /* the designer: its stage's pages */
         designer_pages(&n, &k);
-    else for (i = 0; i < NPAGES; i++)                   /* (an engine in sections: the section's pages) */
+    else if ((pg->fam == FAM_ENV || pg->fam == FAM_LFO) && native_titles(pg->fam)) {   /* in the button's order (the
+                                                                     * engine's own first), its own pages only */
+        uint8_t fp[NPAGES];
+        uint32_t m = fam_pages(pg->fam, fp);
+        for (i = 0; i < m; i++)
+            if (PAGES[fp[i]].fam == pg->fam) {
+                if (fp[i] == ui.page)
+                    k = n;
+                n++;
+            }
+    } else for (i = 0; i < NPAGES; i++)                   /* (an engine in sections: the section's pages) */
         if (PAGES[i].fam == pg->fam && page_visible(i) &&
             (!sc || (PAGES[i].scope == SC_FMOP ? PAGES[ui.page].scope == SC_FMOP : sec_of(i) + 1u == sc))) {
             if (i == ui.page)

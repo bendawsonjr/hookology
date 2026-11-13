@@ -2439,7 +2439,8 @@ static int test_native_env_lfo(void)
     ui_power_on();
     set_engine_of(TSEL, ENGI_CZ);
     open_family(FAM_ENV);
-    bad += check("ENV on CZ-1: Line 1's pitch envelope, ENV lit", str_eq(cur_page()->title, "C1 PIT R1-4") && cur_fam() == FAM_ENV);
+    bad += check("ENV on CZ-1: Line 1's pitch envelope (an EDIT page: EDIT lit)",
+                 str_eq(cur_page()->title, "C1 PIT R1-4") && cur_fam() == FAM_EDIT);
     open_family(FAM_ENV);
     bad += check("..ENV again: its wave (DCW) envelope", str_eq(cur_page()->title, "C1 WAV R1-4"));
     for (i = 0; i < NPAGES; i++)
@@ -2452,9 +2453,18 @@ static int test_native_env_lfo(void)
     go_home();
     set_engine_of(TSEL, ENGI_PROPHET);
     open_family(FAM_ENV);
-    bad += check("ENV on the Prophet: its filter envelope", str_eq(cur_page()->title, "P5 FLT ENV"));
+    bad += check("ENV on the Prophet: its filter envelope, ENV lit", str_eq(cur_page()->title, "P5 FLT ENV") &&
+                 cur_fam() == FAM_ENV);
     open_family(FAM_LFO);
-    bad += check("LFO on the Prophet: its LFO", str_eq(cur_page()->title, "P5 LFO"));
+    bad += check("LFO on the Prophet: its LFO, LFO lit", str_eq(cur_page()->title, "P5 LFO") && cur_fam() == FAM_LFO);
+    open_family(FAM_EDIT);
+    o = cur_fam() == FAM_EDIT;
+    for (i = 0; i < 30u; i++) {
+        o &= cur_fam() == FAM_EDIT && !str_eq(cur_page()->title, "P5 LFO") && !str_eq(cur_page()->title, "P5 FLT ENV") &&
+             !str_eq(cur_page()->title, "P5 WHEEL");
+        open_family(FAM_EDIT);
+    }
+    bad += check("EDIT on the Prophet: EDIT lit throughout, never its LFO / envelope pages", o);
     go_home();
     set_engine_of(TSEL, ENGI_FM6);
     open_family(FAM_ENV);
@@ -2599,20 +2609,21 @@ static int test_popups(void)
     }
     {   /* sections (ui_sections.c): PRESETS the next section and back to the page last used; EDIT: the map */
         uint32_t f;
-        ui_power_on(); set_engine_of(TSEL, ENGI_PROPHET); go_title("P5 FLT ENV"); frame();
+        ui_power_on(); set_engine_of(TSEL, ENGI_PROPHET); go_title("P5 MOD FLT"); frame();
         f = ui.page;
         turn(EN_PRESET, 1);
-        o = str_eq(sec.name[sec_of(ui.page)], "Amp");
+        o = str_eq(sec.name[sec_of(ui.page)], "Voice");
         turn(EN_PRESET, -1);
-        bad += check("SECTIONS: PRESETS the next section (Filter -> Amp), back: the page last used in it (FLT ENV)",
+        bad += check("SECTIONS: PRESETS the next section (Mod -> Voice), back: the page last used in it (MOD FLT)",
                      o && ui.page == f);
         press(B_EDIT);
         o = smap.on && smap.row == sec_of(ui.page);
         turn(EN_K2, 1); turn(EN_K1, 0); press(B_OCTUP);
         bad += check("SECTIONS: EDIT on an EDIT page: the map; KNOB 2 a row down, OCT+ opens its page",
-                     o && !smap.on && str_eq(sec.name[sec_of(ui.page)], "Amp"));
+                     o && !smap.on && str_eq(sec.name[sec_of(ui.page)], "Voice"));
         press(B_EDIT); press(B_EDIT);
         bad += check("SECTIONS: EDIT again closes the map", !smap.on);
+        go_title("P5 OSC A"); frame();
         press(B_EDIT);
         uint32_t row = smap.row;
         turn(EN_K2, 3);
@@ -2620,11 +2631,11 @@ static int test_popups(void)
         turn(EN_K2, -3);
         bad += check("SECTIONS: map KNOB 2 counts categories, including several detents in one frame",
                      o && smap.row == row);
-        turn(EN_K2, -1);                              /* Filter remembers FLT ENV, not Amp's page column */
+        turn(EN_K2, 3);                               /* Mod remembers MOD FLT, not Osc's page column */
         uint8_t pg[8];
         smap_pages(smap.row, pg);
         bad += check("SECTIONS: a category selects its remembered page independently of the previous category",
-                     str_eq(sec.name[smap.row], "Filter") && pg[smap.col] == f);
+                     str_eq(sec.name[smap.row], "Mod") && pg[smap.col] == f);
         press(B_HOME);
         bad += check("SECTIONS: HOME leaves the category map immediately", ui.home && !smap.on);
         set_engine_of(TSEL, ENGI_CZ); go_title("C1 PIT R1-4"); frame(); press(B_EDIT);
@@ -3385,7 +3396,7 @@ static int engine_cycle(const char *const *want, uint32_t n)   /* EDIT tapped fr
  * page copies a line, compares with the tone as loaded, names the tone */
 static int test_cz1_pages(void)
 {
-    static const char *const CYC[] = {"CZ TOOLS", "CZ LINE", "CZ DETUNE", "CZ VIBRATO",
+    static const char *const CYC[] = {"CZ TOOLS", "CZ LINE", "CZ DETUNE",
         "CZ WINDOW", "CZ1 WAVE", "CZ1 TOUCH",
         "C1 PIT R1-4", "C1 PIT R5-8", "C1 PIT L1-4", "C1 PIT L5-8", "C1 PIT POINT",
         "C1 WAV R1-4", "C1 WAV R5-8", "C1 WAV L1-4", "C1 WAV L5-8", "C1 WAV POINT",
@@ -3542,7 +3553,7 @@ static int test_edit_cycle(void)
 {
     static const char *const CYC_A[] = {"EDIT 1", "EDIT 2", "VOICE", "EDIT 1"};   /* (VOICE: VOICE 1-3's list) */
     static const char *const CYC_F[] = {"EDIT 1", "EDIT 2", "STORE", "ALGO", "FREQ", "OUT", "EG RATE", "EG LVL", "SCALE",
-                                        "CURVE", "PITCH EG", "PITCH LV", "FM LFO", "FM BEND", "VOICE", "EDIT 1"};
+                                        "CURVE", "FM BEND", "VOICE", "EDIT 1"};
     static const char *const CYC_D[] = {"EDIT 1", "EDIT 2", "OP1 ENV", "OP2 ENV", "OP3 ENV", "OP4 ENV",
                                         "OP LEVEL", "VOICE", "EDIT 1"};
     int bad = 0, ok;
@@ -3569,7 +3580,7 @@ static int test_edit_cycle(void)
     bad += check("PHASE DCW1 knob edits its saved parameter", TSEL->p[P_FM1_ATK] > 0);
 #endif
     set_engine_of(TSEL, ENGI_FM6);
-    bad += check("EDIT cycle (FM6): EDIT 1 EDIT 2, FM6's 16 pages, VOICE VOICE 2",
+    bad += check("EDIT cycle (FM6): EDIT 1 EDIT 2, FM6's pages (pitch EG: ENV's, LFO: LFO's), VOICE",
                  TSEL->eng_req == ENGI_FM6 && engine_cycle(CYC_F, NELEM(CYC_F)));
     (void)CYC_D;
     go_title("OP2 ENV"); ui.fam_last[FAM_EDIT] = ui.page;
