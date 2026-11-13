@@ -252,7 +252,7 @@ static void layer_keys(uint32_t keys)
     for (k = 0; k < 27u; k++)
         if ((lys.solo >> k) & 1u)
             s |= 1u << (trk_group() + key_place(k));
-    track_solo = (uint8_t)s;
+    track_solo = (uint8_t)(s | ed_solo);
 }
 
 /* KNOB 1..4 in the open layer: its own (GLO levels), else the four of its page */

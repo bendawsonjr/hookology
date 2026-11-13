@@ -1253,6 +1253,31 @@ async function editorFm6() {
 }
 
 /* ------------------------------------------------- editor tabs and strings --- */
+/* (Hookology) LIVE (command 81) against the mock */
+async function editorLivePage() {
+  const m = E.makeMockDevice({ auto: false, advancedSong: true, songLoop: true, songSections: true, live: true });
+  const link = new E.Link((d) => [...m.access.outputs.values()][0].send(d), { timeout: 100 });
+  [...m.access.inputs.values()][0].onmidimessage = (e) => link.receive(e.data);
+  const rq = (r) => link.request(r), C = E.CMD;
+  const info = E.parse[C.INFO](await rq(E.req.info()));
+  ok(info.live && info.songSections, "LIVE: INFO says the LIVE command is there");
+  const ask = async (...a) => E.parse[C.LIVE](await rq(E.req.live(...a)));
+  let r = await ask(0);
+  ok(!r.playing && r.ntrk === 4 && r.tracks.length === 4 && r.bpm === 120 && r.sec === 0, "LIVE: the state: stopped, four tracks, 120 BPM, section A");
+  r = await ask(1);
+  ok(r.playing, "LIVE: PLAY starts");
+  r = await ask(3, 2);
+  ok(r.next === 2 && r.sec === 0, "LIVE: a section tapped while playing waits for the loop end");
+  r = await ask(4, 0b1010, 0);
+  ok(r.solo === 0b1010, "LIVE: solo on tracks 2 and 4");
+  r = await ask(5, 1, 60, 100); await ask(5, 1, 60, 0);
+  ok(!r.rc && JSON.stringify(m.state.live.notes) === "[[1,60,100],[1,60,0]]", "LIVE: a key's note-on and note-off reach the track");
+  r = await ask(5, 6, 60, 100);
+  ok(r.rc === 1, "LIVE: a note for a track not in use is refused");
+  r = await ask(1);
+  ok(!r.playing, "LIVE: PLAY again stops");
+}
+
 /* (Hookology) the Song page: the song by sections (BANK_SONG ops 5..7) */
 async function editorSongSections() {
   const m = E.makeMockDevice({ auto: false, advancedSong: true, songLoop: true, songSections: true });
@@ -1448,7 +1473,7 @@ function editorTabs() {
   const tabs = [...html.matchAll(/<button role="tab" data-tab="(\w+)"/g)].map((x) => x[1]);
   const panels = [...html.matchAll(/<section class="panel" id="p-(\w+)" data-tab="(\w+)"/g)].map((x) => [x[1], x[2]]);
   const TABS = JSON.parse((/const TABS = (\[[^\]]*\]);/.exec(html) || [])[1] || "[]");
-  ok(tabs.length === 8 && js(tabs) === js(TABS) && js(panels.map((x) => x[1])) === js(TABS) && panels.every(([a, b]) => a === b),
+  ok(tabs.length === 9 && js(tabs) === js(TABS) && js(panels.map((x) => x[1])) === js(TABS) && panels.every(([a, b]) => a === b),
     `editor: ${tabs.length} tabs, one panel each (${tabs.join(" ")})`);
   ok(/localStorage\.setItem\(TAB_KEY/.test(html) && /try \{ localStorage/.test(html) && /history\.replaceState\([^)]*"#" \+ name\)/.test(html)
     && /addEventListener\("hashchange"/.test(html), "editor: last tab in localStorage (try/catch) and in the URL hash");
@@ -1865,6 +1890,7 @@ await editorMixer();
 await editorTrackParam();
 await editorSong();
 await editorSongSections();
+await editorLivePage();
 await editorSessions();
 await editorFm6();
 await editorFm4();

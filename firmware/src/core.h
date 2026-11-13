@@ -655,3 +655,5 @@ static inline void reset_intended(void)         /* a reset on purpose (UBOOT, an
 
 /* GLO solo belongs to the mixer, independently of quick-layer effects. */
 static volatile uint8_t track_solo;
+static uint8_t ed_solo;                  /* (Hookology) the editor's LIVE solo, joined to GLO's held keys (ui_layer.c) */
+#define MIDI_SRC_EDITOR 0x10u            /* (Hookology) a MIDI queue source: the editor's keys, + the track they play */

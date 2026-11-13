@@ -20,7 +20,7 @@ enum { ED_INFO = 1, ED_GET, ED_SET, ED_DUMP, ED_DESC, ED_STEP_GET, ED_STEP_SET, 
        ED_TRACK_PARAM, ED_TRACK_CHANGED, ED_SONG,
        ED_UI_STATE, ED_UI_SET, ED_UI_PALETTES, ED_FAV_GET, ED_FAV_SET,
        ED_MOTION = 64, ED_BACKUP_LIST, ED_BACKUP_GET, ED_BACKUP_PUT,                               /* v6: song chain */
-       ED_AUDIO_STATS = 72, ED_PATTERN, ED_BANK_SONG };                                       /* USB audio diagnostics (68..71: FM6, editor_fm6.c) */
+       ED_AUDIO_STATS = 72, ED_PATTERN, ED_BANK_SONG, ED_LIVE = 81 };   /* (75..78 CZ / native, 80 library: taken) */                                       /* USB audio diagnostics (68..71: FM6, editor_fm6.c) */
 #if MELODEE_CORE1_TEST && MELODEE_DUAL_CORE
 enum { ED_CORE1_TEST = 79 };                         /* test builds only: CPU1 failure injection */
 static void core1_test_stall(void *unused) { (void)unused; for (;;) ; }
@@ -343,6 +343,9 @@ static int ed_args_ok(uint32_t cmd, const uint8_t *a, uint32_t n)
     case ED_MOTION:
         return (n == 1u || (n == 2u && a[1] == 2u) || (n == 3u && a[1] == 1u && a[2] <= 1u) ||
                 (n == 6u && a[1] == 3u) || ((n == 4u || n == 6u) && a[1] == 4u)) && a[0] < NPART;
+    case ED_LIVE:                                       /* (Hookology) the editor's LIVE page */
+        return n && (a[0] <= 2u ? n == 1u : a[0] == 3u ? n == 2u && a[1] < SEC_N : a[0] == 4u ? n == 3u :
+                     a[0] == 5u ? n == 4u && a[1] < NTRK : 0);
     case ED_BANK_SONG:
         if (n && (a[0] == 4u || a[0] == 7u)) return n == 2u;
         if (n && a[0] == 5u) return n == 1u;
@@ -353,6 +356,61 @@ static int ed_args_ok(uint32_t cmd, const uint8_t *a, uint32_t n)
     default:
         return 1;                                  /* variable payloads validate in their handler */
     }
+}
+
+/* (Hookology) LIVE: the FM-1's own buttons from the editor. 0 the state; 1 PLAY (as the button: the song in SONG
+ * MODE, else the loop; playing: STOP); 2 REC on the selected track (as a tap); 3 section a[1] (as its SECTIONS key);
+ * 4 solo (a[1] | a[2] << 7: the editor's, joined to GLO's held keys); 5 a note on track a[1] (a[2] note, a[3]
+ * velocity, 0 off), through the MIDI queue as USB MIDI on channel 16, so the track's scale, chords and recording
+ * apply. Every reply: the state */
+static void rec_toggle(uint32_t latch);                 /* ui_input.c */
+static void sec_play(uint32_t b);                       /* ui_song_sections.c */
+static void ed_live_state(uint32_t op, uint32_t rc)
+{
+    uint32_t k, n = trk_n(), sp = sec_playing();
+    ed_b(op); ed_b(rc);
+    ed_b(song.playing != 0); ed_b(seq_counting() != 0); ed_b(song.rec & 0x7Fu); ed_b(song.rec >> 7);
+    ed_b(chain.running != 0); ed_b(chain.row); ed_b(chain_config.count);
+    ed_b(sp < SEC_N ? sp : 127u); ed_b(secs.next < SEC_N ? secs.next : 127u);
+    ed_v(song.g[G_BPM]); ed_b((uint32_t)song.g[G_SWING] & 0x7Fu);
+    ed_b(chain_config.rsv[CHAIN_LOOP] != 0); ed_b(song_mode_on() != 0);
+    ed_b(trk[0].seq_idx & 0x7Fu); ed_b((uint32_t)trk[0].p[P_SLEN] & 0x7Fu); ed_b((uint32_t)trk[0].p[P_SDIV] & 0x7Fu);
+    ed_b(song.playing ? load_percent() > 127u ? 127u : load_percent() : 0u);
+    ed_b(track_solo & 0x7Fu); ed_b(track_solo >> 7); ed_b(ed_sel()); ed_b(n);
+    for (k = 0; k < n; k++) { ed_b(trk[k].p[P_MUTE] != 0); ed_b((uint32_t)trk[k].p[P_LEVEL] & 0x7Fu); }
+}
+static uint32_t ed_live(const uint8_t *a)
+{
+    switch (a[0]) {
+    case 1u:
+        if (song_picker.active || ft_on) return 2u;
+        if (song.playing || seq_counting() || chain_busy()) transport_req = 2;
+        else if (song_mode_on()) { ui.song_row = 0; chain_play_ui(); }
+        else transport_req = 1;
+        return 0;
+    case 2u:
+        rec_toggle(1);
+        return 0;
+    case 3u:
+        if (chain.running || chain.armed) return 2u;
+        sec_play(a[1]);
+        return 0;
+    case 4u: {
+        uint32_t m = (a[1] | (uint32_t)a[2] << 7) & ((1u << trk_n()) - 1u);
+        ed_solo = (uint8_t)m;
+        track_solo = (uint8_t)m;
+        return 0;
+    }
+    case 5u: {
+        uint32_t pkt = (a[3] ? 0x9Fu : 0x8Fu) << 8 | (uint32_t)(a[2] & 0x7Fu) << 16 | (uint32_t)(a[3] & 0x7Fu) << 24 | (a[3] ? 0x09u : 0x08u);
+        if (a[1] >= trk_n()) return 1u;
+        fm1_irq_off();
+        uint32_t ok = (uint32_t)midi_enqueue(pkt, MIDI_SRC_EDITOR + a[1]);
+        fm1_irq_on();
+        return ok ? 0u : 2u;
+    }
+    }
+    return 0;
 }
 
 /* (Hookology) the song by sections, for the editor's Song page (ED_BANK_SONG ops 5..7): an entry is a section A..H
@@ -815,7 +873,8 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         ed_b(0x55); ed_b(1); ed_b(ed_ui_caps());             /* tagged preferences v1: commands 34..38 */
         ed_b(0x4d); ed_b(2); ed_b(MOTION_MAX); ed_b(1); /* motion v2: native ids, chance v1 */
         ed_b(0x42); ed_b(1); ed_b(3); /* bounded full-backup read + restore */
-        ed_b(0x50); ed_b(5); ed_b(NPAT); ed_b(CHAIN_ROWS);     /* bank controls: 73/74 (5: the song by sections, ops 5..7) */
+        ed_b(0x50); ed_b(6); ed_b(NPAT); ed_b(CHAIN_ROWS);     /* bank controls: 73/74 (5: the song by sections, ops 5..7;
+                                                               * 6: LIVE, command 81) */
         ed_b(0x46); ed_b(1); ed_b(FM6_NFAC); ed_b(0);   /* FM6 patches: cmds 68..71 */
         ed_b(0x43); ed_b(1); ed_b(CZ_BYTES & 127u); ed_b(CZ_BYTES >> 7); ed_b(0); ed_b(0); /* old CZ bank controls retired */
         ed_b(0x35);ed_b(1);ed_b(ENGI_PROPHET);ed_b(USER_GENERAL);ed_b(USER_NATIVE_FM);ed_b(USER_NATIVE_CZ);ed_b(USER_NATIVE_P5);ed_b(0);ed_b(1); /* legacy native clients see their addressable prefix */
@@ -1155,6 +1214,9 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         ui.force = 1;
         break;
     }
+    case ED_LIVE:
+        ed_live_state(a[0], ed_live(a));
+        break;
     case ED_BANK_SONG: {
         if (!na || a[0] > 7u) return;
         uint32_t rc = 0;

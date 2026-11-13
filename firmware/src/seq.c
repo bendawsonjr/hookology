@@ -1389,8 +1389,10 @@ static track_t *midi_track(uint32_t ch)
 
 /* QNT is shared. MPC note routing overrides ROUT and DRUM on every input channel; controllers
  * retain their channel routing and held-note targets. Note-offs use the original saved owner. */
+static track_t *midi_force_track;        /* (Hookology) the editor's keys: the track they play, whatever the routing */
 static track_t *midi_note_track(uint32_t ch, uint32_t note)
 {
+    if (midi_force_track) return midi_force_track;
     if (trk[0].p[P_QUANT] == Q_MPC) {
         uint32_t k = mpc_pad(note) / 16u;
         return k < 4u && k < trk_n() ? &trk[k] : 0;
@@ -1617,9 +1619,11 @@ static void events_block(uint32_t n)
         } else {
             if (clock_mode && song.playing)
                 seq_advance(midi_clock_advance(time));
-            midi_event_source = source;
+            midi_force_track = source >= MIDI_SRC_EDITOR ? &trk[(source - MIDI_SRC_EDITOR) % NTRK] : 0;
+            midi_event_source = midi_force_track ? 1u : source;   /* (the editor's keys: as USB, on their track) */
             midi_event(st, ch, d1, d2);
             midi_event_source = 0;
+            midi_force_track = 0;
         }
     }
     if (usb_discard && (int32_t)(mi_r - usb_discard_until) >= 0) usb_discard = 0;

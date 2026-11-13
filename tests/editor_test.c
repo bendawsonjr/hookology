@@ -65,6 +65,9 @@ static int st_erase(uint32_t off) { (void)off; return -1; }
 #include "../firmware/src/storage.c"
 #include "../firmware/src/editor.c"
 #include "../firmware/src/cz_store.c"
+static uint32_t live_rec_calls, live_sec_last = 99;        /* (the LIVE test: ui_input.c / ui_song_sections.c are not here) */
+static void rec_toggle(uint32_t latch) { (void)latch; live_rec_calls++; }
+static void sec_play(uint32_t b) { live_sec_last = b; }
 
 static int check(const char *what, int ok)
 {
@@ -121,7 +124,7 @@ static int preferences(void)
     uint8_t a[4] = {0, 2, 0, 0};
     reset();
     uint32_t n = request(ED_INFO, a, 0);
-    const uint8_t caps[]={0,0x55,1,121,0x4d,2,MOTION_MAX,1,0x42,1,3,0x50,5,NPAT,CHAIN_ROWS,0x46,1,FM6_NFAC,0,0x43,1,16,1,0,0,0x35,1,19,16,17,18,20,0,1,0x4e,1,64,0,0,1,0x55,1,0,3};
+    const uint8_t caps[]={0,0x55,1,121,0x4d,2,MOTION_MAX,1,0x42,1,3,0x50,6,NPAT,CHAIN_ROWS,0x46,1,FM6_NFAC,0,0x43,1,16,1,0,0,0x35,1,19,16,17,18,20,0,1,0x4e,1,64,0,0,1,0x55,1,0,3};
     bad+=check("INFO preserves existing IDs and advertises the shared 384-slot library",ED_SONG==33&&ED_FAV_SET==38&&n>sizeof caps&&!memcmp(host_wire+n-sizeof caps-1,caps,sizeof caps));
     request(ED_UI_SET, a, 2);
     bad += check("UI_SET updates the actual palette and reports RAM-only saving",
@@ -731,6 +734,44 @@ static int midi_track_protocol(void)
                  TSEL->p[P_FXTYPE] == FX_OFF && !TSEL->p[P_FXSEND]);
     return bad;
 }
+/* (Hookology) the LIVE page: the FM-1's buttons from the editor (ED_LIVE) */
+static int live_protocol(void)
+{
+    int bad = 0;
+    uint8_t a[4] = {0};
+    reset();
+    song.ntrk = 6; song.g[G_BPM] = 97;
+    request(ED_LIVE, a, 1);
+    bad += check("LIVE state: stopped, BPM, six tracks",
+                 host_wire[5] == 0 && !host_wire[6] && !host_wire[7] && host_wire[16] == 97 && host_wire[28] == 6);
+    transport_req = 0; a[0] = 1;
+    request(ED_LIVE, a, 1);
+    bad += check("LIVE PLAY: the transport starts (the loop: no SONG MODE)", transport_req == 1u);
+    transport_req = 0;
+    a[0] = 4; a[1] = 0x24; a[2] = 0;                      /* tracks 3 and 6 */
+    request(ED_LIVE, a, 3);
+    bad += check("LIVE solo: tracks 3 and 6, kept when GLO's keys are read", track_solo == 0x24 && ed_solo == 0x24 && host_wire[25] == 0x24);
+    a[1] = 0x7F; a[2] = 1; request(ED_LIVE, a, 3);
+    bad += check("LIVE solo: only tracks in use", track_solo == 0x3F);
+    a[1] = 0; a[2] = 0; request(ED_LIVE, a, 3);
+    uint32_t w = mi_w;
+    a[0] = 5; a[1] = 4; a[2] = 60; a[3] = 100;
+    request(ED_LIVE, a, 4);
+    bad += check("LIVE note: queued as a note-on for track 5", mi_w == w + 1u && midi_in_source[w % MQ] == MIDI_SRC_EDITOR + 4u &&
+                 ((midi_in_q[w % MQ] >> 8) & 0xFFu) == 0x9Fu && ((midi_in_q[w % MQ] >> 16) & 0x7Fu) == 60u);
+    a[3] = 0; request(ED_LIVE, a, 4);
+    bad += check("LIVE note: and its note-off", mi_w == w + 2u && ((midi_in_q[(w + 1u) % MQ] >> 8) & 0xFFu) == 0x8Fu);
+    a[1] = 6; a[3] = 90;
+    bad += check("LIVE note: a track not in use is refused", request(ED_LIVE, a, 4) && host_wire[6] == 1 && mi_w == w + 2u);
+    a[0] = 2; request(ED_LIVE, a, 1);
+    a[0] = 3; a[1] = 2; request(ED_LIVE, a, 2);
+    bad += check("LIVE REC and section C: as the FM-1's REC tap and SECTIONS key", live_rec_calls == 1 && live_sec_last == 2);
+    a[1] = 9;
+    bad += check("LIVE section: past H is not a command", !request(ED_LIVE, a, 2));
+    mi_r = mi_w; song.ntrk = 4;
+    return bad;
+}
+
 /* (Hookology) the Song page: the song by sections (ED_BANK_SONG ops 5..7) */
 static int song_sections(void)
 {
@@ -792,7 +833,7 @@ static int track_count(void)
 int main(void)
 {
     int bad = midi_track_protocol() + library_transfers() + native_motion_protocol() + prophet_protocol() + bank_protocol() + preferences() + framing() + uart_recovery() + steps() + song_protocol() + malformed_saves() + names_whole() +
-              native_protocol() + shared_protocol() + fm6_patches() + user_preset_roundtrip() + cz_native_protocol() + cz_dedicated_banks() + cz_casio_sysex() + concert_pitch() + scale_catalogue() + project_scale_protocol() + track_count() + song_sections();
+              native_protocol() + shared_protocol() + fm6_patches() + user_preset_roundtrip() + cz_native_protocol() + cz_dedicated_banks() + cz_casio_sysex() + concert_pitch() + scale_catalogue() + project_scale_protocol() + track_count() + song_sections() + live_protocol();
     printf("%s\n", bad ? "EDITOR TEST FAILED" : "editor test passed");
     return bad != 0;
 }

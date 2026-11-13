@@ -180,6 +180,52 @@
   .list button:hover { color: var(--accent); }
   .list col.n { width: 60px; } .list col.e { width: 72px; } .list col.d { width: 78px; }
 
+  /* (Hookology) LIVE */
+  .live-tp { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; }
+  .lvbig { min-height: 60px; padding: 0 26px; font-size: 19px; font-weight: 800; }
+  .lvrec { background: transparent; color: var(--rec); border: 2px solid var(--rec); display: flex; align-items: center; gap: 8px; }
+  .lvrec .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--rec); }
+  .lvrec.on { background: var(--rec); color: var(--bg); }
+  .lvrec.on .dot { background: var(--bg); }
+  .lvnum { display: flex; flex-direction: column; align-items: center; padding: 0 12px; border-left: 1px solid var(--line); }
+  .lvnum > span:first-child { font-size: 12px; font-weight: 700; letter-spacing: .06em; }
+  .lvnum b { font-size: 32px; line-height: 1.15; font-weight: 700; cursor: ns-resize; user-select: none; touch-action: none; }
+  .lvnum b.mono { font: 500 28px var(--mono); cursor: default; }
+  .lvpm { display: flex; gap: 4px; }
+  .lvpm button { min-height: 26px; padding: 0 10px; }
+  .k1l { color: var(--k1); } .k2l { color: var(--k2); } .k3l { color: var(--k3); }
+  .lvside { margin-left: auto; display: flex; flex-direction: column; gap: 2px; min-width: 190px; }
+  .lvsecs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 700px) { .lvsecs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .lvsecs button { min-height: 84px; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between;
+                   padding: 10px 14px; background: var(--well); border: 2px solid var(--line); text-align: left; }
+  .lvsecs button b { font: 600 22px var(--display); }
+  .lvsecs button small { font-size: 12px; font-weight: 600; color: var(--dim); }
+  .lvsecs button.now { background: var(--tc); border-color: var(--tc); color: var(--on-accent); }
+  .lvsecs button.now small { color: inherit; opacity: .8; }
+  .lvsecs button.next { border: 2px dashed var(--tc); animation: lvblink 1s steps(2, start) infinite; }
+  @keyframes lvblink { to { border-color: transparent; } }
+  @media (prefers-reduced-motion: reduce) { .lvsecs button.next { animation: none; } }
+  .lvmix { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+  .lvstrip { background: var(--well); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; align-items: center;
+             border: 2px solid transparent; }
+  .lvstrip.sel { border-color: var(--tc); }
+  .lvstrip.out { opacity: .45; }
+  .lvstrip .hd { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+  .lvstrip .hd .badge { min-width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; font-weight: 800; font-size: 12px;
+                        background: var(--tc); color: var(--on-accent); border: 0; padding: 0; min-height: 0; flex: none; }
+  .lvstrip .hd span { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lvstrip input.fader { writing-mode: vertical-lr; direction: rtl; width: 30px; height: 140px; accent-color: var(--tc); }
+  .lvstrip .ms { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; }
+  .lvstrip .ms button { min-height: 32px; padding: 0; font-weight: 800; }
+  .lvstrip .ms button[aria-pressed="true"].m { background: var(--focus); border-color: var(--focus); color: var(--bg); }
+  .lvstrip .ms button[aria-pressed="true"].s { background: var(--t3); border-color: var(--t3); color: var(--on-accent); }
+  .lvkeys { position: relative; height: 150px; display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: 3px; margin: 10px 0; touch-action: none; user-select: none; }
+  .lvkeys button { min-height: 0; border: 0; border-radius: 0 0 6px 6px; padding: 0 0 8px; display: flex; align-items: flex-end; justify-content: center;
+                   font-size: 12px; font-weight: 700; }
+  .lvkeys .w { grid-row: 1; height: 150px; background: #f1f4f2; color: #56656e; }
+  .lvkeys .b { position: absolute; top: 0; height: 92px; width: calc(100% / 15 * .6); background: #0f1820; color: #93a2ab; z-index: 1; }
+  .lvkeys button.on { background: var(--accent); color: var(--on-accent); }
   /* (Hookology) the Song page */
   .songcols { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 18px; align-items: start; }
   @media (max-width: 900px) { .songcols { grid-template-columns: minmax(0, 1fr); } }
@@ -312,6 +358,7 @@
   </div>
   <nav class="tabs" id="tabs" role="tablist" aria-orientation="vertical" aria-label="Editor pages">
     <span class="grp" role="presentation">PLAY</span>
+    <button role="tab" data-tab="live" data-t="tabLive" data-ic="control_play_f"></button>
     <button role="tab" data-tab="sound" data-t="sound" data-ic="symbol_audio"></button>
     <button role="tab" data-tab="sequencer" data-t="tabSeq" data-ic="symbol_grid"></button>
     <button role="tab" data-tab="tracks" data-t="tabTracks" data-ic="ui_slider_vertical"></button>
@@ -346,6 +393,42 @@
     <div class="trackbar" id="trackbar" hidden><span class="dim" data-t="track"></span><span class="seg" id="trackbtns" role="group" aria-label="Tracks"></span></div>
   </header>
   <p class="hint" id="hint" hidden></p>
+
+  <!-- (Hookology) LIVE: the FM-1 under your hands for a show (command 81) -->
+  <section class="panel" id="p-live" data-tab="live" data-dev hidden>
+    <p class="hint" id="liveold" hidden data-t="liveOld"></p>
+    <div id="livebody">
+      <div class="group live-tp">
+        <button id="lvplay" type="button" class="lvbig pri"></button>
+        <button id="lvrec" type="button" class="lvbig lvrec"><span class="dot"></span>REC</button>
+        <div class="lvnum"><span class="k1l">BPM</span><b id="lvbpm" title="" tabindex="0">120</b>
+          <span class="lvpm"><button type="button" id="lvbpmdn" aria-label="BPM down">−</button><button type="button" id="lvbpmup" aria-label="BPM up">+</button></span></div>
+        <button id="lvtap" type="button" data-t="liveTap"></button>
+        <div class="lvnum"><span class="k2l" data-t="liveSwing"></span><b id="lvswing">0</b></div>
+        <div class="lvnum"><span class="k3l">BAR</span><b id="lvbar" class="mono">–</b></div>
+        <div class="lvside">
+          <label class="sw"><span data-t="songLoop"></span><input type="checkbox" id="lvloop" role="switch"></label>
+          <label class="sw"><span data-t="songMode"></span><input type="checkbox" id="lvmode" role="switch"></label>
+          <span id="lvload" class="dim"></span>
+        </div>
+      </div>
+      <div class="group">
+        <h2 data-t="liveSections"></h2>
+        <p class="dim" data-t="liveSecHelp"></p>
+        <div class="lvsecs" id="lvsecs"></div>
+      </div>
+      <div class="group">
+        <h2 data-t="mixer"></h2>
+        <div class="lvmix" id="lvmix"></div>
+      </div>
+      <div class="group">
+        <div class="bar"><h2 style="margin:0" data-t="liveKeys"></h2><span class="dim" id="lvkeyto"></span>
+          <span style="margin-left:auto" class="bar"><button type="button" id="lvoctdn" data-t="octDown"></button><span id="lvoct" class="dim"></span><button type="button" id="lvoctup" data-t="octUp"></button></span></div>
+        <div class="lvkeys" id="lvkeys"></div>
+        <p class="dim" data-t="liveKeyHelp"></p>
+      </div>
+    </div>
+  </section>
 
   <section class="panel" id="p-sound" data-tab="sound" data-dev hidden>
     <div class="browser" id="browser">
@@ -615,7 +698,7 @@ const CMD = { INFO: 1, GET: 2, SET: 3, DUMP: 4, DESC: 5, STEP_GET: 6, STEP_SET: 
   TRACK_PARAM: 31, TRACK_CHANGED: 32, SONG: 33, PATTERN: 73, BANK_SONG: 74,
   UI_STATE: 34, UI_SET: 35, UI_PALETTES: 36, FAV_GET: 37, FAV_SET: 38,
   MOTION: 64, BACKUP_LIST: 65, BACKUP_GET: 66, BACKUP_PUT: 67,
-  FM6_GET: 68, FM6_PUT: 69, FM6_LIST: 70, FM6_ERASE: 71, CZ_GET: 75, CZ_PUT: 76, CZ_BANK: 77, NATIVE: 78, LIBRARY:80, PROPHET:95 };
+  FM6_GET: 68, FM6_PUT: 69, FM6_LIST: 70, FM6_ERASE: 71, CZ_GET: 75, CZ_PUT: 76, CZ_BANK: 77, NATIVE: 78, LIBRARY:80, LIVE: 81, PROPHET:95 };
 /* frames the device sends on its own (while WATCH is on); never replies */
 
 /*P5-FACTORY-BEGIN*/
@@ -814,6 +897,7 @@ const parse = {
     for (const p of [8, 11, 15]) if (o.motionMax && trailer[p] === 0x46 && trailer[p + 1] === 1) o.fm6 = { factory: trailer[p + 2], bank: trailer[p + 3] };
     o.patterns = o.motionMax && o.backupCaps && trailer[11] === 0x50 && [1,2,3,4,5].includes(trailer[12]) && trailer[13] === 8 ? 8 : 0;
     o.songSections = !!o.motionMax && !!o.backupCaps && trailer[11] === 0x50 && trailer[12] >= 5;   /* (Hookology) the Song page: ops 5..7 */
+    o.live = o.songSections && trailer[12] >= 6;                                                     /* (Hookology) LIVE: command 81 */
     if (o.patterns) o.chainRows = [16,64].includes(trailer[14]) ? trailer[14] : 0;
     o.songRests = !!o.patterns && trailer[12] >= 2;
     o.songBlocks = !!o.patterns && trailer[12] >= 3;
@@ -875,6 +959,16 @@ const parse = {
   [CMD.PATTERN](a) {
     if (a.length !== 6 || a[3] > 7 || (a[4] > 7 && a[4] !== 127) || a[5] !== 8) throw new Error("Invalid pattern reply");
     return { track: a[0], op: a[1], rc: a[2], active: a[3], queued: a[4], count: a[5] };
+  },
+  /* (Hookology) LIVE (command 81): the transport, the sections, the solo, every track's mute and level */
+  [CMD.LIVE](a) {
+    const r = new Reader(a);
+    const o = { op: r.b(), rc: r.b(), playing: !!r.b(), counting: !!r.b(), rec: r.b() | r.b() << 7, chain: !!r.b(), row: r.b(), count: r.b(),
+      sec: r.b(), next: r.b(), bpm: r.v(), swing: r.b(), loop: !!r.b(), mode: !!r.b(), idx: r.b(), len: r.b(), div: r.b(), load: r.b(),
+      solo: r.b() | r.b() << 7, sel: r.b(), ntrk: r.b(), tracks: [] };
+    if (o.ntrk > 8 || a.length !== 24 + 2 * o.ntrk) throw new Error("Invalid LIVE reply");
+    for (let i = 0; i < o.ntrk; i++) o.tracks.push({ mute: !!r.b(), level: r.b() });
+    return o;
   },
   /* (Hookology) the song by sections: entries {sec 0..7 = A..H, 8 rest, 127 mixed (made on the FM-1), repeat} */
   songSections(a) {
@@ -1028,6 +1122,8 @@ const req = {
         !Number.isInteger(bank) || bank < 0 || bank > 7 || !Number.isInteger(dest) || dest < 0 || dest > 7) throw new Error("Invalid pattern request");
     return [CMD.PATTERN, [track, op, ...(op ? [bank] : []), ...(op === 2 ? [dest] : [])]];
   },
+  /* (Hookology) LIVE: 0 state, 1 PLAY / STOP, 2 REC, 3 section s, 4 solo mask, 5 note (track, note, velocity; 0 off) */
+  live: (op = 0, ...a) => [CMD.LIVE, [op, ...a.map((x) => x & 0x7F)]],
   /* op 5 read, 6 write ({sec, repeat, src: the entry it was, or null}), 7 SONG MODE (value 0 / 1) */
   songSections: (op = 5, rows = [], value = 0) => [CMD.BANK_SONG, op === 6 ? [6, rows.length, ...rows.flatMap((r) => [r.sec & 0x7F, r.repeat, r.src == null ? 0x7F : r.src])]
     : op === 7 ? [7, value ? 1 : 0] : [5]],
@@ -1092,7 +1188,7 @@ function replyMatches(cmd, args, a) {
     case CMD.STEP_GET: case CMD.STEP_SET: case CMD.NAMES:
     case CMD.SMP_BEGIN: case CMD.SMP_END: case CMD.SMP_ERASE: return a[0] === args[0];
     case CMD.SMP_WRITE: return a[0] === args[0] && a[1] === args[1] && a[2] === args[2] && a[3] === args[3];
-    case CMD.BANK_SONG: case CMD.SONG: return a[0] === args[0];
+    case CMD.BANK_SONG: case CMD.SONG: case CMD.LIVE: return a[0] === args[0];
     case CMD.PATTERN: return a[0] === args[0] && a[1] === args[1];
     case CMD.PROPHET: return a[2]===args[1]&&a[0]===(args[0]<=1?1:args[0]);
     case CMD.LIBRARY: return a[0]===args[0]&&a[1]===args[1]&&a[2]===args[2];
@@ -2718,7 +2814,7 @@ function makeMockDevice(opt = {}) {
         if (!opt.legacy) b(NTRK);
         if (!opt.legacy && !opt.v3 && !opt.v5) {
           b(0);
-          if (st.uiCaps) { [0x55,1,st.uiCaps,0x4d,2,64,1,0x42,1,3,0x50,opt.songSections?5:opt.songLoop?4:opt.advancedSong?3:1,8,opt.advancedSong?64:16].forEach(b); if (!opt.noFm6) [0x46,1,FM6.FACTORY_PK.length,FM6_BANK,0x43,1,16,1,0,0,0x35,1,19,16,17,18,20,0,1,0x4e,1,64,0,0,1].forEach(b); if(opt.shared)[0x55,1,0,3].forEach(b); }
+          if (st.uiCaps) { [0x55,1,st.uiCaps,0x4d,2,64,1,0x42,1,3,0x50,opt.live?6:opt.songSections?5:opt.songLoop?4:opt.advancedSong?3:1,8,opt.advancedSong?64:16].forEach(b); if (!opt.noFm6) [0x46,1,FM6.FACTORY_PK.length,FM6_BANK,0x43,1,16,1,0,0,0x35,1,19,16,17,18,20,0,1,0x4e,1,64,0,0,1].forEach(b); if(opt.shared)[0x55,1,0,3].forEach(b); }
         }
         break;
       case CMD.GET: case CMD.SET: {
@@ -2836,6 +2932,20 @@ function makeMockDevice(opt = {}) {
         if(op){if(bank>7||op===2&&dest>7)rc=1;else if(op===2)t.patternBanks[dest]=bank===t.pattern?take():JSON.parse(JSON.stringify(t.patternBanks[bank]));
           else {t.patternBanks[t.pattern]=take();t.pattern=bank;const saved=t.patternBanks[bank];t.step=saved?JSON.parse(JSON.stringify(saved.step)):Array.from({length:NSTEP},()=>({...EMPTY,notes:[0,0,0,0],chance:100}));t.motion=saved?JSON.parse(JSON.stringify(saved.motion)):{on:false,events:[]};t.p.splice(29,4,...(saved?.timing||TP.slice(29,33).map(d=>d.def)));}}
         [tr,op,rc,t.pattern,127,8].forEach(b);break;
+      }
+      case CMD.LIVE: {                                   /* (Hookology) LIVE: a small transport for the page */
+        if(!opt.live||!a.length||a[0]>5)return null;let rc=0;const L=st.live??={playing:false,rec:0,sec:0,next:127,solo:0,idx:0,notes:[]};
+        const n=st.tracks.length,G=(l)=>GP.findIndex(d=>d.label===l);
+        if(a[0]===1){L.playing=!L.playing;L.idx=0;if(!L.playing)L.next=127;}
+        else if(a[0]===2)L.rec^=1<<st.sel;
+        else if(a[0]===3){if(a[1]>7)rc=1;else if(L.playing)L.next=a[1];else L.sec=a[1];}
+        else if(a[0]===4)L.solo=(a[1]|a[2]<<7)&((1<<n)-1);
+        else if(a[0]===5){if(a[1]>=n)rc=1;else L.notes.push([a[1],a[2],a[3]]);}
+        if(L.playing){L.idx=(L.idx+1)%16;if(L.idx===0&&L.next<8){L.sec=L.next;L.next=127;}}
+        const bpm=st.g[G("BPM")]??120,sw=st.g[G("SWG")]??0;
+        [a[0],rc,+L.playing,0,L.rec&127,L.rec>>7,0,0,0,L.sec,L.next].forEach(b);v(bpm);
+        [sw&127,0,0,L.idx,16,2,L.playing?23:0,L.solo&127,L.solo>>7,st.sel,n].forEach(b);
+        st.tracks.forEach(x=>{b(x.p[40]?1:0);b(x.p[0]&127);});break;
       }
       case CMD.BANK_SONG: {
         if(opt.songSections&&a[0]>=5&&a[0]<=7){            /* (Hookology) the song by sections */
@@ -3357,7 +3467,7 @@ const GLYPH = {
   control_arrow_loop: 0xEAD6, note_eight: 0xEAEF, symbol_waves: 0xEAE6, function_env_adsr_exp: 0xEA12,
   ui_knob: 0xEA70, symbol_keyboard: 0xEABC, symbol_effector: 0xEAB7, symbol_echo: 0xEAB5, symbol_spring: 0xEAD1,
   symbol_tuning: 0xEAA7, control_arrow_up_down: 0xEACF, symbol_grid: 0xEABA, symbol_cog: 0xEA46,
-  function_filter_lpf_peak: 0xEAA0, ui_slider_vertical: 0xEA73, symbol_books: 0xEADC, control_rec_f: 0xEA09, control_stop_f: 0xEA0F,
+  function_filter_lpf_peak: 0xEAA0, ui_slider_vertical: 0xEA73, symbol_books: 0xEADC, control_play_f: 0xEA07, control_rec_f: 0xEA09, control_stop_f: 0xEA0F,
   symbol_pan: 0xEA53, control_speaker_mute: 0xEAEB,
   waveform_sine: 0xEA85, waveform_triangle_ac: 0xEA89, waveform_sawtooth_ac: 0xEA81, waveform_square: 0xEA87,
   waveform_pulse_quarter: 0xEA7F, waveform_pulse_eighth: 0xEA7B, waveform_noise_step: 0xEA79,
@@ -3486,6 +3596,11 @@ const TEXT = {
     badEngine: "このファームウェアにないエンジンです: ", flashFail: "書き込みに失敗しました（rc {rc}）",
     installer: "Melodee インストーラー",
     tabSeq: "シーケンサー", tabTracks: "トラック", tabSettings: "設定",
+    tabLive: "ライブ", liveTap: "タップ", liveSwing: "スイング", livePlay: "再生", livePlaySong: "ソング再生", liveSections: "セクション",
+    liveSecHelp: "セクションをタップ: ループの終わりから再生（停止中はすぐ）。再生中は塗りつぶし、次は点滅。",
+    livePlaying: "再生中", liveReady: "準備", liveNext: "次", liveKeys: "鍵盤", liveBusy: "今はできません。ソングを停止するか録音を終えてください。",
+    liveKeyHelp: "鍵盤は選択中のトラックをスケールとコードで演奏し、REC で録音します。PC キー: A W S E D F T G Y H U J K O L P ; で演奏、Z / X オクターブ、Space 再生、1-8 セクション、C REC、B タップ。",
+    liveOld: "ライブページには FM-1 を Hookology v1.1-beta62 以降に更新してください。",
     tabSong: "ソング", songSection: "セクション", songTimes: "回数", songAddSec: "+ セクションを追加", songRest: "休み", songMixed: "*（FM-1 で設定）",
     songMenu: "ソングメニュー", songMode: "ソングモード", songPlayStart: "最初から再生", songStopped: "停止中。", songPlayHere: "ここから再生",
     songUp: "上へ", songDown: "下へ", songRemove1: "削除", songSum: "{n} 項目 · {p} 回", songNow: "{n} 項目中 {r} を再生中。",
@@ -3600,6 +3715,11 @@ const TEXT = {
     badEngine: "This firmware has no such engine: ", flashFail: "Write failed (rc {rc})",
     installer: "Hookology installer",
     tabSeq: "Sequencer", tabTracks: "Tracks", tabSettings: "Settings",
+    tabLive: "LIVE", liveTap: "Tap", liveSwing: "SWING", livePlay: "Play", livePlaySong: "Play song", liveSections: "Sections",
+    liveSecHelp: "Tap a section: it plays from the section's loop end (stopped: at once). The one playing is filled, the one coming blinks.",
+    livePlaying: "Playing", liveReady: "Ready", liveNext: "Next", liveKeys: "Keys", liveBusy: "Not now: stop the song or finish the take first.",
+    liveKeyHelp: "The keys play the selected track, through its scale and chords; REC records them. Computer keys: A W S E D F T G Y H U J K O L P ; play, Z / X octave, Space PLAY, 1-8 sections, C REC, B tap.",
+    liveOld: "Update the FM-1 to Hookology v1.1-beta62 or later for the LIVE page.",
     tabSong: "Song", songSection: "Section", songTimes: "Times", songAddSec: "+ Add a section", songRest: "Rest", songMixed: "* (set on the FM-1)",
     songMenu: "Song menu", songMode: "Song mode", songPlayStart: "Play from the start", songStopped: "Stopped.", songPlayHere: "Play from here",
     songUp: "Move up", songDown: "Move down", songRemove1: "Remove", songSum: "{n} entries · {p} sections played", songNow: "Playing entry {r} of {n}.",
@@ -3650,7 +3770,7 @@ $("themebtn").addEventListener("click", () => {
 
 /* ---------------------------------------------------------------- tabs --- */
 /* one panel at a time; the last one is remembered (localStorage) and in the URL hash (#sound ...) */
-const TABS = ["sound", "sequencer", "tracks", "song", "library", "fm6", "projects", "settings"];   /* (the sidebar's order) */
+const TABS = ["live", "sound", "sequencer", "tracks", "song", "library", "fm6", "projects", "settings"];   /* (the sidebar's order) */
 const TAB_KEY = "felucca-editor-tab";
 const TRACK_TABS = new Set(["sound", "sequencer", "tracks"]);
 let tab = (() => {
@@ -3670,6 +3790,8 @@ function showTab(name) {
   if (name === "tracks" && prev !== "tracks" && hasTracks() && dev.dump) op(readMixer);
   if (name === "fm6" && prev !== "fm6" && dev && dev.dump && dev.info.fm6) op(fm6Refresh);
   if (name === "song" && prev !== "song" && songOk()) op(() => readSongSections());
+  if (name === "live" && prev !== "live" && liveOk()) op(() => readLive());
+  if (prev === "live" && name !== "live" && typeof lvAllOff === "function") lvAllOff();
 }
 function renderPanels() {
   /* the Tracks tab only with a four-track firmware */
@@ -3802,7 +3924,7 @@ async function connect() {
   sayK("connecting");
   try {
     if (!access) {
-      if (MOCK) { mock = makeMockDevice({ legacy: QS.get("legacy") === "1", auto: QS.get("mockauto") !== "0", advancedSong: true, songLoop: true, songSections: true }); access = mock.access; }
+      if (MOCK) { mock = makeMockDevice({ legacy: QS.get("legacy") === "1", auto: QS.get("mockauto") !== "0", advancedSong: true, songLoop: true, songSections: true, live: true }); access = mock.access; }
       else {
         try { access = await navigator.requestMIDIAccess({ sysex: true }); }
         catch (e) { sayK("denied"); return; }
@@ -4510,6 +4632,193 @@ setInterval(async () => {                                /* while the page shows
   const release = beginBusy(), d = dev;
   try { await readSongSections(d); } catch (err) { report(err); } finally { release(); }
 }, 1000);
+
+/* ---- (Hookology) LIVE: the FM-1 under your hands for a show (command 81), after SLOOP's LIVE page ----
+   PLAY, REC and the section pads do what the FM-1's own buttons do; the keys play the selected track through its
+   scale and chords; the mixer is TRACK_MIX plus the LIVE solo. Space plays, 1-8 the sections, the letter keys play. */
+const LV = { oct: 4, held: new Map(), taps: [], strips: [], keys: [] };
+const liveOk = () => !!dev && !!dev.info && !!dev.info.live;
+const gIdx = (...labels) => dev.gdesc.findIndex((d) => d && labels.includes(d.label));
+async function readLive(d = dev) {
+  if (!d || !d.info.live) return;
+  const r = parse[CMD.LIVE](await sessionRequest(d, req.live(0)));
+  if (d === dev) { d.live = r; renderLivePage(); }
+}
+async function lvCmd(...a) {
+  const r = parse[CMD.LIVE](await rq(req.live(...a)));
+  if (r.rc) throw new Error(t(r.rc === 2 ? "liveBusy" : "songInvalid"));
+  dev.live = r; renderLivePage();
+}
+function lvTrackName(i) {
+  const x = dev.mix && dev.mix.tracks[i];
+  if (!x) return `${t("track")} ${i + 1}`;
+  const eng = engineLabel(dev.info.engines, x.engine);
+  return eng === "MIDI Track" ? `MIDI ${i + 1}` : (dev.names[x.engine] || [])[x.preset] || eng;
+}
+function lvBar(L) {
+  if (!L.playing) return "–";
+  const per = ROLL.DIV_PER_BAR[L.div] ?? 16, beat = per / 4;
+  if (per < 1) return "1.1";
+  return `${Math.floor(L.idx / per) + 1}.${beat >= 1 ? Math.floor((L.idx % per) / beat) + 1 : 1}`;
+}
+function lvSetG(labels, v, lo, hi) {
+  const i = gIdx(...labels);
+  if (i < 0) return;
+  v = Math.max(lo, Math.min(hi, Math.round(v)));
+  if (dev.live) { if (labels.includes("BPM")) dev.live.bpm = v; else dev.live.swing = v; }
+  userSet(1, i, v, true);
+  renderLivePage();
+}
+function buildLive() {
+  /* the section pads */
+  $("lvsecs").replaceChildren(...SEC_NAMES.map((nm, k) => {
+    const b = el("button", { type: "button", "data-k": k, onclick: () => op(() => lvCmd(3, k)) }, el("b", { text: nm }), el("small"));
+    b.style.setProperty("--tc", `var(--t${k % 4 + 1})`);
+    return b;
+  }));
+  /* two octaves of keys: 15 white, 10 black */
+  const W = [0, 2, 4, 5, 7, 9, 11], box = $("lvkeys"), keys = [];
+  for (let o = 0, w = 0; o < 3; o++) for (let s = 0; s < 12; s++) {
+    const semi = o * 12 + s;
+    if (semi > 24) break;
+    const white = W.includes(s);
+    const b = el("button", { type: "button", class: white ? "w" : "b", "data-s": semi, tabindex: -1, "aria-label": `key ${semi}` });
+    if (white) { b.style.gridColumn = String(w + 1); w++; }
+    else b.style.left = `calc(100% / 15 * ${w} - 100% / 15 * .3)`;
+    keys.push(b);
+  }
+  box.replaceChildren(...keys);
+  LV.keys = keys;
+  const down = (b, e) => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); lvNote(LV.oct * 12 + 12 + +b.dataset.s, true, "p" + b.dataset.s); };
+  const up = (b) => lvNote(LV.oct * 12 + 12 + +b.dataset.s, false, "p" + b.dataset.s);
+  for (const b of keys) {
+    b.addEventListener("pointerdown", (e) => down(b, e));
+    b.addEventListener("pointerup", () => up(b));
+    b.addEventListener("pointercancel", () => up(b));
+  }
+}
+/* a note on the selected track; `who` holds it (a key on the page or of the computer) */
+function lvNote(note, on, who) {
+  if (!liveOk() || note < 0 || note > 127) return;
+  const tr = dev.live ? dev.live.sel : dev.sel || 0;
+  if (on) {
+    if (LV.held.has(who)) return;
+    LV.held.set(who, { note, tr });
+    rq(req.live(5, tr, note, 100)).catch(report);
+  } else {
+    const h = LV.held.get(who);
+    if (!h) return;
+    LV.held.delete(who);
+    rq(req.live(5, h.tr, h.note, 0)).catch(report);
+  }
+  lvKeyMarks();
+}
+function lvAllOff() { for (const who of [...LV.held.keys()]) lvNote(0, false, who); }
+function lvKeyMarks() {
+  const on = new Set([...LV.held.values()].map((h) => h.note));
+  for (const b of LV.keys) b.classList.toggle("on", on.has(LV.oct * 12 + 12 + +b.dataset.s));
+}
+function renderLivePage() {
+  $("liveold").hidden = !dev || !dev.info || liveOk();
+  $("livebody").hidden = !liveOk();
+  if (!liveOk() || !dev.live) return;
+  if (!$("lvsecs").children.length) buildLive();
+  const L = dev.live, n = L.ntrk;
+  $("lvplay").textContent = t(L.playing || L.counting || L.chain ? "songStop" : L.mode ? "livePlaySong" : "livePlay");
+  $("lvrec").classList.toggle("on", !!(L.rec >> L.sel & 1));
+  if (document.activeElement !== $("lvbpm") && !LV.drag) $("lvbpm").textContent = String(L.bpm);
+  $("lvswing").textContent = String(L.swing);
+  $("lvbar").textContent = lvBar(L);
+  $("lvloop").checked = L.loop; $("lvloop").disabled = L.chain;
+  $("lvmode").checked = L.mode;
+  $("lvload").textContent = L.playing ? `LOAD ${L.load}%` : "";
+  for (const b of $("lvsecs").children) {
+    const k = +b.dataset.k, now = L.sec === k, next = L.next === k;
+    b.classList.toggle("now", now); b.classList.toggle("next", next && !now);
+    b.querySelector("small").textContent = now ? t(L.playing ? "livePlaying" : "liveReady") : next ? t("liveNext") : "";
+    b.disabled = L.chain;
+  }
+  /* the strips: rebuilt when the track count changes */
+  const mix = $("lvmix");
+  if (LV.strips.length !== n) {
+    LV.strips = Array.from({ length: n }, (_, i) => {
+      const fader = el("input", { type: "range", class: "fader", min: 0, max: 127, step: 1, "aria-label": `${t("level")} ${i + 1}` });
+      fader.addEventListener("input", () => setLevel(i, +fader.value));
+      const c = { fader,
+        badge: el("button", { type: "button", class: "badge", text: String(i + 1), title: t("selectTrack"), onclick: () => selectTrack(i) }),
+        name: el("span"),
+        m: el("button", { type: "button", class: "m", text: "M", "aria-label": `${t("mute")} ${i + 1}`, onclick: () => setMute(i, !dev.mix.tracks[i].mute) }),
+        s: el("button", { type: "button", class: "s", text: "S", "aria-label": `Solo ${i + 1}`,
+          onclick: () => { const m = dev.live.solo ^ (1 << i); op(() => lvCmd(4, m & 127, m >> 7)); } }) };
+      c.box = el("div", { class: `lvstrip tc${i % 4 + 1}` }, el("div", { class: "hd" }, c.badge, c.name), fader, el("div", { class: "ms" }, c.m, c.s));
+      return c;
+    });
+    mix.replaceChildren(...LV.strips.map((c) => c.box));
+  }
+  LV.strips.forEach((c, i) => {
+    const x = L.tracks[i], mx = dev.mix && dev.mix.tracks[i];
+    const mute = mx ? !!mx.mute : x.mute, level = mx ? mx.level : x.level;
+    c.name.textContent = lvTrackName(i);
+    if (document.activeElement !== c.fader) c.fader.value = String(level);
+    c.m.setAttribute("aria-pressed", mute ? "true" : "false");
+    c.s.setAttribute("aria-pressed", L.solo >> i & 1 ? "true" : "false");
+    c.box.classList.toggle("sel", i === L.sel);
+    c.box.classList.toggle("out", mute || (L.solo && !(L.solo >> i & 1)));
+  });
+  $("lvkeyto").textContent = `${t("track")} ${L.sel + 1} · ${lvTrackName(L.sel)}`;
+  $("lvoct").textContent = `C${LV.oct} – C${LV.oct + 2}`;
+}
+$("lvplay").addEventListener("click", () => op(() => lvCmd(1)));
+$("lvrec").addEventListener("click", () => op(() => lvCmd(2)));
+$("lvbpmdn").addEventListener("click", () => lvSetG(["BPM"], (dev.live?.bpm || 120) - 1, 40, 240));
+$("lvbpmup").addEventListener("click", () => lvSetG(["BPM"], (dev.live?.bpm || 120) + 1, 40, 240));
+$("lvtap").addEventListener("click", () => {
+  const now = performance.now();
+  LV.taps = LV.taps.filter((x) => now - x < 2500).concat(now);
+  if (LV.taps.length >= 2) {
+    const d = (LV.taps.at(-1) - LV.taps[0]) / (LV.taps.length - 1);
+    lvSetG(["BPM"], 60000 / d, 40, 240);
+  }
+});
+for (const [id, labels, lo, hi, def] of [["lvbpm", ["BPM"], 40, 240, 120], ["lvswing", ["SWG", "SWING"], 0, 100, 0]]) {
+  const b = $(id);
+  let y0 = 0, v0 = 0;
+  b.addEventListener("pointerdown", (e) => { if (!dev?.live) return; LV.drag = id; y0 = e.clientY; v0 = id === "lvbpm" ? dev.live.bpm : dev.live.swing; b.setPointerCapture(e.pointerId); });
+  b.addEventListener("pointermove", (e) => {
+    if (LV.drag !== id) return;
+    const v = Math.max(lo, Math.min(hi, Math.round(v0 + (y0 - e.clientY) / (e.shiftKey ? 8 : 2))));
+    b.textContent = String(v);
+  });
+  b.addEventListener("pointerup", () => { if (LV.drag !== id) return; LV.drag = null; lvSetG(labels, +b.textContent, lo, hi); });
+  b.addEventListener("dblclick", () => lvSetG(labels, def, lo, hi));
+}
+$("lvloop").addEventListener("change", () => op(async () => { const a = await rq(req.bankSong(4, [], $("lvloop").checked ? 1 : 0)); if (a[1]) throw new Error(t("songBusy")); await readLive(); }));
+$("lvmode").addEventListener("change", () => op(async () => { parse.songSections(await rq(req.songSections(7, [], $("lvmode").checked))); await readLive(); }));
+$("lvoctdn").addEventListener("click", () => { lvAllOff(); LV.oct = Math.max(0, LV.oct - 1); renderLivePage(); });
+$("lvoctup").addEventListener("click", () => { lvAllOff(); LV.oct = Math.min(7, LV.oct + 1); renderLivePage(); });
+/* the computer's keys, on LIVE only and not while typing */
+const LV_KEYS = "awsedftgyhujkolp;";
+const lvTyping = (e) => e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || "") && document.activeElement.type !== "checkbox";
+window.addEventListener("keydown", (e) => {
+  if (tab !== "live" || !liveOk() || !dev.live || lvTyping(e)) return;
+  const k = e.key.toLowerCase();
+  if (e.repeat && (LV_KEYS.includes(k) || k === " ")) { e.preventDefault(); return; }
+  if (k === " ") { e.preventDefault(); op(() => lvCmd(1)); }
+  else if (/^[1-8]$/.test(k)) { e.preventDefault(); op(() => lvCmd(3, +k - 1)); }
+  else if (k === "z") { lvAllOff(); LV.oct = Math.max(0, LV.oct - 1); renderLivePage(); }
+  else if (k === "x") { lvAllOff(); LV.oct = Math.min(7, LV.oct + 1); renderLivePage(); }
+  else if (k === "c") op(() => lvCmd(2));
+  else if (k === "b") $("lvtap").click();
+  else if (LV_KEYS.includes(k)) { e.preventDefault(); lvNote(LV.oct * 12 + 12 + LV_KEYS.indexOf(k), true, "k" + k); }
+});
+window.addEventListener("keyup", (e) => { const k = e.key.toLowerCase(); if (LV.held.has("k" + k)) lvNote(0, false, "k" + k); });
+window.addEventListener("blur", lvAllOff);
+document.addEventListener("visibilitychange", () => { if (document.hidden) lvAllOff(); });
+setInterval(async () => {                                /* while LIVE shows: where the music is */
+  if (!liveOk() || busy || document.hidden || !dev.link.idle || tab !== "live") return;
+  const release = beginBusy(), d = dev;
+  try { await readLive(d); } catch (err) { report(err); } finally { release(); }
+}, 250);
 
 /* Complete archives remain on this computer; no project or sample is uploaded to a server. */
 function renderBackup() {

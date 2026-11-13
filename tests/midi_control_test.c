@@ -507,10 +507,26 @@ static int song_position_test(uint32_t source)
 }
 
 #ifndef MIDI_CONTROL_NO_MAIN
+/* (Hookology) the editor's LIVE keys: queued with MIDI_SRC_EDITOR + track, they play that track whatever ROUT says */
+static int editor_keys_test(void)
+{
+    int bad = 0; midi_test_reset(); song.ntrk = 4;
+    for (uint32_t k = 1; k < 4u; k++) set_engine_of(&trk[k], HOST_SYNTH);
+    song.g[G_ROUTE] = 0;                                   /* CH1-4: channel 16 reaches no track */
+    queued(0x9F, 62, 100, 1);
+    bad += check("a plain channel-16 note reaches no track under CH1-4", !gate_note(&trk[2], 62) && !gate_note(&trk[0], 62));
+    queued(0x8F, 62, 0, 1);
+    queued(0x9F, 64, 100, MIDI_SRC_EDITOR + 2u);
+    bad += check("the editor's key plays track 3, whatever the routing", gate_note(&trk[2], 64) && !gate_note(&trk[0], 64) && !midi_force_track);
+    queued(0x8F, 64, 0, MIDI_SRC_EDITOR + 2u);
+    bad += check("and its release ends it", !gate_note(&trk[2], 64) && !midi_owners[2]);
+    return bad;
+}
+
 int main(void)
 {
     int bad = controls_test() + sustain_test() + ownership_test() + clock_test(1) + clock_test(2) + song_position_test(1) + song_position_test(2) + clock_arp_and_boundaries() +
-              arp_ext_stop_test() + arp_idle_live_test() + usb_burst_test() + routing_range_test() + drum_channel_test() + drum_retrigger_accounting() + clock_project_load_test();
+              arp_ext_stop_test() + arp_idle_live_test() + usb_burst_test() + routing_range_test() + drum_channel_test() + drum_retrigger_accounting() + clock_project_load_test() + editor_keys_test();
     printf("%s\n", bad ? "MIDI CONTROL/CLOCK TEST FAILED" : "MIDI control/clock integration tests passed"); return bad != 0;
 }
 #endif
