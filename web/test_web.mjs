@@ -1253,6 +1253,34 @@ async function editorFm6() {
 }
 
 /* ------------------------------------------------- editor tabs and strings --- */
+/* (Hookology) the Song page: the song by sections (BANK_SONG ops 5..7) */
+async function editorSongSections() {
+  const m = E.makeMockDevice({ auto: false, advancedSong: true, songLoop: true, songSections: true });
+  const link = new E.Link((d) => [...m.access.outputs.values()][0].send(d), { timeout: 100 });
+  [...m.access.inputs.values()][0].onmidimessage = (e) => link.receive(e.data);
+  const rq = (r) => link.request(r), C = E.CMD;
+  const info = E.parse[C.INFO](await rq(E.req.info()));
+  ok(info.songSections && info.songLoop, "Song page: INFO says the song by sections is there");
+  const ask = async (op, rows, v) => E.parse.songSections(await rq(E.req.songSections(op, rows, v)));
+  let r = await ask(6, [{ sec: 0, repeat: 2, src: null }, { sec: 2, repeat: 1, src: null }, { sec: 8, repeat: 1, src: null }]);
+  ok(!r.rc && r.rows.map((x) => `${x.sec}x${x.repeat}`).join() === "0x2,2x1,8x1", "Song page: new entries A x2, C, a rest");
+  m.state.bankSongRows[1].banks = [2, 2, 5, 2];                 /* made on the FM-1: tracks differ */
+  r = await ask(5);
+  ok(r.rows[1].sec === 127 && !r.loop && !r.mode, "Song page: an entry whose tracks differ reads as mixed");
+  r = await ask(6, [{ sec: 127, repeat: 3, src: 1 }, { sec: 0, repeat: 2, src: 0 }]);
+  ok(!r.rc && r.rows[0].sec === 127 && r.rows[0].repeat === 3 && m.state.bankSongRows[0].banks.join() === "2,2,5,2" && r.count === 2,
+    "Song page: the mixed entry moves up, kept as it is; the rest removed");
+  r = await ask(6, [{ sec: 127, repeat: 1, src: null }]);
+  ok(r.rc === 1, "Song page: a new entry cannot be mixed");
+  r = await ask(6, [{ sec: 0, repeat: 1, src: 0 }, { sec: 1, repeat: 1, src: 0 }]);
+  ok(r.rc === 1, "Song page: an entry used twice is refused");
+  r = await ask(7, [], 1);
+  ok(!r.rc && r.mode, "Song page: SONG MODE on");
+  await rq(E.req.bankSong(4, [], 1));
+  r = await ask(5);
+  ok(r.loop && r.mode, "Song page: LOOP SONG and SONG MODE read back");
+}
+
 async function editorSong() {
   const m = E.makeMockDevice({ auto: false });
   const link = new E.Link((d) => [...m.access.outputs.values()][0].send(d), { timeout: 100 });
@@ -1420,7 +1448,7 @@ function editorTabs() {
   const tabs = [...html.matchAll(/<button role="tab" data-tab="(\w+)"/g)].map((x) => x[1]);
   const panels = [...html.matchAll(/<section class="panel" id="p-(\w+)" data-tab="(\w+)"/g)].map((x) => [x[1], x[2]]);
   const TABS = JSON.parse((/const TABS = (\[[^\]]*\]);/.exec(html) || [])[1] || "[]");
-  ok(tabs.length === 7 && js(tabs) === js(TABS) && js(panels.map((x) => x[1])) === js(TABS) && panels.every(([a, b]) => a === b),
+  ok(tabs.length === 8 && js(tabs) === js(TABS) && js(panels.map((x) => x[1])) === js(TABS) && panels.every(([a, b]) => a === b),
     `editor: ${tabs.length} tabs, one panel each (${tabs.join(" ")})`);
   ok(/localStorage\.setItem\(TAB_KEY/.test(html) && /try \{ localStorage/.test(html) && /history\.replaceState\([^)]*"#" \+ name\)/.test(html)
     && /addEventListener\("hashchange"/.test(html), "editor: last tab in localStorage (try/catch) and in the URL hash");
@@ -1836,6 +1864,7 @@ await editorTracks();
 await editorMixer();
 await editorTrackParam();
 await editorSong();
+await editorSongSections();
 await editorSessions();
 await editorFm6();
 await editorFm4();

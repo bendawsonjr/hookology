@@ -344,12 +344,97 @@ static int ed_args_ok(uint32_t cmd, const uint8_t *a, uint32_t n)
         return (n == 1u || (n == 2u && a[1] == 2u) || (n == 3u && a[1] == 1u && a[2] <= 1u) ||
                 (n == 6u && a[1] == 3u) || ((n == 4u || n == 6u) && a[1] == 4u)) && a[0] < NPART;
     case ED_BANK_SONG:
-        if (n && a[0] == 4u) return n == 2u;
+        if (n && (a[0] == 4u || a[0] == 7u)) return n == 2u;
+        if (n && a[0] == 5u) return n == 1u;
+        if (n && a[0] == 6u) return n >= 2u && n == 2u + 3u * a[1];
         /* fall through */
     case ED_SONG:
         return n && (a[0] == 1u || n == 1u || (a[0] == 2u && n == 2u));
     default:
         return 1;                                  /* variable payloads validate in their handler */
+    }
+}
+
+/* (Hookology) the song by sections, for the editor's Song page (ED_BANK_SONG ops 5..7): an entry is a section A..H
+ * (0..7) when every track in use plays that pattern, 8 when they all rest, ED_SEC_MIXED when its tracks differ (made
+ * on the FM-1: kept as it is). Its punch FX and sound snapshots go where the entry goes. */
+#define ED_SEC_REST 8u
+#define ED_SEC_MIXED 0x7Fu
+static uint32_t ed_sec_of(uint32_t row)
+{
+    uint32_t v = chain_patterns[row][0], k;
+    for (k = 1; k < trk_n(); k++) if (chain_patterns[row][k] != v) return ED_SEC_MIXED;
+    return v < SEC_N ? v : v == CHAIN_REST ? ED_SEC_REST : ED_SEC_MIXED;
+}
+static void ed_row_swap(uint32_t i, uint32_t j)         /* entries i and j trade places, all they carry */
+{
+    uint8_t pt[NTRK], sd[NTRK]; chain_fx_t fx[CHAIN_FX_EVENTS]; chain_row_t r;
+    memcpy(pt, chain_patterns[i], NTRK); memcpy(chain_patterns[i], chain_patterns[j], NTRK); memcpy(chain_patterns[j], pt, NTRK);
+    memcpy(sd, chain_config.sound[i], NTRK); memcpy(chain_config.sound[i], chain_config.sound[j], NTRK); memcpy(chain_config.sound[j], sd, NTRK);
+    memcpy(fx, chain_config.fx[i], sizeof fx); memcpy(chain_config.fx[i], chain_config.fx[j], sizeof fx); memcpy(chain_config.fx[j], fx, sizeof fx);
+    r = chain_config.row[i]; chain_config.row[i] = chain_config.row[j]; chain_config.row[j] = r;
+}
+/* a: count, then per entry {section (or ED_SEC_MIXED: keep), repeats 1..16, the entry it was (or 0x7F: new)}; each
+ * old entry at most once. 0 done, 1 refused, 2 busy */
+static uint32_t ed_song_sections_put(const uint8_t *a)
+{
+    uint32_t n = a[0], old = chain_config.count, i, j, used = 0, used_hi = 0;
+    uint8_t at[CHAIN_ROWS];                              /* at[k]: where old entry k is now */
+    if (n > CHAIN_ROWS) return 1;
+    for (i = 0; i < n; i++) {
+        uint32_t sec = a[1u + 3u * i], rep = a[2u + 3u * i], src = a[3u + 3u * i];
+        if ((sec > ED_SEC_REST && sec != ED_SEC_MIXED) || !rep || rep > 16u) return 1;
+        if (src != 0x7Fu) {
+            uint32_t bit = src < 32u ? (used >> src) & 1u : (used_hi >> (src - 32u)) & 1u;
+            if (src >= old || bit) return 1;
+            if (src < 32u) used |= 1u << src; else used_hi |= 1u << (src - 32u);
+        } else if (sec == ED_SEC_MIXED) return 1;
+    }
+    if (chain_busy() || !song_edit_begin()) return 2;
+    for (i = 0; i < CHAIN_ROWS; i++) at[i] = (uint8_t)i;
+    for (i = 0; i < n; i++) {                            /* entry i takes old entry src (swapped in from where it is) */
+        uint32_t src = a[3u + 3u * i];
+        if (src == 0x7Fu) continue;
+        j = at[src];
+        if (j != i) {
+            uint32_t k;
+            for (k = 0; k < CHAIN_ROWS && at[k] != i; k++) {}
+            ed_row_swap(i, j);
+            if (k < CHAIN_ROWS) at[k] = (uint8_t)j;
+            at[src] = (uint8_t)i;
+        }
+    }
+    for (i = 0; i < n; i++) {
+        uint32_t sec = a[1u + 3u * i], src = a[3u + 3u * i];
+        if (src == 0x7Fu) {                              /* a new entry: no punch FX, the tracks' own sounds */
+            memset(chain_config.fx[i], 0, sizeof chain_config.fx[i]);
+            memset(chain_config.sound[i], 0, NTRK);
+        }
+        if (sec != ED_SEC_MIXED && (src == 0x7Fu || ed_sec_of(i) != sec))
+            memset(chain_patterns[i], sec == ED_SEC_REST ? CHAIN_REST : sec, NTRK);
+        chain_config.row[i] = (chain_row_t){chain_patterns[i][0], a[2u + 3u * i]};
+    }
+    for (i = n; i < CHAIN_ROWS; i++) {                   /* what is left past the end: cleared */
+        memset(chain_patterns[i], 0, NTRK); memset(chain_config.fx[i], 0, sizeof chain_config.fx[i]);
+        memset(chain_config.sound[i], 0, NTRK); chain_config.row[i] = (chain_row_t){0, 1};
+    }
+    chain_config.count = (uint8_t)n;
+    song_edit_end();
+    ui.song_row = 0; ui.force = 1;
+    return 0;
+}
+static void ed_song_mode_set(uint32_t on)              /* as the SECTIONS sheet's SONG MODE (sections_flag) */
+{
+    if (chain_config.rsv[CHAIN_MODE] == on) return;
+    if (chain_busy()) {
+        fm1_irq_off();
+        chain_config.rsv[CHAIN_MODE] = (uint8_t)on;
+        if (chain.running || chain.armed) chain.config.rsv[CHAIN_MODE] = (uint8_t)on;
+        fm1_irq_on();
+        ui.force = 1;
+    } else if (song_edit_begin()) {
+        chain_config.rsv[CHAIN_MODE] = (uint8_t)on;
+        song_edit_end();
     }
 }
 
@@ -730,7 +815,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         ed_b(0x55); ed_b(1); ed_b(ed_ui_caps());             /* tagged preferences v1: commands 34..38 */
         ed_b(0x4d); ed_b(2); ed_b(MOTION_MAX); ed_b(1); /* motion v2: native ids, chance v1 */
         ed_b(0x42); ed_b(1); ed_b(3); /* bounded full-backup read + restore */
-        ed_b(0x50); ed_b(4); ed_b(NPAT); ed_b(CHAIN_ROWS);     /* bank controls: 73/74 */
+        ed_b(0x50); ed_b(5); ed_b(NPAT); ed_b(CHAIN_ROWS);     /* bank controls: 73/74 (5: the song by sections, ops 5..7) */
         ed_b(0x46); ed_b(1); ed_b(FM6_NFAC); ed_b(0);   /* FM6 patches: cmds 68..71 */
         ed_b(0x43); ed_b(1); ed_b(CZ_BYTES & 127u); ed_b(CZ_BYTES >> 7); ed_b(0); ed_b(0); /* old CZ bank controls retired */
         ed_b(0x35);ed_b(1);ed_b(ENGI_PROPHET);ed_b(USER_GENERAL);ed_b(USER_NATIVE_FM);ed_b(USER_NATIVE_CZ);ed_b(USER_NATIVE_P5);ed_b(0);ed_b(1); /* legacy native clients see their addressable prefix */
@@ -1071,8 +1156,16 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         break;
     }
     case ED_BANK_SONG: {
-        if (!na || a[0] > 4u) return;
+        if (!na || a[0] > 7u) return;
         uint32_t rc = 0;
+        if (a[0] >= 5u) {                                  /* (Hookology) the song by sections: the Song page */
+            if (a[0] == 6u) rc = ed_song_sections_put(a + 1);
+            else if (a[0] == 7u) { if (a[1] > 1u) rc = 1; else ed_song_mode_set(a[1]); }
+            ed_b(a[0]); ed_b(rc); ed_b(chain_config.count); ed_b(chain.running); ed_b(chain.row); ed_b(chain.remaining);
+            ed_b(chain_config.rsv[CHAIN_LOOP]); ed_b(chain_config.rsv[CHAIN_MODE] == 1u);
+            for (uint32_t row = 0; row < chain_config.count; row++) { ed_b(ed_sec_of(row)); ed_b(chain_config.row[row].repeat); }
+            break;
+        }
         if (a[0] == 1u) {
             if (na < 2u || a[1] > CHAIN_ROWS || na != 2u + a[1] * 5u) rc = 1;
             else if (chain_busy()) rc = 2;

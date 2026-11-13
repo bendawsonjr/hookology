@@ -121,7 +121,7 @@ static int preferences(void)
     uint8_t a[4] = {0, 2, 0, 0};
     reset();
     uint32_t n = request(ED_INFO, a, 0);
-    const uint8_t caps[]={0,0x55,1,121,0x4d,2,MOTION_MAX,1,0x42,1,3,0x50,4,NPAT,CHAIN_ROWS,0x46,1,FM6_NFAC,0,0x43,1,16,1,0,0,0x35,1,19,16,17,18,20,0,1,0x4e,1,64,0,0,1,0x55,1,0,3};
+    const uint8_t caps[]={0,0x55,1,121,0x4d,2,MOTION_MAX,1,0x42,1,3,0x50,5,NPAT,CHAIN_ROWS,0x46,1,FM6_NFAC,0,0x43,1,16,1,0,0,0x35,1,19,16,17,18,20,0,1,0x4e,1,64,0,0,1,0x55,1,0,3};
     bad+=check("INFO preserves existing IDs and advertises the shared 384-slot library",ED_SONG==33&&ED_FAV_SET==38&&n>sizeof caps&&!memcmp(host_wire+n-sizeof caps-1,caps,sizeof caps));
     request(ED_UI_SET, a, 2);
     bad += check("UI_SET updates the actual palette and reports RAM-only saving",
@@ -731,6 +731,45 @@ static int midi_track_protocol(void)
                  TSEL->p[P_FXTYPE] == FX_OFF && !TSEL->p[P_FXSEND]);
     return bad;
 }
+/* (Hookology) the Song page: the song by sections (ED_BANK_SONG ops 5..7) */
+static int song_sections(void)
+{
+    int bad = 0;
+    uint8_t a[2 + 3 * 8];
+    reset();
+    song.ntrk = 6;
+    chain_config.count = 3;
+    memset(chain_patterns[0], 0, NTRK); chain_config.row[0] = (chain_row_t){0, 2};          /* A x2 */
+    memset(chain_patterns[1], 1, NTRK); chain_patterns[1][2] = 3; chain_config.row[1] = (chain_row_t){1, 1};   /* mixed */
+    memset(chain_patterns[2], CHAIN_REST, NTRK); chain_config.row[2] = (chain_row_t){CHAIN_REST, 1};           /* rest */
+    chain_config.fx[1][0] = (chain_fx_t){5, 2, 3};
+    a[0] = 5; request(ED_BANK_SONG, a, 1);
+    bad += check("SONG sections: read A x2, mixed, rest",
+                 host_wire[5] == 5 && !host_wire[6] && host_wire[7] == 3 && host_wire[13] == 0 && host_wire[14] == 2 &&
+                 host_wire[15] == 0x7F && host_wire[17] == 8);
+    /* new order: the mixed entry first, A as C x3, a new E; the rest dropped */
+    const uint8_t put[] = {6, 3, 0x7F, 1, 1,  2, 3, 0,  4, 1, 0x7F};
+    request(ED_BANK_SONG, put, sizeof put);
+    bad += check("SONG sections: written, the mixed entry kept with its punch FX",
+                 !host_wire[6] && chain_config.count == 3 && chain_patterns[0][2] == 3 && chain_patterns[0][0] == 1 &&
+                 chain_config.fx[0][0].fx == 5 && chain_config.fx[0][0].length == 3);
+    bad += check("SONG sections: a changed section and a new one, every track",
+                 chain_patterns[1][0] == 2 && chain_patterns[1][5] == 2 && chain_config.row[1].repeat == 3 &&
+                 chain_patterns[2][0] == 4 && chain_patterns[2][7] == 4 && !chain_config.fx[2][0].fx && !chain_config.fx[1][0].fx);
+    const uint8_t dup[] = {6, 2, 0, 1, 0,  1, 1, 0};
+    request(ED_BANK_SONG, dup, sizeof dup);
+    bad += check("SONG sections: an entry used twice is refused", host_wire[6] == 1 && chain_config.count == 3);
+    const uint8_t keepnew[] = {6, 1, 0x7F, 1, 0x7F};
+    request(ED_BANK_SONG, keepnew, sizeof keepnew);
+    bad += check("SONG sections: a new entry cannot be 'keep'", host_wire[6] == 1);
+    a[0] = 7; a[1] = 1; request(ED_BANK_SONG, a, 2);
+    bad += check("SONG sections: SONG MODE on", !host_wire[6] && chain_config.rsv[CHAIN_MODE] == 1 && host_wire[12] == 1);
+    a[1] = 0; request(ED_BANK_SONG, a, 2);
+    bad += check("SONG sections: SONG MODE off", chain_config.rsv[CHAIN_MODE] == 0);
+    song.ntrk = 4;
+    return bad;
+}
+
 /* (Hookology) the editor lists every track in use: six sound tracks, MIDI tracks 7 and 8 */
 static int track_count(void)
 {
@@ -753,7 +792,7 @@ static int track_count(void)
 int main(void)
 {
     int bad = midi_track_protocol() + library_transfers() + native_motion_protocol() + prophet_protocol() + bank_protocol() + preferences() + framing() + uart_recovery() + steps() + song_protocol() + malformed_saves() + names_whole() +
-              native_protocol() + shared_protocol() + fm6_patches() + user_preset_roundtrip() + cz_native_protocol() + cz_dedicated_banks() + cz_casio_sysex() + concert_pitch() + scale_catalogue() + project_scale_protocol() + track_count();
+              native_protocol() + shared_protocol() + fm6_patches() + user_preset_roundtrip() + cz_native_protocol() + cz_dedicated_banks() + cz_casio_sysex() + concert_pitch() + scale_catalogue() + project_scale_protocol() + track_count() + song_sections();
     printf("%s\n", bad ? "EDITOR TEST FAILED" : "editor test passed");
     return bad != 0;
 }
