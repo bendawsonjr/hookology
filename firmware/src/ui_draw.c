@@ -135,7 +135,7 @@ static int32_t roll_text(uint32_t k, int32_t x, int32_t y, const char *s, uint16
 
 /* the header (large type, 30 px): the transport (16 px; a song playing: its disc) at x 5, the BPM (the text face,
  * rolling) at x 26, the REC mark (filled: the selected track armed; a ring: another one), the octave shift as an
- * outlined pill ("+2") and the song's row, then the page's dots; at the right a chip in the track's colour (24 px, the
+ * outlined pill ("+2") and the song's row, then the page's place ("2/7"); at the right a chip in the track's colour (24 px, the
  * label face) naming where you are (Stage: the engine; a page: its title), or a message in its place (a layer: its
  * name); a battery glyph only while it runs low. Which track: Stage's rows, the pages' sound bar (its numeral) */
 static uint32_t page_sheet(void);                       /* ui_popup.c */
@@ -193,7 +193,8 @@ static void head_chip_text(char *b)
         str_cpy(b, t, 16);
     }
 }
-/* the page's place in its family: a dot a page, the page's a pill in the track's colour (no room: "3/12") */
+/* the page's place in its family: (Hookology) "2/7", the page's number in the track's colour, the count in MID (no room:
+ * nothing) */
 static void head_pages(int32_t x, int32_t x1)          /* (x: after the transport's marks; x1: where the chip, or the
                                                          * battery, starts) */
 {
@@ -211,20 +212,14 @@ static void head_pages(int32_t x, int32_t x1)          /* (x: after the transpor
         }
     if (n < 2u)
         return;
-    if (x + (int32_t)n * 12 + 10 > x1 - 6) {            /* (no room for the dots; none for that either: nothing) */
-        char b[8];
-        fmt_int(b, (int32_t)k + 1);
-        str_cpy(b + str_len(b), "/", 2);
-        fmt_int(b + str_len(b), (int32_t)n);
-        if (x + text_w(TY_LB, b) <= x1 - 4)
-            cv_text_on(x, ty_y(H_HEAD / 2, TY_LB), TY_LB, b, T_MID, T_BG);
+    char a[6], b[6];
+    fmt_int(a, (int32_t)k + 1);
+    b[0] = '/';
+    fmt_int(b + 1, (int32_t)n);
+    if (x + text_w(TY_LB, a) + text_w(TY_LB, b) > x1 - 4)
         return;
-    }
-    for (i = 0; i < n; i++) {                           /* a dot a page, the page's a pill */
-        int32_t w = i == k ? 16 : 6;
-        cv_rrect(x, H_HEAD / 2 - 3, w, 6, 3, i == k ? T_THEME : T_LINE, T_BG);
-        x += w + 6;
-    }
+    x = cv_text_on(x, ty_y(H_HEAD / 2, TY_LB), TY_LB, a, T_THEME, T_BG);
+    cv_text_on(x, ty_y(H_HEAD / 2, TY_LB), TY_LB, b, T_MID, T_BG);
 }
 /* the message (or the layer's name) does not fit the header from x: it goes under it as a toast (draw_toast) */
 static uint8_t toast_shown;                             /* the toast drawn (its place to give back when it goes) */
