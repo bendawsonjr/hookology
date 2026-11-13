@@ -509,7 +509,7 @@ static void rack_test(void)
     head_chip_text(chip);assert(str_eq(chip,"NOTE ECHO"));
     press(B_OCTDN);assert(str_eq(cur_page()->title,"FX") && fx_rack_row[0]==0);
     turn(EN_K1,1);press(B_OCTUP);assert(pop.on==POP_LIST);                         /* an empty slot: the list */
-    assert(vl.sel==FX_SOFT);turn(EN_K1,1);turn(EN_K1,1);press(B_OCTUP);assert(pop.on==POP_NONE && TSEL->p[P_FX2TYPE]==FX_MIDIDELAY);   /* (Hookology: Dirt, Colour, Notes) */
+    assert(vl.sel==FX_SOFT);turn(EN_K1,1);turn(EN_K1,1);turn(EN_K1,1);press(B_OCTUP);assert(pop.on==POP_NONE && TSEL->p[P_FX2TYPE]==FX_MIDIDELAY);   /* (Hookology: Dirt, Colour, Rhythm, Notes) */
     press(B_OCTUP);assert(cur_page()->id[0]==P_FX2MIX);head_chip_text(chip);assert(str_eq(chip,"NOTE ECHO"));
     press(B_FX);assert(str_eq(cur_page()->title,"FX"));                            /* FX from a slot: the rack */
     turn(EN_SELECT,1);assert(cur_page()->id[0]==P_FXMIX);turn(EN_SELECT,1);assert(cur_page()->id[0]==P_FX2MIX);

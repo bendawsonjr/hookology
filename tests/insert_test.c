@@ -33,10 +33,12 @@ int main(void)
 {
     {   /* the list: OFF, the INSERTs (Dirt, Colour), the note effects */
         ui_power_on();const param_desc_t *d=&TP[P_FXTYPE];
-        static const int16_t order[]={FX_OFF,FX_SOFT,FX_CRUSH,FX_FORMANT,FX_TAPE,FX_SPIT,FX_MIDIDELAY,FX_MIDIVERB};
+        static const int16_t order[]={FX_OFF,FX_SOFT,FX_CRUSH,FX_FORMANT,FX_TAPE,FX_SPIT,FX_GATE,FX_STUTTER,FX_MIDIDELAY,FX_MIDIVERB};
         assert(enum_rows(d)==(int32_t)NELEM(order));
         for(uint32_t i=0;i<NELEM(order);i++)assert(enum_value(d,(int32_t)i)==order[i] && enum_rank(d,order[i])==(int32_t)i);
-        for(int32_t t=0;t<FX_COUNT;t++)assert(fx_track_type(t)==(fx_is_midi(t) || (t>=FX_SOFT && t<=FX_CRUSH) || t==FX_FORMANT || t==FX_TAPE || t==FX_SPIT?t:FX_OFF));
+        for(int32_t t=0;t<FX_COUNT;t++)assert(fx_track_type(t)==(fx_is_midi(t) || (t>=FX_SOFT && t<=FX_CRUSH) || t==FX_FORMANT || t==FX_TAPE || t==FX_SPIT || t==FX_GATE || t==FX_STUTTER?t:FX_OFF));
+        for(int32_t i=0;i<enum_rows(&GP[G_MFXTYPE]);i++)assert(!fx_slicer_type(enum_value(&GP[G_MFXTYPE],i)));   /* (the SLICER: a track's only) */
+        song.g[G_MFX2TYPE]=FX_GATE;shared_fx_normalize(song.g);assert(song.g[G_MFX2TYPE]==FX_OFF);
         /* ROOM is off the shared list; a song that has it still names it */
         for(int32_t i=0;i<enum_rows(&GP[G_MFXTYPE]);i++)assert(enum_value(&GP[G_MFXTYPE],i)!=FX_ROOM);
         assert(!strcmp(N_AUDIO_FX[FX_ROOM],"ROOM"));
@@ -104,6 +106,64 @@ int main(void)
         for(uint32_t k=0;k<32;k++){for(uint32_t i=0;i<CTL;i++)tone[i]=(int32_t)(sin((k*CTL+i)*2.0*M_PI*220.0/FS)*60000.0);
             assert(fx_insert(&trk[0],tone,CTL));if(k>=8)for(uint32_t i=0;i<CTL;i++)one+=(uint64_t)abs(fx_left[i]-tone[i]);}
         assert(one>0 && two>0 && one!=two);
+    }
+    {   /* SLICER GATE: pattern 7 (x...x...) at 120 BPM 1/16, stopped (its own clock from 0): steps 0, 4, 8, 12 open,
+         * the rest closed; DEPTH 50 % halves them; the knobs' names; the chosen defaults */
+        static const uint32_t STEP=5513u;                                    /* (1/16 at 120 BPM: 5512.5 samples) */
+        for(uint32_t depth=0;depth<2;depth++){
+            voice();song.g[G_BPM]=120;spread_on=0;
+            trk[0].p[P_FXTYPE]=FX_GATE;trk[0].p[P_FXMIX]=depth?64:127;trk[0].p[P_FXRATE]=1;trk[0].p[P_FXCHAR]=6;
+            double e[16]={0};int32_t tone[CTL];uint32_t at=0;
+            while(at<16u*STEP){
+                for(uint32_t i=0;i<CTL;i++)tone[i]=(int32_t)(sin((at+i)*2.0*M_PI*440.0/FS)*60000.0);
+                assert(fx_insert(&trk[0],tone,CTL));
+                for(uint32_t i=0;i<CTL;i++){uint32_t k=(at+i)/STEP,ph=(at+i)%STEP;if(k<16 && ph>300 && ph<STEP-300)e[k]+=fabs((double)fx_left[i]);}
+                at+=CTL;
+            }
+            for(uint32_t k=1;k<16;k++){                           /* (step 0: the MIX fade in from the dry) */
+                double rel=e[k]/e[4];
+                if(k%4u==0)assert(rel>0.97 && rel<1.03);
+                else if(depth)assert(rel>0.45 && rel<0.55);
+                else assert(rel<0.01);
+            }
+        }
+        ui_power_on();
+        TSEL->p[P_FXTYPE]=FX_STUTTER;
+        assert(!strcmp(track_desc(TSEL,P_FXMIX)->label,"DEPTH") && !strcmp(track_desc(TSEL,P_FXRATE)->label,"RATE"));
+        {const param_desc_t *d=track_desc(TSEL,P_FXCHAR);assert(!strcmp(d->label,"PAT") && d->max==15 && !strcmp(d->names[6],"7"));}
+        assert(!strcmp(track_desc(TSEL,P_FXRATE)->names[1],"1/16"));
+        TSEL->p[P_FXTYPE]=FX_OFF;TSEL->p[P_FXRATE]=60;TSEL->p[P_FXCHAR]=64;go_title("FX");fx_rack_row[0]=0;
+        vlist_open(ui.page,0);turn(EN_K1,1);turn(EN_K1,1);assert(vl.sel==FX_GATE);press(B_OCTUP);
+        assert(TSEL->p[P_FXTYPE]==FX_GATE && TSEL->p[P_FXMIX]==127 && TSEL->p[P_FXRATE]==1 && TSEL->p[P_FXCHAR]==0);
+    }
+    {   /* STUTTER: the sound only on the open steps; a closed step repeats the last open one (GATE: silent there) */
+        static const uint32_t STEP=5513u;
+        double closed[2]={0};
+        for(uint32_t stut=0;stut<2;stut++){
+            voice();song.g[G_BPM]=120;spread_on=0;
+            trk[0].p[P_FXTYPE]=(int16_t)(stut?FX_STUTTER:FX_GATE);trk[0].p[P_FXMIX]=127;trk[0].p[P_FXRATE]=1;trk[0].p[P_FXCHAR]=6;
+            int32_t tone[CTL];uint32_t at=0;
+            while(at<16u*STEP){
+                for(uint32_t i=0;i<CTL;i++){uint32_t k=(at+i)/STEP;tone[i]=k%4u?0:(int32_t)(sin((at+i)*2.0*M_PI*440.0/FS)*60000.0);}
+                assert(fx_insert(&trk[0],tone,CTL));
+                for(uint32_t i=0;i<CTL;i++){uint32_t k=(at+i)/STEP,ph=(at+i)%STEP;if(k>=4 && k<16 && k%4u && ph>300 && ph<STEP-300)closed[stut]+=fabs((double)fx_left[i]);}
+                at+=CTL;
+            }
+            assert(resource[RES_FXI0].size==fx_slicer_bytes(stut?FX_STUTTER:FX_GATE));
+        }
+        assert(closed[0]<1.0 && closed[1]>1e6);
+        printf("SLICER: GATE closed steps %.0f, STUTTER repeats in them %.0f; STUTTER holds %u bytes\n",closed[0],closed[1],fx_slicer_bytes(FX_STUTTER));
+    }
+    {   /* playing: the track's song clock (step 0 at PLAY); its swing moves the odd steps */
+        voice();song.g[G_BPM]=120;song.playing=1;trk[0].seq_pos=0;spread_on=0;
+        trk[0].p[P_FXTYPE]=FX_GATE;trk[0].p[P_FXMIX]=127;trk[0].p[P_FXRATE]=1;trk[0].p[P_FXCHAR]=0;
+        int32_t tone[CTL]={0};
+        trk[0].seq_clock=6144u*5u+2000u;assert(fx_insert(&trk[0],tone,CTL));assert(fx_slicer_now(&trk[0],0)==5);
+        trk[0].seq_clock=6144u*16u*3u+6144u*11u+100u;assert(fx_insert(&trk[0],tone,CTL));assert(fx_slicer_now(&trk[0],0)==11);
+        trk[0].p[P_SSWING]=50;uint32_t a=swing_step_len(&trk[0],6144u,0);assert(a>6144u);
+        trk[0].seq_clock=a-100u+35u;assert(fx_insert(&trk[0],tone,CTL));assert(fx_slicer_now(&trk[0],0)==0);   /* (the long even step) */
+        trk[0].seq_clock=a+60u;assert(fx_insert(&trk[0],tone,CTL));assert(fx_slicer_now(&trk[0],0)==1);
+        song.playing=0;trk[0].p[P_SSWING]=0;
     }
     {   /* the voice budget: each INSERT takes 5 units, at MIX 0 none; a note effect none */
         ui_power_on();uint32_t base=voice_fx_units();

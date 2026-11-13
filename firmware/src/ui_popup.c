@@ -513,7 +513,7 @@ static void vlist_open(uint8_t page, uint8_t slot)
 /* KNOB 1 on the effects' list: the next family's (or the previous one's) first effect */
 static int32_t fxl_family_step(const param_desc_t *d, int32_t sel, int32_t k1)
 {
-    uint32_t nf = d->names == N_AUDIO_FX ? FXF_NOTES : FXF_NOTES + 1u;
+    uint32_t nf = d->names == N_AUDIO_FX ? FXF_RHYTHM : FXF_NOTES + 1u;
     int32_t f = clamp((int32_t)fx_family(sel) + (k1 > 0 ? 1 : -1), (int32_t)fx_family_lo(d), (int32_t)nf - 1);
     return f == (int32_t)fx_family(sel) ? sel : FX_ORDER[FX_FAM_FIRST[f]];
 }
@@ -612,7 +612,7 @@ static void pop_row(int32_t y, const char *lb, const char *v, int on, int red, i
  * are (KNOB 2 .. 4), the knobs' words in the family's colour */
 static const char *const FX_KNOB_WORDS[NELEM(FX_ORDER)] = {"", "SIZE DAMP TONE", "TIME FDBK TONE", "RATE DEPTH",
     "RATE DEPTH", "RATE DEPTH", "RATE DEPTH RESO", "RATE DEPTH RESO", "RATE DEPTH RESO", "DRIVE TONE SHAPE",
-    "BITS ALIAS", "RATE FOCUS", "RATE JITTER", "RATE BITE", "TIME DECAY", "REL"};
+    "BITS ALIAS", "RATE FOCUS", "RATE JITTER", "RATE BITE", "DEPTH RATE PATTERN", "DEPTH RATE PATTERN", "TIME DECAY", "REL"};
 #define FXL_H (240 - H_HEAD)
 static void fxl_draw(const param_desc_t *d)
 {

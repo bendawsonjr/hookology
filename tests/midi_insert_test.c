@@ -185,7 +185,7 @@ static void ui_storage(void)
     assert(str_eq(page_desc(slot, 0, &vp)->label, "LEVEL"));
     assert(page_desc(slot, 1, &vp)->fmt == F_ENUM && page_desc(slot, 1, &vp)->max == 9);
     assert(str_eq(page_desc(slot, 2, &vp)->label, "DECAY") && !page_desc(slot, 3, &vp));
-    assert(GP[G_MFXTYPE].max == FX_DELAY && GP[G_MFX2TYPE].max == FX_DELAY && GP[G_MFX3TYPE].max == FX_DELAY);   /* (DELAY appended: Hookology) */
+    assert(GP[G_MFXTYPE].max == FX_STUTTER && GP[G_MFX2TYPE].max == FX_STUTTER && GP[G_MFX3TYPE].max == FX_STUTTER);   /* (DELAY, then the SLICER's IDs appended: Hookology; the shared list stops before them) */   /* (DELAY appended: Hookology) */
     delay(TSEL, 1, 4, 31); TSEL->p[P_FX3TYPE] = FX_MIDIVERB; TSEL->p[P_FX3MIX] = 90;
     project_t q; project_store_t p; project_capture(&q); assert(proj_pack(&p, &q) && proj_import(&proj_scratch, &p, sizeof p));
     for (uint32_t k = P_FXTYPE; k <= P_FX3CHAR; k++) assert(proj_scratch.t[0].p[k] == TSEL->p[k]);

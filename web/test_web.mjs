@@ -691,7 +691,7 @@ async function trackEffects() {
     for (const scope of [1]) {
       const base=scope===0?96:27,third=scope===0?111:42;
       const typeDesc=E.parse[E.CMD.DESC](await rq(E.req.desc(scope,base)));
-      ok(typeDesc.max===20 && typeDesc.names[20]==="DELAY" && (scope===0 || (!typeDesc.names[10] && !typeDesc.names[11])),"FX: new types retain MIDI-only slots in the shared rack enum");
+      ok(typeDesc.max===22 && typeDesc.names[20]==="DELAY" && (scope===0 || (!typeDesc.names[10] && !typeDesc.names[11])),"FX: new types retain MIDI-only slots in the shared rack enum");
       ok(eq([12,13,14,15].map(v=>E.fmtValue(typeDesc,v)[0]),["DRIVE · SOFT","DRIVE · HARD","DRIVE · FOLD","DRIVE · FUZZ"]),"FX: every stored DRIVE shape has a distinct editor choice");
       for (const [type,a,b,fmt] of [[8,"SIZE","DAMP",E.F.PCT],[12,"DRIVE","TONE",E.F.PCT],[16,"BITS","ALIAS",E.F.BITS],[17,"RATE","DEPTH",E.F.LFOHZ],[18,"RATE","DEPTH",E.F.LFOHZ],[19,"RATE","DEPTH",E.F.LFOHZ]]) {
         await rq(E.req.set(scope,base,type));

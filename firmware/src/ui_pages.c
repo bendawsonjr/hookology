@@ -738,6 +738,24 @@ static void pv_fx(int32_t h)
             x += step;
             n++;
         }
+    } else if (type == FX_GATE || type == FX_STUTTER) { /* (Hookology) the SLICER's 16 steps: open full, closed by DEPTH
+                                                          * (STUTTER: the repeat, outlined), the step now lit */
+        uint32_t pat = fx_slicer_pattern(cha);
+        int32_t now = master ? -1 : fx_slicer_now(TSEL, slot), base = (low >> 4) - 2, hgt = ((low - top) >> 4) - 4;
+        int32_t shut = hgt * (127 - clamp(mix, 0, 127)) / 127;
+        for (k = 0; k < 16u; k++) {
+            int32_t x = 18 + (int32_t)k * 13, open = (int32_t)((pat >> k) & 1u), b = open ? hgt : shut;
+            uint16_t c = (int32_t)k == now ? T_TEXT : open ? th : gh;
+            if (open || type == FX_GATE) {
+                if (b > 1) cv_rrect(x, base - b, 11, b, 2, c, T_PANEL);
+                else cv_rect(x, base - 1, 11, 1, c);
+            } else {                                    /* (STUTTER: the repeat at DEPTH, an outline) */
+                int32_t r = hgt * clamp(mix, 0, 127) / 127;
+                cv_rect(x, base - r, 11, 1, c);cv_rect(x, base - r, 1, r, c);cv_rect(x + 10, base - r, 1, r, c);
+                cv_rect(x, base - 1, 11, 1, c);
+            }
+            if ((k & 3u) == 0u) cv_rect(x, base + 3, 2, 3, T_DIM);   /* (the beats) */
+        }
     } else if (type == FX_DELAY) {                      /* (Hookology) the sound and its echoes at TIME, fading by FDBK */
         int32_t step = 52 * FX_DTIME_12[clamp(rate, 0, 7)] / 12, x = 18, v = 127, n = 0, base = (low >> 4) - 6, hgt = ((low - top) >> 4) - 6;
         for (k = 0; k < 5u; k++)                        /* the beats */

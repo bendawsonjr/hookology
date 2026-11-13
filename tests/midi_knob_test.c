@@ -167,7 +167,7 @@ static int page_and_local_controls(void)
     go_page(GR_FXRACK);                                 /* (the racks' effect: KNOB 2 since Hookology beta30, CC 18) */
     knob_cc(1, 18, 64); knob_cc(1, 18, 127);
     d = page_desc(cur_page(), 0, &vp);
-    bad += check("absolute track FX selection reaches the list end, NOTE TAIL", d && *vp == FX_MIDIVERB && enum_rows(d) == 8);
+    bad += check("absolute track FX selection reaches the list end, NOTE TAIL", d && *vp == FX_MIDIVERB && enum_rows(d) == 10);
     knob_cc(1, 18, 0); d = page_desc(cur_page(), 0, &vp);
     bad += check("absolute FX selection returns to OFF across nonnumeric effect IDs", d && !*vp);
     knob_reset(MK_OFF, MK_ABSOLUTE);

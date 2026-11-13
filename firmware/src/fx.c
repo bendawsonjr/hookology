@@ -256,6 +256,7 @@ static inline __attribute__((always_inline)) int32_t fx_tone_input(fx_state_t *f
 #include "fx_sloop_reverb.h"
 #include "fx_sloop_insert.h"
 #include "fx_delay.h"
+#include "fx_slicer.h"
 /* ROOM: four damped combs at 13..26 ms, quarter-rate, 2 KiB. */
 static __attribute__((noinline,section(".dsp_text"))) void fx_time(fx_state_t *restrict f,int16_t *restrict mem,uint32_t n,int32_t target)
 {
@@ -465,12 +466,13 @@ static void fx_state_prepare(fx_plan_t *plan,fx_state_t *f,uint32_t res,uint32_t
 #endif
     int16_t *mem=0;
     if(f->type==FX_DELAY)f->rev_l=fx_delay_target((uint32_t)clamp(p[2],0,7),f->light);   /* (Hookology: its time now) */
-    if(f->type==FX_ROOM || f->type==FX_CHORUS || f->type==FX_REVERB || f->type==FX_DELAY || fx_sloop_type(f->type)){
+    if(f->type==FX_ROOM || f->type==FX_CHORUS || f->type==FX_REVERB || f->type==FX_DELAY || fx_sloop_type(f->type) || fx_slicer_type(f->type)){
         if(fx_single(f->type))for(uint32_t k=0;k<FX_STATE_COUNT;k++)
             if(RES_FX0+k!=res && fx_state[k].type==f->type && resource[RES_FX0+k].size)return;
-        uint32_t bytes=f->type==FX_REVERB?(f->light?sizeof(fx_sloop_reverb_light_t):sizeof(fx_sloop_reverb_t)):f->type==FX_DELAY?fx_delay_bytes(f->light):fx_sloop_type(f->type)?fx_sloop_insert_bytes(f->type):2048u;
+        uint32_t bytes=f->type==FX_REVERB?(f->light?sizeof(fx_sloop_reverb_light_t):sizeof(fx_sloop_reverb_t)):f->type==FX_DELAY?fx_delay_bytes(f->light):fx_sloop_type(f->type)?fx_sloop_insert_bytes(f->type):fx_slicer_type(f->type)?fx_slicer_bytes(f->type):2048u;
         if(!f->failed && !resource[res].size){
             void *(*volatile allocate)(uint32_t,uint32_t)=fx_memory;mem=allocate(res,bytes);if(!mem)f->failed=1;
+            else if(fx_slicer_type(f->type))memset(mem,0,sizeof(fx_slicer_t));   /* (Hookology: its clock and gate fresh) */
         }else if(resource[res].size)mem=resource[res].ptr;
         if(!mem){f->mix=0;return;}
     }
@@ -689,8 +691,17 @@ static __attribute__((noinline)) int fx_insert(track_t *t,const int32_t *b,uint3
         fx_state_prepare(&plan,f,RES_FXI0+k,FX_SLOTS+k,t->p+P_FXTYPE+slot*FX_PARAMS,t->p[P_FXTONE+slot],0u);
         if(!plan.active){if(!f->mix && !f->type)fx_insert_free(k);continue;}
         if(!ran){fx_insert_in(t,b,n);ran=1;}
-        fx_slot_run(&plan,n);
+        if(fx_slicer_type(plan.f->type))fx_slicer_run(plan.f,plan.mem,t,n,plan.target);
+        else fx_slot_run(&plan,n);
     }
     if(ran)fx_insert_pan(t,n);
     return ran;
+}
+/* (Hookology) the step a track slot's SLICER is on, -1: none running (the pages) */
+static int32_t fx_slicer_now(const track_t *t,uint32_t slot)
+{
+    uint32_t k=fx_insert_id(t,slot);
+    fx_state_t *f=fx_insert_state(k);
+    if(!f || !fx_slicer_type(f->type) || !resource[RES_FXI0+k].size)return -1;
+    return ((const fx_slicer_t *)resource[RES_FXI0+k].ptr)->idx;
 }

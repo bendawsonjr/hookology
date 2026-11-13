@@ -146,7 +146,7 @@ static uint16_t fx_fam_col(uint32_t f)
 {
     const ui_pal_t *p = &UI_PALETTES[ux.pal];
     return f == FXF_SPACE ? p->knob[3][2] : f == FXF_MOTION ? p->trk[3] : f == FXF_DIRT ? p->knob[0][2] :
-           f == FXF_COLOUR ? p->trk[1] : f == FXF_NOTES ? p->trk[2] : T_DIM;
+           f == FXF_COLOUR ? p->trk[1] : f == FXF_RHYTHM ? p->trk[0] : f == FXF_NOTES ? p->trk[2] : T_DIM;
 }
 static int sec_on(void);                                /* ui_sections.c */
 static uint32_t sec_of(uint32_t i);
