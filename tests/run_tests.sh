@@ -280,6 +280,7 @@ sound && t "SLOOP FX: compact stereo reverb, eight inserts, shared returns and c
 sound && t "REVERB LIGHT: ECONOMY's half-rate reverb against FULL, memory, switching" reverb_light_test -O1 $FW
 sound && t "DELAY: timing, feedback, bounded, slow tempos, ECONOMY, knobs, one in the rack" delay_test -O1 $FW
 sound && t "INSERT: a track's own effect, one a track, OFF / MIX 0 free, LEVEL / MUTE / sends / PAN after it" insert_test -O1 $FW
+t "PRESETS: the patch list from the top, KNOB 2 past the first lights the category line" browser_top_test -O1 $FW
 core && t "MIDI inserts: native release tails, timed note repeats, ownership, UI and persistence" midi_insert_test -O1 $FW
 core && t "MIDI Track: USB notes, TRS routing, song/recording, cleanup, silent mixer and persistence" midi_track_test -O1 $FW
 core && t "MIDI Track: host output, reconnect cleanup and USB input loss" midi_track_host_test:midi_track_test -O1 -DMELODEE_USB_HOST=1 $FW

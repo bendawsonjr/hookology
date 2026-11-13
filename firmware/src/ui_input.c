@@ -1230,10 +1230,18 @@ static void edit_param(uint32_t slot, int32_t steps)
     }
     if (pg->graph == GR_BROWSE) {   /* the browser's two columns: KNOB 1 LIST (ALL FAV RECENT, the categories), 2 the
                                      * sounds in it (as PRESETS); 3 FAV, 4 the next / previous engine */
-        if (slot == 1u) {
+        if (slot == 1u) {                                 /* (Hookology) up past the first sound: the category line lit,
+                                                           * no wrap to the last; down again: the first */
+            uint32_t total, cur = preset_pos(&total);
+            if (br_at_top) {
+                if (steps > 0) { br_at_top = 0; ui.force = 1; }
+                return;
+            }
+            if (steps < 0 && total && cur == 0u) { br_at_top = 1; ui.force = 1; return; }
             browse_turn(EN_K2, steps);
             return;
         }
+        br_at_top = 0;
         browse_commit();                                  /* (the others act on the sound shown: load it first) */
         if (slot == 3u) {
             select_engine(eng_step(TSEL->eng_req, steps));

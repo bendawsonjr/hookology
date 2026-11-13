@@ -213,6 +213,7 @@ static void recent_push(uint32_t src, uint32_t k)
 enum { LM_ALL, LM_FAV, LM_RECENT, LM_CAT };
 #define LM_N (LM_CAT + NELEM(CAT_ORDER))
 static uint8_t list_recent;
+static uint8_t br_at_top;   /* (Hookology) KNOB 2 went up past the first sound: the category line is lit (ui_browser.c) */
 static uint8_t list_trk[NTRK];                             /* each track's LIST + 1, 0 none */
 static struct { uint8_t on, trk, mode, x; uint16_t n; uint32_t t; } brw;   /* the pending place: list index n; x the
                                                                              * turn's acceleration (the browser's badge) */
@@ -255,6 +256,7 @@ static void list_set(uint32_t m)                            /* the selected trac
     list_recent = m == LM_RECENT;
     list_lcat = (uint8_t)(m >= LM_CAT && m < LM_N ? CAT_ORDER[m - LM_CAT] : 0u);
     brw.on = 0;
+    br_at_top = 0;
 }
 static int list_keep(uint32_t m, uint32_t src, uint32_t k)
 {
