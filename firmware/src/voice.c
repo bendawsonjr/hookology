@@ -176,6 +176,10 @@ static uint32_t voice_fx_units(void)
         u += type == FX_REVERB ? (song.g[G_ECO] == 1 ? 5u : 15u) : type == FX_DELAY ? (song.g[G_ECO] == 1 ? 3u : 4u) :
              type != FX_OFF ? 8u : 0u;
     }
+    for (uint32_t p = 0; p < NPART; p++)                 /* (Hookology) a track's INSERTs: each about a third of a REVERB */
+        for (uint32_t slot = 0; slot < FX_SLOTS; slot++)
+            if (fx_insert_type(trk[p].p[P_FXTYPE + slot * FX_PARAMS]) && trk[p].p[P_FXTYPE + slot * FX_PARAMS + 1u] &&
+                trk[p].engine != ENGI_MIDI) u += 5u;
     return u;
 #endif
 }

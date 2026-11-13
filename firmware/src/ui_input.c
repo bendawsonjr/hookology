@@ -1279,10 +1279,8 @@ static void edit_param(uint32_t slot, int32_t steps)
         return;
     if (midi_edit_value >= 0) {
         if (fx_names(d)) {
-            int32_t rank = (midi_edit_value * ((int32_t)fx_order_n(d) - 1) + 63) / 127;
-            v = fx_step(d, *vp, rank - (int32_t)fx_rank(*vp));
-        } else if (d->names == N_NOTE_FX) {
-            v = enum_value(d, (midi_edit_value * (enum_rows(d) - 1) + 63) / 127);
+            int32_t rank = (midi_edit_value * (fx_count(d) - 1) + 63) / 127;
+            v = fx_step(d, *vp, rank - fx_index(d, *vp));
         } else v = enum_step(d, *vp, d->min + (midi_edit_value * (d->max - d->min) + 63) / 127);
     } else {
         v = accel(EN_K1 + slot, steps, desc_range(d));
@@ -1309,6 +1307,8 @@ static void edit_param(uint32_t slot, int32_t steps)
         if (!vp[1]) vp[1] = 64;
         if (v == FX_MIDIDELAY) { vp[2] = 1; vp[3] = 64; }
     }
+    if (pg->scope == SC_TRACK && pg->graph == GR_FXRACK && slot == 0u && *vp == FX_OFF && fx_insert_type(v) && !vp[1])
+        vp[1] = 127;                                    /* (Hookology: an INSERT starts all in) */
     if(pg->scope==SC_GLOBAL && vp>=song.g+G_MFXTYPE && vp<=song.g+G_MFX3TYPE &&
        ((uint32_t)(vp-song.g)-G_MFXTYPE)%FX_PARAMS==0u){
         uint32_t flags=motion_guard();shared_fx_select(song.g,((uint32_t)(vp-song.g)-G_MFXTYPE)/FX_PARAMS,v);motion_unguard(flags);

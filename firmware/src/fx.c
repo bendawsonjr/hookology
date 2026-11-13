@@ -422,35 +422,35 @@ static __attribute__((noinline)) void *fx_memory(uint32_t id,uint32_t bytes){ret
 typedef struct {fx_state_t *f;int16_t *mem;int32_t target;int16_t third;uint8_t active,shared;} fx_plan_t;
 /* CPU0 owns allocation, releases and control snapshots. A worker receives
  * only fixed handles, preventing a retired worker from interrupting the arena. */
-static void fx_slot_prepare(fx_plan_t *plan,uint32_t si,const int16_t *p)
+/* f: the state, res: its memory's handle, si: its seed (Hookology: a track's INSERT too, fx_insert) */
+static void fx_state_prepare(fx_plan_t *plan,fx_state_t *f,uint32_t res,uint32_t si,const int16_t *p,int32_t tone_value,uint32_t shared)
 {
     plan->active=0;
     uint32_t type=(uint32_t)clamp(p[0],0,FX_COUNT-1);
     if(fx_is_midi((int32_t)type) || fx_retired((int32_t)type))type=FX_OFF; /* retired effects and note inserts never enter audio DSP */
-    fx_state_t *f=&fx_state[si];
-    if(fx_retired(f->type) || fx_retired(p[0])) { resource_release(RES_FX0+si); fx_zero(f); }
+    if(fx_retired(f->type) || fx_retired(p[0])) { resource_release(res); fx_zero(f); }
     int32_t amount=clamp(p[1],0,127);
     int32_t target=type?(amount+(amount==127))*256:0;
 #if defined(MELODEE_FX_PROFILE) && MELODEE_FX_PROFILE && defined(FM1_IRQ_TARGET)
     uint32_t slot=si%FX_SLOTS;
-    uint32_t bus=fx_profile_control>>30u,profiling=bus!=0u;
+    uint32_t bus=fx_profile_control>>30u,profiling=bus!=0u && shared;
     if(profiling){type=(fx_profile_control>>(slot*4u))&15u;target=type?(bus?32768:100*256):0;}
 #endif
     uint32_t light=(type==FX_REVERB || type==FX_DELAY) && song.g[G_ECO]==1;   /* (Hookology: ECONOMY's LIGHT) */
     uint32_t changed=f->type!=type || ((type==FX_REVERB || type==FX_DELAY) && f->light!=light);
     if(f->type && type && changed && f->mix)target=0;
     if(!target && !f->mix){
-        if(f->type || resource[RES_FX0+si].size){resource[RES_FX0+si].size=0;fx_zero(f);}
+        if(f->type || resource[res].size){resource[res].size=0;fx_zero(f);}
         return;
     }
     if(f->epoch!=fx_epoch || (type && changed && !f->mix)){
-        resource[RES_FX0+si].size=0;fx_zero(f);
+        resource[res].size=0;fx_zero(f);
         f->epoch=fx_epoch;f->type=(uint8_t)type;f->light=(uint8_t)light;f->rng=(int32_t)(0x73a9825du+(NROWS*FX_SLOTS+si)*997u);
     }
     f->rate=(int16_t)clamp(p[2],0,127);f->character=(int16_t)clamp(p[3],0,127);
     if(fx_has_tone(f->type)){   /* the low cut (section 0: the floor, TONE above 0 higher), TONE below 0 the high cut (1) */
-        uint32_t slot=si%FX_SLOTS,div=f->type==FX_REVERB?(f->light?4u:1u):f->type==FX_DELAY?fx_delay_div(f->light):4u;
-        int32_t tone=clamp(song.g[G_MFXTONE+slot],-FX_TONE_MAX,FX_TONE_MAX);
+        uint32_t div=f->type==FX_REVERB?(f->light?4u:1u):f->type==FX_DELAY?fx_delay_div(f->light):4u;
+        int32_t tone=clamp(tone_value,-FX_TONE_MAX,FX_TONE_MAX);
         for(uint32_t k=0;k<2u;k++){   /* (a2: the cutoff now, Hz; 0 off) */
             int32_t hz=k?(tone<0?fx_tone_hz(tone):0):fx_low_cut_hz(f->type,tone);
             fx_bq_t *q=&f->time_tone[k];
@@ -467,16 +467,20 @@ static void fx_slot_prepare(fx_plan_t *plan,uint32_t si,const int16_t *p)
     if(f->type==FX_DELAY)f->rev_l=fx_delay_target((uint32_t)clamp(p[2],0,7),f->light);   /* (Hookology: its time now) */
     if(f->type==FX_ROOM || f->type==FX_CHORUS || f->type==FX_REVERB || f->type==FX_DELAY || fx_sloop_type(f->type)){
         if(fx_single(f->type))for(uint32_t k=0;k<FX_STATE_COUNT;k++)
-            if(k!=si && fx_state[k].type==f->type && resource[RES_FX0+k].size)return;
+            if(RES_FX0+k!=res && fx_state[k].type==f->type && resource[RES_FX0+k].size)return;
         uint32_t bytes=f->type==FX_REVERB?(f->light?sizeof(fx_sloop_reverb_light_t):sizeof(fx_sloop_reverb_t)):f->type==FX_DELAY?fx_delay_bytes(f->light):fx_sloop_type(f->type)?fx_sloop_insert_bytes(f->type):2048u;
-        if(!f->failed && !resource[RES_FX0+si].size){
-            void *(*volatile allocate)(uint32_t,uint32_t)=fx_memory;mem=allocate(RES_FX0+si,bytes);if(!mem)f->failed=1;
-        }else if(resource[RES_FX0+si].size)mem=resource[RES_FX0+si].ptr;
+        if(!f->failed && !resource[res].size){
+            void *(*volatile allocate)(uint32_t,uint32_t)=fx_memory;mem=allocate(res,bytes);if(!mem)f->failed=1;
+        }else if(resource[res].size)mem=resource[res].ptr;
         if(!mem){f->mix=0;return;}
     }
-    plan->shared=1u;
-    plan->third=song.g[G_MFXTONE+si%FX_SLOTS];
+    plan->shared=(uint8_t)shared;
+    plan->third=(int16_t)tone_value;
     plan->f=f;plan->mem=mem;plan->target=target;plan->active=1;
+}
+static void fx_slot_prepare(fx_plan_t *plan,uint32_t si,const int16_t *p,int32_t tone_value,uint32_t shared)
+{
+    fx_state_prepare(plan,&fx_state[si],RES_FX0+si,si,p,tone_value,shared);
 }
 static __attribute__((noinline,section(".audio_text"))) int fx_slot_run(const fx_plan_t *plan,uint32_t n)
 {
@@ -597,7 +601,7 @@ static void fx_bus_start(uint32_t n)
 #if defined(MELODEE_FX_PROFILE) && MELODEE_FX_PROFILE && defined(FM1_IRQ_TARGET)
     uint32_t start=fm1_ticks();
 #endif
-    for(uint32_t slot=0;slot<FX_SLOTS;slot++)fx_slot_prepare(&fx_bus_plan[slot],slot,song.g+G_MFXTYPE+slot*FX_PARAMS);
+    for(uint32_t slot=0;slot<FX_SLOTS;slot++)fx_slot_prepare(&fx_bus_plan[slot],slot,song.g+G_MFXTYPE+slot*FX_PARAMS,song.g[G_MFXTONE+slot],1u);
     for(uint32_t slot=0;slot<FX_SLOTS;slot++)if(fx_bus_plan[slot].active && fx_bus_plan[slot].target){
         int32_t amount=clamp(song.g[G_FXRETURN],0,127);fx_bus_target=(amount+(amount==127))*256;break;
     }
@@ -624,4 +628,69 @@ static void fx_bus_join(void)
 #if MELODEE_AUDIO_PROFILE
     if(fx_audio_ready){audio_profile_add(AP_FX,fx_audio_ticks);fx_audio_ready=0;}
 #endif
+}
+
+/* (Hookology) INSERTs: up to one audio effect in each of a track's three slots (core.h fx_insert_type), chained slot 1,
+ * 2, 3 in its own signal, run on CPU0 in mix_part before the track's LEVEL, PAN, MUTE and sends (mix.c
+ * mix_insert_samples). A slot's state (RES_FXS0) and memory (RES_FXI0) are held in the arena only while it is in use:
+ * OFF, a note effect or MIX 0 (its fade done) costs nothing and holds nothing. */
+static uint32_t fx_insert_id(const track_t *t,uint32_t slot){return (uint32_t)(t-trk)*FX_SLOTS+slot;}
+static void fx_insert_free(uint32_t k){resource_release(RES_FXI0+k);resource_release(RES_FXS0+k);}
+static fx_state_t *fx_insert_state(uint32_t k){return resource[RES_FXS0+k].size?(fx_state_t *)resource[RES_FXS0+k].ptr:0;}
+static int fx_insert_slot_active(const track_t *t,uint32_t slot)
+{
+    uint32_t k=fx_insert_id(t,slot),base=P_FXTYPE+slot*FX_PARAMS;
+    fx_state_t *f=fx_insert_state(k);
+    if((f && f->mix) || (fx_insert_type(t->p[base]) && t->p[base+1u]))return 1;
+    if(resource[RES_FXS0+k].size || resource[RES_FXI0+k].size)fx_insert_free(k);
+    return 0;
+}
+static int fx_insert_active(const track_t *t)
+{
+    if(t>=trk+NPART || t->engine==ENGI_MIDI)return 0;
+    int on=0;for(uint32_t slot=0;slot<FX_SLOTS;slot++)on|=fx_insert_slot_active(t,slot);
+    return on;
+}
+/* the track's mono (or spread) render -> fx_left / fx_right, centred: PAN comes after the effect (fx_insert_pan) */
+static __attribute__((noinline,section(".dsp_text"))) void fx_insert_in(const track_t *t,const int32_t *b,uint32_t n)
+{
+    if(!spread_on){   /* (the part's sum stays within +-884000: mix.c mix_level) */
+        for(uint32_t i=0;i<n;i++)fx_left[i]=fx_right[i]=clamp(b[i],-884000,884000);
+        return;
+    }
+    int32_t s=(t->p[P_SPRD]+1)>>1,pa=clamp(-s,-64,63),pb=clamp(s,-64,63);
+    int32_t gla=4096-(pa>0?pa*64:0),gra=4096+(pa<0?pa*64:0),glb=4096-(pb>0?pb*64:0),grb=4096+(pb<0?pb*64:0);
+    for(uint32_t i=0;i<n;i++){   /* (>> 2 first: two 4096 gains on +-884000 stay inside 31 bits) */
+        int32_t a=clamp(spread_buf[i],-884000,884000)>>2,c=clamp(b[i]-spread_buf[i],-884000,884000)>>2;
+        fx_left[i]=fx_div_pow2(a*gla+c*glb,10);fx_right[i]=fx_div_pow2(a*gra+c*grb,10);
+    }
+}
+static __attribute__((noinline,section(".audio_text"))) void fx_insert_pan(const track_t *t,uint32_t n)
+{
+    int32_t pan=t->p[P_PAN];if(!pan)return;
+    int32_t gl=4096-(pan>0?pan*64:0),gr=4096+(pan<0?pan*64:0);
+    for(uint32_t i=0;i<n;i++){fx_left[i]=fx_scale(fx_left[i],(uint32_t)gl*16u);fx_right[i]=fx_scale(fx_right[i],(uint32_t)gr*16u);}
+}
+/* 1: fx_left / fx_right hold the track, effected and panned; 0: nothing to do (the dry mixer as before) */
+static __attribute__((noinline)) int fx_insert(track_t *t,const int32_t *b,uint32_t n)
+{
+    if(!fx_insert_active(t))return 0;
+    int ran=0;
+    for(uint32_t slot=0;slot<FX_SLOTS;slot++){
+        if(!fx_insert_slot_active(t,slot))continue;
+        uint32_t k=fx_insert_id(t,slot);
+        fx_state_t *f=fx_insert_state(k);
+        if(!f){   /* (a fresh state: zeroed; no room in the arena: this slot plays dry) */
+            f=resource_get(RES_FXS0+k,sizeof *f);
+            if(!f)continue;
+            fx_zero(f);f->epoch=fx_epoch;
+        }
+        fx_plan_t plan;   /* (a note effect or OFF here: prepared as OFF, a fading insert finishes its fade) */
+        fx_state_prepare(&plan,f,RES_FXI0+k,FX_SLOTS+k,t->p+P_FXTYPE+slot*FX_PARAMS,t->p[P_FXTONE+slot],0u);
+        if(!plan.active){if(!f->mix && !f->type)fx_insert_free(k);continue;}
+        if(!ran){fx_insert_in(t,b,n);ran=1;}
+        fx_slot_run(&plan,n);
+    }
+    if(ran)fx_insert_pan(t,n);
+    return ran;
 }

@@ -217,6 +217,25 @@ static __attribute__((noinline,section(".dsp_text"))) void mix_mono_samples(trac
 #endif
 
 static int32_t solo_gain[NPART]={[0 ... NPART-1u]=32768};
+/* (Hookology) a track with an INSERT: fx_left / fx_right (effected, panned: fx.c fx_insert) -> MUTE / solo, LEVEL, the
+ * mix and the sends, as the dry paths do */
+static __attribute__((noinline,section(".dsp_text"))) void mix_insert_samples(track_t *t,uint32_t n)
+{
+    uint32_t ti=(uint32_t)(t-trk),send=fx_send_on?fx_send_gain(t):0u,dk=ti*8u;
+    int32_t lvl=LEVEL_Q12[t->p[P_LEVEL]&127],pk=t->peak;
+    int32_t gain=solo_gain[ti],to=!t->p[P_MUTE] && (!track_solo || ((track_solo>>ti)&1u))?32768:0;
+    for(uint32_t i=0;i<n;i++){
+        gain+=clamp(to-gain,-256,256);
+        int32_t l=mulq16(fx_left[i],(uint32_t)gain<<1),r=mulq16(fx_right[i],(uint32_t)gain<<1);
+        l=mix_level(l,lvl,i+dk);r=mix_level(r,lvl,i+dk);
+        int32_t a=l<0?-l:l,c=r<0?-r:r;if(c>a)a=c;if(a>pk)pk=a;
+#if MELODEE_USB_AUDIO
+        if(track_capture_on&&ti<NROWS)track_capture[i*NROWS+ti]=fx_div_pow2(l+r,1);
+#endif
+        mix_add(l,r,i,send);
+    }
+    solo_gain[ti]=gain;t->peak=pk;
+}
 static void mix_solo(track_t *t,int32_t *b,uint32_t n)
 {
     uint32_t ti=(uint32_t)(t-trk);
@@ -300,8 +319,14 @@ static __attribute__((noinline)) void mix_part(track_t *t,uint32_t n)
 #if defined(MELODEE_FX_PROFILE) && MELODEE_FX_PROFILE && defined(FM1_IRQ_TARGET)
     if(fx_profile_control>>30u && fx_profile_track((uint32_t)(t-trk))){for(uint32_t i=0;i<n;i++)part_buf[i]=((i&8u)?-8000:8000)+(int32_t)i*97;rendered=1;spread_on=0;}
 #endif
+    int insert=0;
+    if(rendered || fx_insert_active(t)){   /* (Hookology: the track's INSERT, its tail too once the notes have stopped) */
+        if(!rendered){memset(part_buf,0,n*sizeof *part_buf);spread_on=0;}
+        if(fx_insert_active(t)){AP_START(fx_start);int (*volatile run)(track_t *,const int32_t *,uint32_t)=fx_insert;insert=run(t,part_buf,n);AP_END(AP_FX,fx_start);}
+    }
     AP_START(mix_start);
-    if(rendered){
+    if(insert){void (*volatile mix)(track_t *,uint32_t)=mix_insert_samples;mix(t,n);}
+    else if(rendered){
         mix_solo(t,part_buf,n);
         if(spread_on)mix_spread(t,part_buf,n);
         else{

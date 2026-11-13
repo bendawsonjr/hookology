@@ -9,7 +9,9 @@
  * code/data/retained-state boundary. Small banks first preserve the large
  * contiguous POOL bank for engine state and note history. */
 enum { RES_ENGINE0, RES_NOTE_HISTORY = RES_ENGINE0 + NPART, RES_FX0,
-       RES_RECORD_UNDO = RES_FX0 + FX_STATE_COUNT,
+       RES_FXI0 = RES_FX0 + FX_STATE_COUNT,     /* (Hookology) a track slot's INSERT: its effect's memory */
+       RES_FXS0 = RES_FXI0 + NPART * FX_SLOTS,  /* its state (fx_state_t) */
+       RES_RECORD_UNDO = RES_FXS0 + NPART * FX_SLOTS,
        RES_STEP_UNDO, RES_LOAD_UNDO, RES_SONG_UNDO, RES_SONG_SOUNDS, RES_SONG_BASE, RES_SONG_PREVIEW,
 #if MELODEE_USB_AUDIO
        RES_USB_TRACKS,

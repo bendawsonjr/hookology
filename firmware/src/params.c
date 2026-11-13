@@ -12,20 +12,25 @@ static const char *const N_LTRIG[] = {"NOTE", "FREE"};
 static const char *const N_LPOL[] = {"BI", "UNI"};
 /* SOFT .. FUZZ are one DRIVE, their SHAPE on KNOB 4 (N_SHAPE) */
 static const char *const N_FX[] = {"OFF", "PHASER", "WIDTH", "FORMANT", "TAPE", "SPIT", "", "ROOM", "REVERB", "CHORUS", "NOTE TAIL", "NOTE ECHO", "DRIVE", "DRIVE", "DRIVE", "DRIVE", "CRUSH", "FLANGER", "PEDAL PHASER", "PEDAL CHORUS", "DELAY"};
-static const char *const N_NOTE_FX[FX_COUNT] = {"OFF", "", "", "", "", "", "", "", "", "", "NOTE TAIL", "NOTE ECHO", "", "", "", "", "", "", "", "", ""};
+/* (Hookology) a track's slots: its INSERT (the character effects, core.h fx_insert_type) and the note effects */
+static const char *const N_NOTE_FX[FX_COUNT] = {"OFF", "", "", "FORMANT", "TAPE", "SPIT", "", "", "", "", "NOTE TAIL", "NOTE ECHO", "DRIVE", "DRIVE", "DRIVE", "DRIVE", "CRUSH", "", "", "", ""};
 static const char *const N_AUDIO_FX[] = {"OFF", "PHASER", "WIDTH", "FORMANT", "TAPE", "SPIT", "", "ROOM", "REVERB", "CHORUS", "", "", "DRIVE", "DRIVE", "DRIVE", "DRIVE", "CRUSH", "FLANGER", "PEDAL PHASER", "PEDAL CHORUS", "DELAY"};
 /* DELAY's TIME (Hookology; fx.c FX_DTIME): beats as quarter-beat multiples x3 */
 static const char *const N_DTIME[] = {"1/16", "1/8T", "1/8", "1/8D", "1/4T", "1/4", "1/4D", "1/2"};
 static const char *const N_SHAPE[FX_FUZZ + 1u] = {[FX_SOFT] = "SOFT", [FX_HARD] = "HARD", [FX_FOLD] = "FOLD", [FX_FUZZ] = "FUZZ"};
 /* the effects as the picker and the list give them (README "FX rack"), in families: Space, Motion, Dirt, Colour,
  * Notes (the track's racks only: the last two); DRIVE stands for SOFT .. FUZZ. The stored IDs keep their numbers */
-static const uint8_t FX_ORDER[] = {FX_OFF, FX_ROOM, FX_REVERB, FX_DELAY, FX_WIDTH, FX_PHASER, FX_CHORUS, FX_FLANGER, FX_PEDAL_PHASER,
+/* (Hookology: ROOM is off the list (a song that has it still plays it); a track's list is OFF, then Dirt, Colour and Notes) */
+static const uint8_t FX_ORDER[] = {FX_OFF, FX_REVERB, FX_DELAY, FX_WIDTH, FX_PHASER, FX_CHORUS, FX_FLANGER, FX_PEDAL_PHASER,
                                    FX_PEDAL_CHORUS, FX_SOFT, FX_CRUSH, FX_FORMANT, FX_TAPE, FX_SPIT, FX_MIDIDELAY, FX_MIDIVERB};
-static const uint8_t FX_FAM_FIRST[] = {0, 1, 5, 10, 12, 15, 17};   /* each family's first place in FX_ORDER */
+static const uint8_t FX_FAM_FIRST[] = {0, 1, 4, 9, 11, 14, 16};   /* each family's first place in FX_ORDER */
 static const char *const FX_FAM_NAME[] = {"Off", "Space", "Motion", "Dirt", "Colour", "Notes"};
 enum { FXF_OFF, FXF_SPACE, FXF_MOTION, FXF_DIRT, FXF_COLOUR, FXF_NOTES };
-static int fx_names(const param_desc_t *d) { return d->names == N_FX || d->names == N_AUDIO_FX; }
+static int fx_names(const param_desc_t *d) { return d->names == N_FX || d->names == N_AUDIO_FX || d->names == N_NOTE_FX; }
 static uint32_t fx_order_n(const param_desc_t *d) { return d->names == N_AUDIO_FX ? FX_FAM_FIRST[FXF_NOTES] : NELEM(FX_ORDER); }
+/* the list's first effect after OFF: a track's (N_NOTE_FX) starts at Dirt */
+static uint32_t fx_order_lo(const param_desc_t *d) { return d->names == N_NOTE_FX ? FX_FAM_FIRST[FXF_DIRT] : 1u; }
+static uint32_t fx_family_lo(const param_desc_t *d) { return d->names == N_NOTE_FX ? FXF_DIRT : FXF_SPACE; }
 static uint32_t fx_rank(int32_t type)                   /* its place in FX_ORDER */
 {
     uint32_t i;
@@ -43,11 +48,24 @@ static uint32_t fx_family(int32_t type)
         f++;
     return f;
 }
-/* steps places on from an effect in FX_ORDER (its ends kept; no step: the effect as it is, a DRIVE's shape too) */
+/* an effect's place in its list (OFF 0, then the list's effects: fx_order_lo on) and back */
+static int32_t fx_index(const param_desc_t *d, int32_t type)
+{
+    int32_t r = (int32_t)fx_rank(type), lo = (int32_t)fx_order_lo(d);
+    return r < lo ? 0 : r - lo + 1;
+}
+static int32_t fx_at(const param_desc_t *d, int32_t index)
+{
+    int32_t n = (int32_t)fx_order_n(d) - (int32_t)fx_order_lo(d) + 1;
+    index = clamp(index, 0, n - 1);
+    return index ? FX_ORDER[index - 1 + (int32_t)fx_order_lo(d)] : FX_OFF;
+}
+static int32_t fx_count(const param_desc_t *d) { return (int32_t)fx_order_n(d) - (int32_t)fx_order_lo(d) + 1; }
+/* steps places on from an effect in its list (its ends kept; no step: the effect as it is, a DRIVE's shape too) */
 static int32_t fx_step(const param_desc_t *d, int32_t from, int32_t steps)
 {
-    int32_t r = (int32_t)fx_rank(from), to = clamp(r + steps, 0, (int32_t)fx_order_n(d) - 1);
-    return to == r ? from : FX_ORDER[to];
+    int32_t r = fx_index(d, from), to = clamp(r + steps, 0, fx_count(d) - 1);
+    return to == r ? from : fx_at(d, to);
 }
 static const char *const N_ONOFF[] = {"OFF", "ON"};
 static const char *const N_VPOINTS[] = {"AUTO", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13",
@@ -186,13 +204,13 @@ static void fm6_freq_text(char *val, const char **unit, int coarse)
 }
 
 static const param_desc_t TP[P_COUNT] = {
-    [P_FXTYPE] = PE("NOTE FX", N_NOTE_FX, 0),
+    [P_FXTYPE] = PE("FX", N_NOTE_FX, 0),
     [P_FXMIX] = PD("MIX", F_PCT, 0, 127, 0),
     [P_FXRATE] = PD("RATE", F_LFOHZ, 0, 127, 60),
     [P_FXCHAR] = PD("CHAR", F_PCT, 0, 127, 64),
-    [P_FX2TYPE] = PE("NOTE FX", N_NOTE_FX, 0), [P_FX2MIX] = PD("MIX", F_PCT, 0, 127, 0),
+    [P_FX2TYPE] = PE("FX", N_NOTE_FX, 0), [P_FX2MIX] = PD("MIX", F_PCT, 0, 127, 0),
     [P_FX2RATE] = PD("RATE", F_LFOHZ, 0, 127, 60), [P_FX2CHAR] = PD("CHAR", F_PCT, 0, 127, 64),
-    [P_FX3TYPE] = PE("NOTE FX", N_NOTE_FX, 0), [P_FX3MIX] = PD("MIX", F_PCT, 0, 127, 0),
+    [P_FX3TYPE] = PE("FX", N_NOTE_FX, 0), [P_FX3MIX] = PD("MIX", F_PCT, 0, 127, 0),
     [P_FX3RATE] = PD("RATE", F_LFOHZ, 0, 127, 60), [P_FX3CHAR] = PD("CHAR", F_PCT, 0, 127, 64),
     [P_LN0] = PD("KICK", F_PCT, 0, 127, 127),
     [P_LN1] = PD("SNARE", F_PCT, 0, 127, 127),

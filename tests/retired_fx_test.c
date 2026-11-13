@@ -17,14 +17,14 @@ static void buffers(void)
                 assert(resource_get(RES_FX0+si, sizes[b]));
                 fx_state[si].type = (uint8_t)retired[r]; fx_state[si].mix = 32768;
                 int16_t p[4] = {(int16_t)retired[r],127,127,127}; fx_plan_t plan;
-                fx_slot_prepare(&plan, si, p);
+                fx_slot_prepare(&plan, si, p, song.g[G_MFXTONE + si % FX_SLOTS], 1u);
                 assert(!plan.active && !resource[RES_FX0+si].size && !fx_state[si].type && !fx_state[si].mix);
                 uint32_t failures = resource_failures;
-                for (uint32_t k = 0; k < 32; k++) fx_slot_prepare(&plan, si, p);
+                for (uint32_t k = 0; k < 32; k++) fx_slot_prepare(&plan, si, p, song.g[G_MFXTONE + si % FX_SLOTS], 1u);
                 assert(!plan.active && !resource[RES_FX0+si].size && resource_failures == failures);
                 /* An old slot cannot retain memory when replaced by a surviving effect. */
                 assert(resource_get(RES_FX0+si, sizes[b])); fx_state[si].type = (uint8_t)retired[r];
-                p[0] = FX_PHASER; fx_slot_prepare(&plan, si, p);
+                p[0] = FX_PHASER; fx_slot_prepare(&plan, si, p, song.g[G_MFXTONE + si % FX_SLOTS], 1u);
                 assert(plan.active && plan.f->type == FX_PHASER && !resource[RES_FX0+si].size);
                 fx_zero(&fx_state[si]);
             }
@@ -59,10 +59,11 @@ static void controls(void)
     assert(FX_ECHO == 6 && FX_ROOM == 7 && FX_REVERB == 8 && FX_CHORUS == 9 && FX_MIDIVERB == 10 && FX_MIDIDELAY == 11);
     assert(!N_FX[FX_ECHO][0] && str_eq(N_FX[FX_REVERB],"REVERB") && !N_AUDIO_FX[FX_ECHO][0] && str_eq(N_AUDIO_FX[FX_REVERB],"REVERB"));
     assert(enum_orig(&TP[P_FXTYPE],FX_ECHO)==FX_OFF && enum_orig(&GP[G_MFXTYPE],FX_REVERB)==FX_REVERB);
-    assert(enum_step(&TP[P_FXTYPE],FX_OFF,FX_OFF+1)==FX_MIDIVERB);
-    assert(enum_step(&TP[P_FXTYPE],FX_MIDIVERB,FX_MIDIVERB+1)==FX_MIDIDELAY);
+    /* (Hookology) a track's list: OFF, its INSERTs (DRIVE, CRUSH, FORMANT, TAPE, SPIT), the note effects */
+    assert(enum_step(&TP[P_FXTYPE],FX_OFF,FX_OFF+1)==FX_SOFT);
+    assert(enum_step(&TP[P_FXTYPE],FX_MIDIDELAY,FX_MIDIDELAY+1)==FX_MIDIVERB);
     assert(enum_orig(&TP[P_FXTYPE],FX_REVERB)==FX_OFF);
-    assert(enum_rows(&TP[P_FXTYPE])==3 && enum_rows(&GP[G_MFXTYPE])==15);   /* (+ DELAY: Hookology) */
+    assert(enum_rows(&TP[P_FXTYPE])==8 && enum_rows(&GP[G_MFXTYPE])==14);   /* (+ DELAY, - ROOM: Hookology) */
     press(B_FX);assert(cur_page()->fam==FAM_FX);
     btn_down(B_FX);frames(800);assert(ui.layer==LAYER_FX);
     key_down(white(0));frame();assert(!gates() && kb_layer);key_up(white(0));frame();assert(!gates());

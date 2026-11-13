@@ -482,17 +482,17 @@ static void pick_poll(void)                             /* ST_KNOB_MS after the 
 /* Compact enum lists omit retired empty entries without changing stored IDs. */
 static int32_t enum_rows(const param_desc_t *d)
 {
-    if(fx_names(d))return (int32_t)fx_order_n(d);       /* (the effects: in their families, params.c FX_ORDER) */
+    if(fx_names(d))return fx_count(d);                  /* (the effects: in their families, params.c FX_ORDER) */
     int32_t count=0;for(int32_t v=d->min;v<=d->max;v++)count+=d->names[v][0]!=0;return count;
 }
 static int32_t enum_rank(const param_desc_t *d,int32_t value)
 {
-    if(fx_names(d))return (int32_t)fx_rank(value);
+    if(fx_names(d))return fx_index(d,value);
     int32_t rank=0;for(int32_t v=d->min;v<value;v++)rank+=d->names[v][0]!=0;return rank;
 }
 static int32_t enum_value(const param_desc_t *d,int32_t rank)
 {
-    if(fx_names(d))return FX_ORDER[clamp(rank,0,(int32_t)fx_order_n(d)-1)];
+    if(fx_names(d))return fx_at(d,rank);
     for(int32_t v=d->min;v<=d->max;v++)if(d->names[v][0] && !rank--)return v;return d->min;
 }
 static struct { uint8_t page, slot; int16_t sel; } vl;
@@ -506,7 +506,7 @@ static void vlist_open(uint8_t page, uint8_t slot)
     d = vlist_desc(&vp);
     if (!d || !vp)
         return;
-    vl.sel = fx_names(d) && *vp == FX_OFF ? FX_ORDER[1] : *vp;   /* (an empty slot: the effects from the first) */
+    vl.sel = fx_names(d) && *vp == FX_OFF ? fx_at(d, 1) : *vp;   /* (an empty slot: the effects from the first) */
     pop.on = POP_LIST;
     ui.force = 1;
 }
@@ -514,7 +514,7 @@ static void vlist_open(uint8_t page, uint8_t slot)
 static int32_t fxl_family_step(const param_desc_t *d, int32_t sel, int32_t k1)
 {
     uint32_t nf = d->names == N_AUDIO_FX ? FXF_NOTES : FXF_NOTES + 1u;
-    int32_t f = clamp((int32_t)fx_family(sel) + (k1 > 0 ? 1 : -1), FXF_SPACE, (int32_t)nf - 1);
+    int32_t f = clamp((int32_t)fx_family(sel) + (k1 > 0 ? 1 : -1), (int32_t)fx_family_lo(d), (int32_t)nf - 1);
     return f == (int32_t)fx_family(sel) ? sel : FX_ORDER[FX_FAM_FIRST[f]];
 }
 static void vlist_input(int32_t k1, int32_t k2, uint32_t oct)
@@ -533,12 +533,12 @@ static void vlist_input(int32_t k1, int32_t k2, uint32_t oct)
         vl.sel = (int16_t)(fx_names(d) ? fx_step(d, vl.sel, k2 > 0 ? 1 : -1) :
                            enum_step(d,vl.sel,clamp(vl.sel + (k2 > 0 ? 1 : -1), d->min, d->max)));
     if (fx_names(d) && vl.sel == FX_OFF)                /* (the list holds effects only) */
-        vl.sel = FX_ORDER[1];
+        vl.sel = fx_at(d, 1);
     if (oct & 1u) {
         pop_close();
     } else if (oct & 2u) {                              /* (its page edits it, as if it were shown) */
         uint8_t pg = ui.page;
-        int32_t steps = fx_names(d) ? (int32_t)fx_rank(vl.sel) - (int32_t)fx_rank(*vp) : vl.sel - *vp;
+        int32_t steps = fx_names(d) ? fx_index(d, vl.sel) - fx_index(d, *vp) : vl.sel - *vp;
         ui.page = vl.page;
         fx_list_take = 1;                               /* (a chosen REVERB moves to this slot) */
         if (steps)
@@ -610,7 +610,7 @@ static void pop_row(int32_t y, const char *lb, const char *v, int on, int red, i
 /* the effects' list (OCT+ on an empty slot, as the sound browser: README "FX rack"): under the header the slot, the
  * family in its colour and the effect's place in it; the family's effects, the one picked a card with what its knobs
  * are (KNOB 2 .. 4), the knobs' words in the family's colour */
-static const char *const FX_KNOB_WORDS[NELEM(FX_ORDER)] = {"", "SIZE DECAY TONE", "SIZE DAMP TONE", "RATE DEPTH",
+static const char *const FX_KNOB_WORDS[NELEM(FX_ORDER)] = {"", "SIZE DAMP TONE", "TIME FDBK TONE", "RATE DEPTH",
     "RATE DEPTH", "RATE DEPTH", "RATE DEPTH RESO", "RATE DEPTH RESO", "RATE DEPTH RESO", "DRIVE TONE SHAPE",
     "BITS ALIAS", "RATE FOCUS", "RATE JITTER", "RATE BITE", "TIME DECAY", "REL"};
 #define FXL_H (240 - H_HEAD)

@@ -165,10 +165,14 @@ static int fx_sloop_type(int32_t t){return t>=FX_SOFT && t<=FX_PEDAL_CHORUS;}
 static int fx_sloop_swept(int32_t t){return t>=FX_FLANGER && t<=FX_PEDAL_CHORUS;}
 static int fx_third_control(int32_t t){return fx_sloop_swept(t) || t==FX_ROOM || t==FX_REVERB;}
 static int fx_is_midi(int32_t type) { return type == FX_MIDIVERB || type == FX_MIDIDELAY; }
-#define FX_CHAIN_COUNT 1u /* the shared rack only; tracks retain note-effect controls */
-#define FX_STATE_COUNT (FX_CHAIN_COUNT*FX_SLOTS)
+/* the shared rack's effect states (fx.c fx_state); (Hookology) a track slot's INSERT keeps its state and memory in
+ * the arena while it is in use (resources.c RES_FXS0, RES_FXI0; fx.c fx_insert) */
+#define FX_STATE_COUNT FX_SLOTS
 #define FX_TONE_MAX 63
-static int fx_track_type(int32_t type) { return fx_is_midi(type) ? type : FX_OFF; }
+/* (Hookology) INSERT: a track's audio effect, in its signal before LEVEL, PAN and the sends: the character effects
+ * (DRIVE, CRUSH, FORMANT, TAPE, SPIT); one in any of its three slots, chained 1, 2, 3 */
+static int fx_insert_type(int32_t t){return (t>=FX_SOFT && t<=FX_CRUSH) || t==FX_FORMANT || t==FX_TAPE || t==FX_SPIT;}
+static int fx_track_type(int32_t type) { return fx_is_midi(type) || fx_insert_type(type) ? type : FX_OFF; }
 static void track_fx_normalize(int16_t *p)
 {
     for(uint32_t slot=0;slot<FX_SLOTS;slot++)p[P_FXTYPE+slot*FX_PARAMS]=(int16_t)fx_track_type(p[P_FXTYPE+slot*FX_PARAMS]);
@@ -288,8 +292,7 @@ static void params_by_count(int16_t *out, const int16_t *in, uint32_t np, const 
         out[i] = i < nc ? in[i] : def[i];
     for (i = 0; i < 8u; i++)
         out[P_E0 + i] = in[nc + i];
-    for (i = 0; i < FX_SLOTS; i++)
-        out[P_FXTYPE + i * FX_PARAMS] = (int16_t)fx_track_type(out[P_FXTYPE + i * FX_PARAMS]);
+    track_fx_normalize(out);
 }
 
 /* engine indices the stores name (engines.c ENGINES[]: append-only) */

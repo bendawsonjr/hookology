@@ -35,7 +35,7 @@ static int fx_kernel_process(track_t *t,int32_t *b,uint32_t n)
     for(uint32_t slot=0;slot<FX_SLOTS;slot++){
         song.g[G_MFXTONE+slot]=t->p[P_FXTONE+slot];
         fx_plan_t plan;uint32_t fresh=fx_state[slot].epoch!=fx_epoch || fx_state[slot].type!=t->p[P_FXTYPE+slot*FX_PARAMS];
-        fx_slot_prepare(&plan,slot,t->p+P_FXTYPE+slot*FX_PARAMS);
+        fx_slot_prepare(&plan,slot,t->p+P_FXTYPE+slot*FX_PARAMS,song.g[G_MFXTONE+slot],1u);
         if(plan.active){plan.shared=0;plan.third=t->p[P_FXTONE+slot];if(fresh)plan.f->rng=(int32_t)(0x73a9825du+slot*997u);} /* historical DSP oracle; real sends are tested separately */
         active|=fx_slot_run(&plan,n);
     }

@@ -26,7 +26,7 @@ static void run(float *out_l,float *out_r,uint32_t n,int burst,int noise)
             if(noise && t<n/2u){rng=rng*1103515245u+12345u;x=(int32_t)(rng>>12)-524288;}
             fx_left[i]=fx_right[i]=x;
         }
-        fx_slot_prepare(&plan,0,pp);
+        fx_slot_prepare(&plan,0,pp,song.g[G_MFXTONE],1u);
         if(plan.active){plan.mem=resource[RES_FX0].ptr;fx_slot_run(&plan,CTL);}
         for(uint32_t i=0;i<CTL && at+i<n;i++){
             assert(abs(fx_left[i])<=600000 && abs(fx_right[i])<=600000);
@@ -76,7 +76,7 @@ int main(void)
         song.g[G_MFX2TYPE]=FX_OFF;song.g[G_MFXTYPE]=FX_DELAY;song.g[G_MFX3TYPE]=FX_OFF;assert(voice_fx_units()==4u);song.g[G_ECO]=1;assert(voice_fx_units()==3u);song.g[G_ECO]=0;
         setup(120,0,5,50,127);run(0,0,FS/10u,1,0);assert(resource[RES_FX0].size);
         pp[1]=0;run(0,0,FS/10u,0,0);assert(!resource[RES_FX0].size);
-        assert(FX_ORDER[3]==FX_DELAY && fx_family(FX_DELAY)==FXF_SPACE && !strcmp(N_AUDIO_FX[FX_DELAY],"DELAY"));
+        assert(FX_ORDER[2]==FX_DELAY && fx_family(FX_DELAY)==FXF_SPACE && !strcmp(N_AUDIO_FX[FX_DELAY],"DELAY"));
     }
     const char *dir=getenv("DELAY_WAV");
     if(dir){
@@ -84,7 +84,7 @@ int main(void)
         static const double hz[3]={293.66,369.99,440.0};
         for(uint32_t at=0;at<4*FS;at+=CTL){
             for(uint32_t i=0;i<CTL;i++){double t=(double)(at+i)/FS,env=t<0.4?exp(-t*6.0):0,s=0;for(int k=0;k<3;k++)s+=sin(2*M_PI*hz[k]*t)+0.3*sin(6*M_PI*hz[k]*t);fx_left[i]=fx_right[i]=(int32_t)(s*env*35000.0);}
-            fx_slot_prepare(&plan,0,pp);if(plan.active){plan.mem=resource[RES_FX0].ptr;fx_slot_run(&plan,CTL);}
+            fx_slot_prepare(&plan,0,pp,song.g[G_MFXTONE],1u);if(plan.active){plan.mem=resource[RES_FX0].ptr;fx_slot_run(&plan,CTL);}
             for(uint32_t i=0;i<CTL;i++){l[at+i]=(float)fx_left[i];r[at+i]=(float)fx_right[i];}
         }
         char path[512];snprintf(path,sizeof path,"%s/delay.wav",dir);wav(path,l,r,4*FS);
