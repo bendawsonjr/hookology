@@ -149,6 +149,22 @@ static void ps_dup(void) { ps_row_insert(1); }
 static void ps_song_loop_v(char *b) { str_cpy(b, chain_config.rsv[CHAIN_LOOP] ? "On" : "Off", 4); }
 static void ps_song_loop_turn(int32_t s) { song_loop_set(s > 0); }
 static void ps_song_loop(void) { song_loop_set(!chain_config.rsv[CHAIN_LOOP]); }
+/* (Hookology) SECTIONS' sheet: LOOP SONG and SONG MODE (ui_song_sections.c sections_flag) */
+static void ps_sloop_v(char *b) { str_cpy(b, chain_config.rsv[CHAIN_LOOP] ? "On" : "Off", 4); }
+static void ps_sloop_turn(int32_t s) { sections_flag(CHAIN_LOOP, s > 0, "SONG LOOP "); }
+static void ps_sloop(void) { sections_flag(CHAIN_LOOP, !chain_config.rsv[CHAIN_LOOP], "SONG LOOP "); }
+static void ps_smode_v(char *b) { str_cpy(b, chain_config.rsv[CHAIN_MODE] == 1u ? "On" : "Off", 4); }
+static void ps_smode_turn(int32_t s) { sections_flag(CHAIN_MODE, s > 0, "SONG MODE "); }
+static void ps_smode(void) { sections_flag(CHAIN_MODE, chain_config.rsv[CHAIN_MODE] != 1u, "SONG MODE "); }
+static const sheet_row_t SHEET_SECTIONS[] = {
+    {"Loop song", ps_sloop_v, ps_sloop_turn, ps_sloop, 0}, {"Song mode", ps_smode_v, ps_smode_turn, ps_smode, 0}};
+static void sections_sheet_open(void)
+{
+    char nm[20];
+    fmt_int(nm, chain_config.count);
+    str_cpy(nm + str_len(nm), chain_config.count == 1u ? " entry" : " entries", 10);
+    sheet_open("Song", nm, SHEET_SECTIONS, NELEM(SHEET_SECTIONS));
+}
 static void song_punch_open(void)
 {
     if (ui.song_row >= chain_config.count) { ui_message("ADD A SONG ROW"); return; }

@@ -10,8 +10,9 @@
  *   held clears the song (the question first); REC again, PLAY or leaving the page ends it;
  *   REC playing records the song: from the next loop of track 1 every section played, and how many times, is logged
  *   (the jam, seq.c); REC again or STOP makes it the song (over a song: the question before it starts);
- *   KNOB 1 the song entry, 2 its section, 3 its repeats, 4 the song's length; PLAY plays the song from the top
- *   (no song: the loop); EDIT held undoes the song edits, as on SONG.
+ *   KNOB 1 the song entry, 2 its section, 3 its repeats, 4 the song's length; OCT+ the sheet: LOOP SONG, SONG MODE
+ *   (Hookology: with SONG MODE on, PLAY on any page plays the song from the top; off, the loop, sections by their
+ *   keys); EDIT held undoes the song edits, as on SONG.
  * The song is SONG's own (64 rows): an entry where every track plays one section shows its letter, else '*'; SONG
  * stays for rests, single tracks, presets and punch FX. Included by ui_draw.c, after ui_patterns.c */
 
@@ -284,24 +285,25 @@ static void sec_build_delete(void)
     ui_message("ENTRY DELETED");
 }
 
-/* PLAY on SECTIONS: the song from its first entry (SONG plays from a row); no song, the loop */
-/* OCT+ on SECTIONS (Hookology): SONG LOOP on / off, the song's own (SONG's sheet, saved with it). Stopped: an edit (EDIT
- * held undoes it); playing: at once, for the song playing too (chain_tick reads it at the song's end) */
-static void sections_loop(void)
+/* (Hookology) SECTIONS' sheet (OCT+): LOOP SONG and SONG MODE, the song's own (saved with it). Stopped: an edit (EDIT held
+ * undoes it); playing: at once, for the song playing too (chain_tick reads LOOP at the song's end) */
+static void sections_flag(uint32_t idx, uint32_t on, const char *name)
 {
-    uint32_t on = !chain_config.rsv[CHAIN_LOOP];
     if (!chain_config.count) { ui_message("NO SONG YET"); return; }
+    if (chain_config.rsv[idx] == on) return;
     if (chain_busy()) {
         fm1_irq_off();
-        chain_config.rsv[CHAIN_LOOP] = (uint8_t)on;
-        if (chain.running || chain.armed) chain.config.rsv[CHAIN_LOOP] = (uint8_t)on;
+        chain_config.rsv[idx] = (uint8_t)on;
+        if (chain.running || chain.armed) chain.config.rsv[idx] = (uint8_t)on;
         fm1_irq_on();
         ui.force = 1;
-    } else {
-        song_loop_set((int)on);
+    } else if (song_edit_begin()) {
+        chain_config.rsv[idx] = (uint8_t)on;
+        song_edit_end();
     }
-    if (chain_config.rsv[CHAIN_LOOP] == on) ui_say("SONG LOOP ", on ? "ON" : "OFF");
+    if (chain_config.rsv[idx] == on) ui_say(name, on ? "ON" : "OFF");
 }
+/* PLAY on SECTIONS (with SONG MODE on): the song from its first entry (SONG plays from a row); no song, the loop */
 static void sections_play(void)
 {
     if (scs.build) { scs.build = 0; ui.force = 1; }

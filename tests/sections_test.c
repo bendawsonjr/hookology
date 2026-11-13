@@ -157,8 +157,8 @@ static void build(void)
     assert(chain_config.count == 1 && sec_row(0) == 2);
     press(B_REC); frame();
     assert(!scs.build && msg_is("BUILD DONE"));
-    press(B_REC); frame(); press(B_PLAY); units_block(0); frame();   /* PLAY ends it: the song plays */
-    assert(!scs.build && chain.running);
+    press(B_REC); frame(); press(B_PLAY); units_block(0); frame();   /* PLAY ends it (SONG MODE off: the loop plays) */
+    assert(!scs.build && song.playing && !chain.running);
     press(B_PLAY); units_block(0); frame();
     press(B_REC); frame(); go_page(GR_SONG); frame();   /* leaving the page ends it */
     assert(!scs.build);
@@ -174,6 +174,7 @@ static void whole_section(void)
     press(B_REC); frame(); tap_key(SEC_KEY[0]); frame(); tap_key(SEC_KEY[0]); frame(); tap_key(SEC_KEY[1]); frame();
     press(B_REC); frame();
     assert(chain_config.count == 2 && chain_config.row[0].repeat == 2);
+    chain_config.rsv[CHAIN_MODE] = 1;                   /* (SONG MODE: PLAY plays the song) */
     press(B_PLAY); units_block(0); frame();
     assert(chain.running && chain.row == 0 && chain.lead[0] == 1u);
     {                                                   /* A x2: four of track 1's loops (eight steps), then B */
@@ -203,7 +204,8 @@ static void song_list(void)
     chain_patterns[1][1] = 5;                           /* an entry SONG changed on one track: '*' */
     assert(sec_row(1) == SEC_NONE);
     chain_patterns[1][1] = 1;
-    turn(EN_K1, -1); press(B_PLAY); units_block(0);     /* PLAY: the song from the top, whatever the entry */
+    chain_config.rsv[CHAIN_MODE] = 1;
+    turn(EN_K1, -1); press(B_PLAY); units_block(0);     /* PLAY (SONG MODE): the song from the top, whatever the entry */
     assert(chain.running && chain.row == 0);
     tap_key(SEC_KEY[2]); frame();
     assert(msg_is("STOP SONG TO SWITCH"));
@@ -258,26 +260,35 @@ static void daw_start(void)
     daw(0xFAu); assert(song.playing && !chain.running);
     daw(0xFCu); frame();
     go_page(GR_SECTIONS); frames(300u); assert(chain_cued);
-    press(B_PLAY); units_block(0); frame();             /* PLAY there: the song, as before */
+    chain_config.rsv[CHAIN_MODE] = 1;
+    press(B_PLAY); units_block(0); frame();             /* PLAY there (SONG MODE): the song */
     assert(song.playing && chain.running && !chain_cued);
     press(B_PLAY); units_block(0); frame();
     song.g[G_CLOCK] = 0; frames(32u); assert(!chain_cued && !song_sounds.mask);
     puts("SECTIONS: a DAW's Start (or Continue from the top) plays the song; other pages and CLK INT the loop passed");
 }
-/* OCT+ on SECTIONS: SONG LOOP on / off (stopped: an edit; playing: at once); PLAY on HOME's MIXER plays the song */
+/* (Hookology) OCT+ on SECTIONS: the song's sheet, LOOP SONG and SONG MODE (stopped: an edit; playing: at once). SONG MODE
+ * on: PLAY on any page plays the song from its top; off: the loop, on SECTIONS too */
 static void song_loop(void)
 {
     uint32_t i, wrapped = 0, last = 0;
     setup();
-    press(B_OCTUP); frame(); assert(!chain_config.rsv[CHAIN_LOOP] && msg_is("NO SONG YET"));
+    press(B_OCTUP); frame(); assert(pop.on == POP_SHEET && str_eq(pop.rows[0].label, "Loop song"));
+    press(B_OCTUP); frame(); assert(!pop.on && !chain_config.rsv[CHAIN_LOOP] && msg_is("NO SONG YET"));
     sec_hold_key(1); tap_key(SEC_KEY[0]); frame();     /* B a copy of A; the song A B */
     press(B_REC); frame(); tap_key(SEC_KEY[0]); frame(); tap_key(SEC_KEY[1]); frame(); press(B_REC); frame();
-    assert(chain_config.count == 2 && !scs.build && !chain_config.rsv[CHAIN_LOOP]);
+    assert(chain_config.count == 2 && !scs.build && !chain_config.rsv[CHAIN_LOOP] && !song_mode_on());
     assert(!str_eq(song_edit_status(), "LOOP"));
-    press(B_OCTUP); frame();
+    press(B_PLAY); units_block(0); frame();             /* SONG MODE off: PLAY on SECTIONS plays the loop */
+    assert(song.playing && !chain.running);
+    press(B_PLAY); units_block(0); frame();
+    press(B_OCTUP); frame(); press(B_OCTUP); frame();   /* the sheet's first row: LOOP SONG on */
     assert(chain_config.rsv[CHAIN_LOOP] && msg_is("SONG LOOP ON") && str_eq(song_edit_status(), "LOOP"));
-    go_home(); ui.home_pg = HP_MIXER; frame();
-    press(B_PLAY); units_block(0); frame();             /* MIXER: the song, from its first entry */
+    press(B_OCTUP); frame(); turn(EN_K1, 1); turn(EN_K2, 1); frame();   /* its second: SONG MODE on (KNOB 2) */
+    assert(pop.on && song_mode_on());
+    press(B_OCTDN); frame(); assert(!pop.on);
+    go_home(); ui.home_pg = HP_TRACKS; frame();
+    press(B_PLAY); units_block(0); frame();             /* SONG MODE: TRACKS plays the song, from its first entry */
     assert(song.playing && chain.running && chain.row == 0 && str_eq(song_edit_status(), "SONG LOOP"));
     for (i = 0; i < 40u; i++) {                         /* A B A B ..: past the end, round again */
         units_block(tick()); frame();
@@ -286,19 +297,27 @@ static void song_loop(void)
     }
     assert(song.playing && chain.running && wrapped >= 2u);
     go_page(GR_SECTIONS); frame();
-    press(B_OCTUP); frame();                            /* playing: off at once, the song ends at its end */
+    press(B_OCTUP); frame(); press(B_OCTUP); frame();   /* playing: LOOP off at once, the song ends at its end */
     assert(!chain_config.rsv[CHAIN_LOOP] && !chain.config.rsv[CHAIN_LOOP] && msg_is("SONG LOOP OFF"));
     for (i = 0; i < 40u && song.playing; i++) { units_block(tick()); frame(); }
     assert(!song.playing && !chain.running);
+    go_page(GR_ADSR); frame();                          /* a sound page: SONG MODE plays the song there too */
+    press(B_PLAY); units_block(0); frame();
+    assert(song.playing && chain.running && chain.row == 0);
+    press(B_PLAY); units_block(0); frame();
+    go_page(GR_SECTIONS); frame();
+    press(B_OCTUP); frame(); turn(EN_K1, 1); press(B_OCTUP); frame();   /* SONG MODE off (OCT+ on its row) */
+    assert(!pop.on && !song_mode_on() && msg_is("SONG MODE OFF"));
     go_home(); ui.home_pg = HP_MIXER; frame();
-    press(B_PLAY); units_block(0); frame();             /* LOOP off: PLAY on MIXER plays the loop, not the song */
+    press(B_PLAY); units_block(0); frame();             /* off: MIXER plays the loop */
     assert(song.playing && !chain.running);
     press(B_PLAY); units_block(0); frame();
-    chain_defaults(&chain_config); frame();             /* no song: PLAY on MIXER plays the loop */
+    chain_config.rsv[CHAIN_MODE] = 1; chain_defaults(&chain_config); frame();   /* no song: the loop */
+    assert(!song_mode_on());
     press(B_PLAY); units_block(0); frame();
     assert(song.playing && !chain.running);
     press(B_PLAY); units_block(0); frame();
-    puts("SECTIONS: OCT+ SONG LOOP (stopped and playing), PLAY on MIXER plays the song with LOOP on passed");
+    puts("SECTIONS: OCT+ the song's sheet, LOOP SONG (stopped and playing), SONG MODE on any page, off the loop passed");
 }
 int main(void)
 {

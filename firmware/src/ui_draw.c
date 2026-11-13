@@ -319,7 +319,7 @@ static void draw_head(void)
 #if MELODEE_USB_HOST
     sig += uh.on ? (1u + uh.run) * 6151u : 0u;          /* the HOST tag: waiting, or a controller connected */
 #endif
-    sig += load * 2147483u + (uint32_t)(song.g[G_ECO] == 1) * 92821u;
+    sig += load * 2147483u + (uint32_t)(song.g[G_ECO] == 1) * 92821u + (uint32_t)song_mode_on() * 15485863u;
     if (head_badge_on()) sig += head_badge_sig() * 2654435769u;
     if (bpm != ui.roll_bpm) {
         char a[8];
@@ -372,13 +372,16 @@ static void draw_head(void)
     } else {
         const aafont_t *cf = TY_TX;                     /* (where you are: plain words in the track's colour;
                                                          * PATTERNS plain, the grid is in colour) */
-        const char *tag = song.g[G_ECO] == 1 ? "ECO" : "";   /* (Hookology: the project plays LIGHT) */
+        char tagb[24] = "";                             /* (Hookology: ECO the project plays LIGHT, SONG its SONG MODE) */
+        if (song.g[G_ECO] == 1) str_cpy(tagb, "ECO", sizeof tagb);
+        if (song_mode_on()) str_cpy(tagb + str_len(tagb), tagb[0] ? " SONG" : "SONG", sizeof tagb - str_len(tagb));
 #if MELODEE_USB_HOST
-        if (uh.on) tag = tag[0] ? "ECO HOST" : "HOST";
+        if (uh.on) str_cpy(tagb + str_len(tagb), tagb[0] ? " HOST" : "HOST", sizeof tagb - str_len(tagb));
 #endif
 #if MELODEE_BLE
-        if (mb.on) tag = !tag[0] ? "BLE" : tag[1] == 'O' ? "HOST BLE" : "ECO BLE";
+        if (mb.on) str_cpy(tagb + str_len(tagb), tagb[0] ? " BLE" : "BLE", sizeof tagb - str_len(tagb));
 #endif
+        const char *tag = tagb;
         int32_t hw = tag[0] ? text_w(TY_LB, tag) + 10 : 0;
 
         int32_t cw = text_w(cf, chip) + 4;

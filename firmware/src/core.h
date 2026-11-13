@@ -484,6 +484,8 @@ _Static_assert(sizeof(motion_store_t) == 260u, "motion disk layout");
 #define CHAIN_REST NPAT
 #define CHAIN_HOLD (NPAT + 1u)
 #define CHAIN_LOOP 0u /* chain_config_t.rsv index; persisted by FBKM */
+#define CHAIN_MODE 1u /* (Hookology) SONG MODE: PLAY plays the song from its first entry on any page; the same store */
+#define song_mode_on() (chain_config.rsv[CHAIN_MODE] == 1u && chain_config.count)
 #define CHAIN_FX_EVENTS 4u
 #define CHAIN_SOUNDS 64u
 /* fx: zero is dry; 1..27 are the stable SLOOP key-effect IDs plus one.

@@ -2772,12 +2772,13 @@ static void ui_input(void)
                 transport_req = 2;
             else if (!ui.home && cur_page()->graph == GR_SONG)
                 chain_play_ui();
-            else if (sections_page() || (ui.home && ui.home_pg == HP_MIXER && chain_config.rsv[CHAIN_LOOP] &&
-                                         chain_config.count))
-                sections_play();                        /* (MIXER too with SONG LOOP on, Hookology: the song cycling
-                                                         * while mixing; LOOP off: the loop, as on TRACKS) */
-            else
+            else if (song_mode_on()) {                  /* (Hookology) SONG MODE: the song from its top, on any page */
+                if (sections_page()) sections_play();
+                else { ui.song_row = 0; chain_play_ui(); }
+            } else {                                    /* the loop (SECTIONS: its keys switch the sections) */
+                if (sections_page() && scs.build) { scs.build = 0; ui.force = 1; }
                 transport_req = 1;
+            }
             break;
         case B_SEQ:
         case B_REC:                                     /* tap / hold: above */
@@ -2869,8 +2870,9 @@ static void ui_input(void)
         sec_build_delete();
     } else if (scs.build && sections_page() && !ui.layer && (oct & 2u)) {
         /* (OCT+ does nothing in BUILD) */
-    } else if (sections_page() && !secs.rec && !ui.layer && (oct & 2u)) {   /* SECTIONS: OCT+ SONG LOOP on / off */
-        sections_loop();
+    } else if (sections_page() && !secs.rec && !ui.layer && (oct & 2u)) {   /* SECTIONS: OCT+ the song's sheet (Hookology:
+                                                                         * LOOP SONG, SONG MODE) */
+        sections_sheet_open();
     } else if (list_on() && (oct & 2u)) {                      /* a list page: OCT+ the row's list, OCT- Stage */
         list_enter();
     } else if (list_on() && (oct & 1u)) {
