@@ -13,7 +13,8 @@
  * PRESETS scrolls from ABOUT through all credits. ui.menu: 1 list, 2 information. */
 /* ------------------------------------------------------------ menu --- */
 #define MENU_HEAD H_HEAD                 /* the menu's own title strip */
-enum { MI_COLOR, MI_FONT, MI_HOLD, MI_LIGHTS,
+/* (Hookology) the most used first: AUDIO CLICK, its level and sound, COUNT-IN; then as Melodee had them */
+enum { MI_CLICK, MI_CLICK_LEVEL, MI_CLICK_SOUND, MI_COUNTIN, MI_COLOR, MI_FONT, MI_HOLD, MI_LIGHTS,
 #if MELODEE_USB_AUDIO
        MI_USB, MI_USB_INPUT, MI_USB_VOLUME,
 #endif
@@ -24,9 +25,10 @@ enum { MI_COLOR, MI_FONT, MI_HOLD, MI_LIGHTS,
        MI_BLE,
 #endif
        MI_MIDI_OUT, MI_MIDI_KNOBS, MI_MIDI_MODE, MI_MIDI_LEARN,
-       MI_CLICK, MI_CLICK_LEVEL, MI_CLICK_SOUND, MI_COUNTIN, MI_REC_MODE, MI_PREVIEW, MI_ADD, MI_CHORD_NAMES, MI_AUTOSAVE, MI_PICKER, MI_ACCEL, MI_HOME_SEL, MI_GLO_SEL, MI_TRACKS, MI_SCREEN, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
+       MI_REC_MODE, MI_PREVIEW, MI_ADD, MI_CHORD_NAMES, MI_AUTOSAVE, MI_PICKER, MI_ACCEL, MI_HOME_SEL, MI_GLO_SEL, MI_TRACKS, MI_SCREEN, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
        MI_COUNT };
-static const char *const MI_NAME[MI_COUNT] = {"COLOR", "FONT", "HOLD", "LIGHTS",
+static const char *const MI_NAME[MI_COUNT] = {"AUDIO CLICK", "CLICK LEVEL", "CLICK SOUND", "COUNT-IN",
+                                              "COLOR", "FONT", "HOLD", "LIGHTS",
 #if MELODEE_USB_AUDIO
                                               "USB AUDIO", "USB INPUT", "USB VOLUME",
 #endif
@@ -37,7 +39,7 @@ static const char *const MI_NAME[MI_COUNT] = {"COLOR", "FONT", "HOLD", "LIGHTS",
                                               "BLUETOOTH",
 #endif
                                               "MIDI OUT", "MIDI KNOBS", "MIDI MODE", "MIDI LEARN",
-                                              "AUDIO CLICK", "CLICK LEVEL", "CLICK SOUND", "COUNT-IN", "REC MODE", "NOTE PREVIEW", "CHORD ENTRY",
+                                              "REC MODE", "NOTE PREVIEW", "CHORD ENTRY",
                                               "CHORD NAMES",
                                               "AUTOSAVE", "PICKER POPUPS", "KNOB ACCEL", "HOME SELECT", "GLO SELECT", "UNUSED TRACKS", "SCREEN OFF", "CALIBRATION", "ABOUT", "SOUND DESIGNER", "BACK"};
 #if MELODEE_USB_AUDIO
@@ -318,7 +320,7 @@ static void draw_menu(void)
                 if (y + MENU_RH <= top || y >= top + (int32_t)cv_h)
                     continue;
                 menu_words(w, MI_NAME[i], sizeof w);
-                if (i >= MI_CLICK && i <= MI_ADD)
+                if ((i >= MI_CLICK && i <= MI_COUNTIN) || i == MI_REC_MODE || i == MI_PREVIEW || i == MI_ADD)
                     value = i==MI_CLICK?(const char *const[]){"OFF","REC","ON"}[settings_click%3u]:
                       i==MI_CLICK_LEVEL?(fmt_int(b,settings_click_level),str_cpy(b+str_len(b),"%",4),b):
                       i==MI_CLICK_SOUND?(settings_click_soft?"SOFT":"BRIGHT"):
