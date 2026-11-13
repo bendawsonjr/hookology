@@ -33,7 +33,7 @@ const E = vm.runInNewContext(proto + `
 ;({ frame, unframe, parse, req, Link, parseWav, resample, normalize, takeSample, autoTrim, zoomView, rootFromName, buildSlot, makeMockDevice, CMD, SMP,
    UP, bank, nativeBank, capturePatch, auditionPatch, startWatch, libraryFile, readLibraryFile, paramKeys, patternFromSteps, stepsFromPattern, upName,
    mixer, parseNotes, parseHits, hitsText, gridFromSteps, LANE_NOTE, LANE_OF, isDevicePort, readDevicePreferences, devicePresetRows, engineOrder, ENGINE_ORDER, aliasOf, fmtValue, F, FM6,
-   FM4, fromDigital, CZ, P5, P5_FACTORY, p5LibraryPatch, readSysexLibrary, nativeImportTargets, scaleRows, SCALE_INFO, czLibraryPatch, czBankEncode, czBankDecode, czBankUpload, czBankRead, czLegacyTone })`,
+   FM4, fromDigital, CZ, P5, P5_FACTORY, p5LibraryPatch, readSysexLibrary, nativeImportTargets, scaleRows, SCALE_INFO, czLibraryPatch, czBankEncode, czBankDecode, czBankUpload, czBankRead, czLegacyTone, ROLL, SMF })`,
 { setTimeout, clearTimeout, setInterval, clearInterval, console });
 
 ok(["FM-1", "FM-1 MIDI 1", "Melodee", "Felucca"].every(name => E.isDevicePort({name})) &&
@@ -1369,6 +1369,53 @@ async function editorSessions() {
   ok(!sent && S.count() === 0, "editor: library storage delay cannot send a save to a new device");
 }
 
+
+/* (Hookology) the piano roll's edits and MIDI files out and back in */
+function editorRollMidi() {
+  const { ROLL, SMF } = E, R = () => ROLL.rest(), N = (notes, vel = 96) => ({ n: notes.length, notes: notes.concat([0, 0, 0, 0]).slice(0, 4), time: 0, flags: 0, vel, hit: 0, acc: 0 });
+  const apply = (steps, m) => { const o = steps.map((x) => ({ ...x })); for (const [i, x] of m) o[i] = { ...o[i], ...x }; return o; };
+  let st = Array.from({ length: 16 }, R);
+  st = apply(st, ROLL.place(st, 16, 0, 60, 4));
+  ok(st[0].time === 0 && st[0].notes[0] === 60 && [1, 2, 3].every((i) => st[i].time === 1) && st[4].time === 2, "roll: a quarter note at 1/16 is a NOTE and three TIEs");
+  st = apply(st, ROLL.place(st, 16, 0, 64, 1));
+  ok(st[0].n === 2 && st[0].notes[1] === 64 && st[1].time === 1, "roll: a note on a chord's first step joins it, the length stays");
+  st = apply(st, ROLL.place(st, 16, 2, 67, 1));
+  ok(ROLL.chords(st, 16).map((c) => c.at + ":" + c.dur).join() === "0:2,2:1" && st[3].time === 2, "roll: a note inside a held chord ends it there");
+  st = apply(st, ROLL.resize(st, 16, 2, 5));
+  ok(ROLL.chords(st, 16).find((c) => c.at === 2).dur === 5, "roll: dragging a note's end ties it over the rests");
+  st = apply(st, ROLL.remove(st, 16, 2, 67));
+  ok(st[2].time === 2 && [3, 4, 5, 6].every((i) => st[i].time === 2), "roll: the last note of a chord removed leaves rests");
+  /* a synth pattern -> .mid -> back */
+  const pat = Array.from({ length: 16 }, R);
+  Object.assign(pat, { 0: N([57, 60, 64]), 1: ROLL.tie(), 4: N([55], 70), 8: N([62, 65]), 9: ROLL.tie(), 10: ROLL.tie(), 14: N([48]) });
+  pat[4] = { ...pat[4], flags: 1 };
+  const f = SMF.write(SMF.fromSteps(pat, 16, 2), { bpm: 97, ch: 2, name: "Hookology track 3" });
+  const back = SMF.read(f), plan = SMF.toSteps(back.tracks[0].notes, back.ppq, 2, 64);
+  const sig = (a) => ROLL.chords(a, 16).map((c) => `${c.at}/${c.dur}/${c.notes.join(".")}`).join();
+  ok(back.bpm === 97 && back.tracks[0].name === "Hookology track 3" && sig(plan.steps) === sig(pat) && plan.len === 15,
+    "MIDI: a synth pattern out and back keeps its chords, lengths, tempo and name");
+  ok(plan.steps[4].vel === 127 && !plan.report.moved && !plan.report.overlap, "MIDI: an accent goes out at 127; nothing moved on the way back");
+  const p8 = SMF.toSteps(back.tracks[0].notes, back.ppq, 0, 64);   /* (DIV 1/4: step 15 of 1/16 falls between) */
+  ok(p8.report.moved > 0, "MIDI: notes between the steps of a coarser DIV are reported as moved");
+  /* the DRUM track: lanes as GM notes, accents at 127 */
+  const dr = Array.from({ length: 16 }, R);
+  dr[0] = { ...R(), time: 0, vel: 100, hit: 1 | 8, acc: 1 }; dr[4] = { ...R(), time: 0, vel: 100, hit: 2 | 8, acc: 0 };
+  const dn = SMF.fromDrums(dr, 16, 2);
+  ok(dn.some((n) => n.key === 36 && n.vel === 127) && dn.some((n) => n.key === 38) && dn.filter((n) => n.key === 42).length === 2,
+    "MIDI: drum hits go out as GM notes (36 KICK, 38 SNARE, 42 HATCL), accents at 127");
+  const db = SMF.read(SMF.write(dn, { ch: 9 })), dp = SMF.toSteps(db.tracks[0].notes, db.ppq, 2, 64, true);
+  ok(dp.steps[0].hit === 9 && dp.steps[0].acc === 1 && dp.steps[4].hit === 10 && !dp.steps[4].acc, "MIDI: drum notes come back on their lanes with their accents");
+  /* a format 1 file with two tracks, running status and note-on velocity 0 as note-off */
+  const trk = (b) => [0x4D, 0x54, 0x72, 0x6B, 0, 0, 0, b.length, ...b];
+  const t1 = [0, 0xFF, 0x51, 3, 0x07, 0xA1, 0x20, 0, 0xFF, 0x2F, 0];
+  const t2 = [0, 0x90, 60, 100, 0, 64, 90, 96, 60, 0, 0, 64, 0, 0, 0xFF, 0x2F, 0];
+  const f1 = Uint8Array.from([0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, 2, 0, 96, ...trk(t1), ...trk(t2)]);
+  const r1 = SMF.read(f1);
+  ok(r1.format === 1 && r1.bpm === 120 && r1.tracks.length === 2 && r1.tracks[1].notes.length === 2 && r1.tracks[1].notes[0].dur === 96,
+    "MIDI: format 1, a tempo track, running status and velocity-0 note-offs are read");
+  let bad = false; try { SMF.read(Uint8Array.from([1, 2, 3])); } catch (e) { bad = true; }
+  ok(bad, "MIDI: a file that is not MIDI is refused");
+}
 function editorTabs() {
   const tabs = [...html.matchAll(/<button role="tab" data-tab="(\w+)"/g)].map((x) => x[1]);
   const panels = [...html.matchAll(/<section class="panel" id="p-(\w+)" data-tab="(\w+)"/g)].map((x) => [x[1], x[2]]);
@@ -1792,6 +1839,7 @@ await editorSong();
 await editorSessions();
 await editorFm6();
 await editorFm4();
+editorRollMidi();
 editorTabs();
 editorIcons();
 samplesMatch();

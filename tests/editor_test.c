@@ -731,10 +731,29 @@ static int midi_track_protocol(void)
                  TSEL->p[P_FXTYPE] == FX_OFF && !TSEL->p[P_FXSEND]);
     return bad;
 }
+/* (Hookology) the editor lists every track in use: six sound tracks, MIDI tracks 7 and 8 */
+static int track_count(void)
+{
+    int bad = 0;
+    uint8_t a[2] = {5, 0};
+    reset();
+    song.ntrk = 6;
+    request(ED_TRACK, a, 0);
+    bad += check("TRACK lists the six tracks in use", host_wire[5] == 0 && host_wire[6] == 6);
+    request(ED_TRACK, a, 1);
+    bad += check("TRACK selects track 6 and says so", song.sel == 5 && host_wire[5] == 5 && host_wire[6] == 6);
+    song.ntrk = 8; a[0] = 7;
+    request(ED_TRACK, a, 1);
+    bad += check("TRACK reaches MIDI track 8", song.sel == 7 && host_wire[5] == 7 && host_wire[6] == 8);
+    request(ED_INFO, a, 0);
+    song.ntrk = 4; song.sel = 0;
+    return bad;
+}
+
 int main(void)
 {
     int bad = midi_track_protocol() + library_transfers() + native_motion_protocol() + prophet_protocol() + bank_protocol() + preferences() + framing() + uart_recovery() + steps() + song_protocol() + malformed_saves() + names_whole() +
-              native_protocol() + shared_protocol() + fm6_patches() + user_preset_roundtrip() + cz_native_protocol() + cz_dedicated_banks() + cz_casio_sysex() + concert_pitch() + scale_catalogue() + project_scale_protocol();
+              native_protocol() + shared_protocol() + fm6_patches() + user_preset_roundtrip() + cz_native_protocol() + cz_dedicated_banks() + cz_casio_sysex() + concert_pitch() + scale_catalogue() + project_scale_protocol() + track_count();
     printf("%s\n", bad ? "EDITOR TEST FAILED" : "editor test passed");
     return bad != 0;
 }

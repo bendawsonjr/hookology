@@ -9,41 +9,137 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Melodee Editor</title>
+<title>Hookology Editor</title>
 <style>
-  /* Fukiai: Hügelton Instruments' icon font (MIT, FUKIAI-LICENSE.txt). Icons are text in .ic spans;
-     they stay hidden until the face has loaded (html.fk), so a missing font never shows boxes. */
+  /* Hookology design (docs: the design system): Stage (dark) first, Daylight (light) on the sidebar's switch.
+     Fukiai: Hügelton Instruments' icon font (MIT, FUKIAI-LICENSE.txt). Icons are text in .ic spans;
+     they stay hidden until the face has loaded (html.fk), so a missing font never shows boxes.
+     Figtree and Unbounded: SIL OFL 1.1 (OFL-Figtree.txt, OFL-Unbounded.txt), Latin subsets. */
   @font-face { font-family: "Fukiai"; src: url("fukiai.ttf") format("truetype"); font-display: block; unicode-range: U+EA00-EB09; }
-  :root { --bg: #fff; --fg: #000; --dim: #666; --line: #ccc; }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --bg: #000; --fg: #fff; --dim: #888; --line: #444; }
+  @font-face { font-family: "Figtree"; src: url("figtree.ttf") format("truetype"); font-weight: 300 900; font-display: swap; }
+  @font-face { font-family: "Unbounded"; src: url("unbounded.ttf") format("truetype"); font-weight: 200 900; font-display: swap; }
+  :root {
+    --bg: #15212b; --side: #111b23; --surface: #1e2e39; --well: #15212b; --fg: #f1f4f2; --dim: #93a2ab; --line: #2c3e4a;
+    --accent: #ff5a36; --on-accent: #15212b; --rec: #ff4466; --focus: #ffc23d;
+    --t1: #ff5a36; --t2: #ffc23d; --t3: #1fa39c; --t4: #8f80f2;
+    --k1: var(--t1); --k2: var(--t2); --k3: var(--t3); --k4: var(--t4);
+    --ui: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --display: "Unbounded", "Figtree", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    color-scheme: dark;
   }
-  :root[data-theme="dark"] { --bg: #000; --fg: #fff; --dim: #888; --line: #444; }
-  html { color-scheme: light dark; }
-  body { margin: 0; background: var(--bg); color: var(--fg);
-         font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-         font-variant-numeric: tabular-nums; }
-  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
-  h1 { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
-  h2 { font-size: 13px; font-weight: 600; margin: 0 0 4px; padding-bottom: 2px; border-bottom: 1px solid var(--fg); }
-  h3 { font-size: 11px; font-weight: 400; color: var(--dim); margin: 4px 0 0; }
+  :root[data-theme="light"] {
+    --bg: #f1f4f2; --side: #e6ebe8; --surface: #ffffff; --well: #f1f4f2; --fg: #15212b; --dim: #56656e; --line: #c9d3d6;
+    --accent: #c2391a; --on-accent: #ffffff; --rec: #c8173a; --focus: #15212b;
+    --t1: #c2391a; --t2: #966600; --t3: #0e7f79; --t4: #6655d6;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 500 14px/1.45 var(--ui); font-variant-numeric: tabular-nums;
+         -webkit-font-smoothing: antialiased; }
   a { color: inherit; }
-  .lang { float: right; font-size: 12px; color: var(--dim); text-decoration: underline; background: none; padding: 0; }
-  button { font: inherit; background: var(--fg); color: var(--bg); border: 0; padding: 2px 10px; cursor: pointer; }
-  button:disabled { opacity: .3; cursor: default; }
-  button.lang { color: var(--dim); background: none; }
-  select, input[type=text], input[type=number], input[type=search] {
-    font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); padding: 1px 3px; border-radius: 0; }
-  input[type=range] { width: 100%; margin: 0; accent-color: var(--fg); }
-  input[type=checkbox] { accent-color: var(--fg); margin: 0; }
-  .bar { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin: 0 0 8px; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* the frame: a sidebar (brand, pages, connection) and the page */
+  .app { display: flex; flex-wrap: wrap; min-height: 100vh; }
+  .side { flex: 0 0 236px; background: var(--side); border-right: 1px solid var(--line); padding: 22px 14px; display: flex;
+          flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  main { flex: 999 1 560px; min-width: 0; padding: 26px 36px 48px; max-width: 1400px; }
+  @media (max-width: 820px) {
+    .side { flex-basis: 100%; height: auto; position: static; border-right: 0; border-bottom: 1px solid var(--line); }
+    main { padding: 18px 16px 40px; }
+  }
+  .site { display: flex; align-items: center; gap: 10px; padding: 0 8px 16px; }
+  .site .brand { display: flex; flex-direction: column; line-height: 1; }
+  .site .brand b { font: 600 19px var(--display); letter-spacing: -0.01em; }
+  .site .brand small { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--dim); margin-top: 5px; }
+  .tabs { display: flex; flex-direction: column; gap: 2px; }
+  @media (max-width: 820px) { .tabs { flex-direction: row; flex-wrap: wrap; } .tabs .grp { flex-basis: 100%; } }
+  .tabs .grp { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--dim); padding: 12px 10px 4px; }
+  .tabs button { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 10px; border-radius: 8px; background: none;
+                 color: var(--dim); border: 0; font: 600 15px var(--ui); text-align: left; cursor: pointer; }
+  .tabs button:hover { color: var(--fg); }
+  .tabs button[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: inset 3px 0 0 var(--accent); }
+  .conn { margin-top: auto; padding: 16px 8px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+  .conn .bar { flex-direction: column; align-items: stretch; gap: 6px; margin: 0; }
+  #version { font: 500 12px var(--mono); color: var(--dim); }
+  .conn .links { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
+  .conn .links a { color: var(--dim); text-decoration: none; }
+  .conn .links a:hover { color: var(--fg); }
+  .lang, .themebtn { background: none !important; color: var(--dim) !important; border: 0 !important; padding: 0 !important;
+                     height: auto !important; font-size: 13px !important; text-decoration: underline; text-align: left; }
+
+  /* page head */
+  .top { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; }
+  h1 { margin: 0; font: 600 30px/1.15 var(--display); letter-spacing: -0.01em; }
+  h2 { margin: 0 0 10px; font: 500 19px/1.2 var(--display); }
+  h3 { margin: 14px 0 8px; font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--dim); text-transform: uppercase; }
+  #status { min-height: 1.4em; color: var(--dim); }
+  .hint { margin: 16px 0; color: var(--dim); }
   .dim { color: var(--dim); }
-  #status { min-height: 1.4em; }
-  section { margin: 12px 0; }
-  .groups { columns: 250px; column-gap: 20px; }
-  .group { break-inside: avoid; margin: 0 0 12px; }
-  .row { display: grid; grid-template-columns: 46px 1fr 70px; gap: 6px; align-items: center; min-height: 22px; }
-  .row.scalepicker { grid-template-columns: minmax(0, 1fr); gap: 4px; align-items: start; }
+  footer { margin-top: 36px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--dim); }
+
+  /* controls */
+  button { font: 600 14px var(--ui); background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 8px;
+           padding: 0 14px; min-height: 34px; cursor: pointer; }
+  button:hover { border-color: var(--dim); }
+  button:disabled { opacity: .35; cursor: default; }
+  #connect { background: var(--accent); color: var(--on-accent); border: 0; font-weight: 800; min-height: 40px; }
+  select, input:not([type]), input[type=text], input[type=number], input[type=search] {
+    font: 500 14px var(--ui); color: var(--fg); background: var(--well); border: 1px solid var(--line); border-radius: 6px;
+    padding: 4px 8px; min-height: 32px; }
+  select[size] { padding: 4px; }
+  select[size] option { padding: 5px 8px; border-radius: 4px; }
+  select[size] option:checked { background: var(--line); }
+  input[type=range] { width: 100%; margin: 0; accent-color: var(--k, var(--accent)); height: 18px; }
+  input[type=checkbox] { accent-color: var(--accent); margin: 0; width: 16px; height: 16px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 0 0 10px; }
+  .seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+  .seg button, button.tog { background: var(--surface); color: var(--fg); }
+  .seg button[aria-pressed="true"], button.tog[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+
+  /* the tracks across the top: a numeral badge in the track's colour, the sound, the engine */
+  .trackbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .trackbar > .dim { display: none; }
+  #trackbtns { display: flex; flex-wrap: wrap; gap: 8px; }
+  #trackbtns button { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 14px 0 8px; border: 2px solid transparent;
+                      background: var(--surface); text-align: left; max-width: 230px; }
+  #trackbtns button[aria-pressed="true"] { border-color: var(--tc); background: var(--surface); color: var(--fg); }
+  #trackbtns .badge { min-width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; font-weight: 800;
+                      background: var(--tc); color: var(--on-accent); flex: none; }
+  #trackbtns .tn { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+  #trackbtns .tn b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #trackbtns .tn small { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--dim); }
+  .tc1 { --tc: var(--t1); } .tc2 { --tc: var(--t2); } .tc3 { --tc: var(--t3); } .tc4 { --tc: var(--t4); }
+
+  /* a button's pages: a card, each page a row of four knob tiles (label in the knob's colour, value, the bar) */
+  .panel { margin: 0; }
+  section { margin: 0 0 18px; }
+  .groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 18px; align-items: start; }
+  .group { background: var(--surface); border-radius: 8px; padding: 18px 20px 20px; margin: 0 0 18px; min-width: 0; }
+  .groups .group { margin: 0; }
+  .group > h2 { display: flex; align-items: center; gap: 6px; }
+  .page { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  @media (max-width: 600px) { .page { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .page > .row:nth-child(4n+1) { --k: var(--k1); } .page > .row:nth-child(4n+2) { --k: var(--k2); }
+  .page > .row:nth-child(4n+3) { --k: var(--k3); } .page > .row:nth-child(4n+4) { --k: var(--k4); }
+  .row { display: grid; grid-template-columns: 46px 1fr 70px; gap: 8px; align-items: center; min-height: 28px; }
+  .page > .row { display: flex; flex-direction: column; align-items: stretch; gap: 4px; background: var(--well); border-radius: 6px;
+                 padding: 10px 12px 12px; min-width: 0; touch-action: none; }
+  .page > .row > span:first-child { order: 1; font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--k);
+                                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .page > .row > .v { order: 2; text-align: left; font-size: 22px; font-weight: 600; line-height: 28px; white-space: nowrap;
+                      overflow: hidden; text-overflow: ellipsis; cursor: ns-resize; user-select: none; }
+  .page > .row > :not(span):not(.v) { order: 3; }
+  .page > .row select { width: 100%; }
+  .page > .row.pushed { box-shadow: inset 0 0 0 2px var(--k); }
+  .row .v { text-align: right; white-space: nowrap; }
+  .row select { width: 100%; }
+  .row.pushed .v { font-weight: 800; }
+  .row.modrow { grid-template-columns: 22px 1fr 1fr 1fr 60px; background: var(--well); border-radius: 6px; padding: 6px 10px; margin-bottom: 6px; }
+  .row.scalepicker { grid-template-columns: minmax(0, 1fr); gap: 6px; align-items: start; }
+  .page > .row.scalepicker { grid-column: 1 / -1; }
+  .page > .row.scalepicker .v { font-size: 16px; cursor: default; }
   .scalecontrols { display: grid; gap: 6px; min-width: 0; }
   .scalefilters { display: flex; gap: 6px; flex-wrap: wrap; }
   .scalefilters select, .scalefilters input { flex: 1 1 140px; min-width: 0; width: 100%; }
@@ -51,155 +147,181 @@
   .scalecurrent { display: flex; align-items: center; gap: 6px; }
   .scalecurrent .v { flex: 1; }
   .scalecontrols select[size] { min-height: 125px; min-width: 0; }
-  .row .v { text-align: right; white-space: nowrap; }
-  .row select { width: 100%; }
-  .browser { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
-  .browser select[size] { min-width: 150px; }
-  .slots { display: grid; grid-template-columns: auto auto auto auto; gap: 3px 8px; align-items: center; justify-content: start; }
+
+  /* Sound: engine, patches and the file buttons on one card */
+  .browser { display: flex; flex-wrap: wrap; gap: 16px 20px; align-items: flex-start; background: var(--surface); border-radius: 8px;
+             padding: 18px 20px; margin-bottom: 18px; }
+  .browser label > span:first-child { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--dim); text-transform: uppercase; }
+  .browser select { min-width: 200px; margin-top: 6px; }
+  .browser select[size] { min-width: 280px; }
+  #ctlhelp { margin: 0 0 16px; }
+
+  /* lists, tables */
+  .slots { display: grid; grid-template-columns: auto auto auto auto; gap: 6px 10px; align-items: center; justify-content: start; }
   table { border-collapse: collapse; }
-  th { font-weight: 400; color: var(--dim); text-align: left; padding: 0 6px 2px 0; }
-  td { padding: 1px 6px 1px 0; }
+  th { font-weight: 700; font-size: 12px; letter-spacing: .04em; color: var(--dim); text-align: left; padding: 0 8px 4px 0; }
+  td { padding: 2px 8px 2px 0; }
   td.i { color: var(--dim); text-align: right; }
+  .libcols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 18px; }
+  .libcols > div { min-width: 0; background: var(--surface); border-radius: 8px; padding: 18px 20px; }
+  .libcols .bar input[type=search] { flex: 1 1 120px; min-width: 0; }
+  .list { height: 300px; overflow: auto; border-radius: 8px; background: var(--well); resize: vertical; }
+  .list table { width: 100%; table-layout: fixed; }
+  .list th { position: sticky; top: 0; background: var(--well); padding: 6px 8px; }
+  .list td { padding: 5px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list tr[data-id], .list tr[data-slot] { cursor: pointer; }
+  .list tr.sel td { background: var(--line); }
+  .list tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  .list tr.empty td { color: var(--dim); }
+  .list tr.over td { outline: 1px dashed var(--accent); outline-offset: -1px; }
+  .list.over { outline: 2px solid var(--accent); }
+  .list .none { padding: 8px; color: var(--dim); }
+  .list button { background: none; border: 0; min-height: 30px; padding: 0 8px; text-align: left; }
+  .list button:hover { color: var(--accent); }
+  .list col.n { width: 60px; } .list col.e { width: 72px; } .list col.d { width: 78px; }
+
+  /* sequencer: the steps as tiles (16 a row, 8 on a phone), and the step table */
+  .grid { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 6px; margin: 8px 0 16px; }
+  @media (max-width: 700px) { .grid { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+  .grid button { background: var(--well); color: var(--dim); border: 0; border-radius: 6px; padding: 5px 7px; min-width: 0; height: 58px;
+                 display: flex; flex-direction: column; justify-content: space-between; gap: 1px; text-align: left; overflow: hidden;
+                 font-size: 12px; line-height: 1.15; }
+  .grid button .n { font-size: 11px; opacity: .8; }
+  .grid button .x { overflow: hidden; overflow-wrap: anywhere; font-weight: 800; font-size: 13px; }
+  .grid button.on { background: var(--accent); color: var(--on-accent); }
+  .grid button.acc .x { text-decoration: underline; }
+  .grid button.tie { box-shadow: inset 0 0 0 2px var(--accent); background: var(--well); color: var(--fg); }
+  .grid button.beat { border-left: 3px solid var(--line); }
+  #steps { background: var(--surface); border-radius: 8px; padding: 18px 20px 20px; }
   #steps input[type=text] { width: 120px; }
-  #steps input[type=number] { width: 48px; }
-  #steps .bad { outline: 1px solid var(--fg); text-decoration: underline wavy; }
-  .fm6ops { overflow-x: auto; }
-  .fm6ops td, .fm6ops th { padding: 0 2px; }
-  input.fm6n { width: 3.2em; }
+  #steps input[type=number] { width: 58px; }
+  #steps .bad { outline: 2px solid var(--rec); }
   #steps tr.off td { color: var(--dim); }
+  #steps tr.hl td { background: var(--line); }
   .stepcols { columns: 470px; column-gap: 24px; }
   .stepcols table { break-inside: avoid; }
   @media (max-width: 600px) {
     .stepcols { columns: auto; overflow-x: auto; }
     #steps input[type=text] { width: 84px; }
-    #steps input[type=number] { width: 42px; }
+    #steps input[type=number] { width: 46px; }
     #steps th, #steps td { padding-right: 3px; }
   }
-  .smp { margin: 0 0 14px; padding: 6px 0 0; border-top: 1px solid var(--line); }
-  .smp.over { outline: 1px solid var(--fg); outline-offset: 2px; }
+  .seqtools { margin: 4px 0 12px; }
+  .rollbox { overflow-x: auto; border-radius: 8px; background: var(--well); }
+  #rollcv { display: block; touch-action: none; }
+  .midiprev { background: var(--well); border-radius: 8px; padding: 14px 16px; margin: 0 0 14px; }
+  .midiprev h3 { margin-top: 0; }
+  .midiprev ul { margin: 6px 0; padding-left: 20px; }
+  .midiprev ul.warn { color: var(--focus); }
+  button.pri { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 800; }
+  #motion-panel { background: var(--surface); border-radius: 8px; padding: 18px 20px; }
+
+  /* FM6 */
+  .fm6ops { overflow-x: auto; }
+  .fm6ops td, .fm6ops th { padding: 1px 3px; }
+  input.fm6n { width: 3.6em; }
+
+  /* samples */
+  .smp { margin: 0 0 14px; padding: 8px 0 0; border-top: 1px solid var(--line); }
+  .smp.over { outline: 2px solid var(--accent); outline-offset: 2px; }
   .smp .head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
-  .smp .head b { font-weight: 600; min-width: 40px; }
+  .smp .head b { font-weight: 700; min-width: 40px; }
   .smp canvas.trim { width: 100%; height: 56px; display: block; touch-action: none; cursor: ew-resize; }
   .smp progress.rec { width: 120px; }
-  .smp progress { width: 160px; height: 6px; accent-color: var(--fg); }
+  .smp progress { width: 160px; height: 6px; accent-color: var(--accent); }
   .smp table { margin: 4px 0; }
   .smp input.name { width: 80px; text-transform: uppercase; }
   .smp input.root { width: 48px; }
   .smp .bad { text-decoration: underline wavy; }
-  footer { margin-top: 24px; font-size: 11px; color: var(--dim); }
-  .row.pushed .v { font-weight: 600; }
-  .row.modrow { grid-template-columns: 16px 1fr 1fr 1fr 52px; }
-  /* librarian: local library and the device's user bank side by side, stacked on a phone */
-  .libcols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 8px 24px; margin-top: 6px; }
-  .libcols > div { min-width: 0; }
-  .libcols .bar input[type=search] { flex: 1 1 120px; min-width: 0; }
-  .list { height: 260px; overflow: auto; border: 1px solid var(--line); resize: vertical; }
-  .list table { width: 100%; table-layout: fixed; }
-  .list th { position: sticky; top: 0; background: var(--bg); padding: 1px 6px; }
-  .list td { padding: 1px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .list tr[data-id], .list tr[data-slot] { cursor: pointer; }
-  .list tr.sel td { background: var(--fg); color: var(--bg); }
-  .list tr.empty td { color: var(--dim); }
-  .list tr.over td { outline: 1px dashed var(--fg); outline-offset: -1px; }
-  .list.over { outline: 1px solid var(--fg); }
-  .list .none { padding: 6px; color: var(--dim); }
-  .list col.n { width: 40px; } .list col.e { width: 72px; } .list col.d { width: 78px; }
+
+  /* tracks: a channel strip per track, its number in the track's colour */
+  .mixer { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; margin: 6px 0 12px; }
+  .strip { background: var(--surface); border-radius: 8px; padding: 12px 10px; display: flex; flex-direction: column; align-items: center;
+           gap: 8px; min-width: 0; border: 2px solid transparent; }
+  .mixer > .strip:nth-child(4n+1) { --tc: var(--t1); } .mixer > .strip:nth-child(4n+2) { --tc: var(--t2); }
+  .mixer > .strip:nth-child(4n+3) { --tc: var(--t3); } .mixer > .strip:nth-child(4n+4) { --tc: var(--t4); }
+  .strip.sel { border-color: var(--tc); }
+  .strip .num { font-size: 16px; font-weight: 800; min-width: 34px; min-height: 30px; background: var(--tc) !important; color: var(--on-accent) !important;
+                border: 0; padding: 0 8px; }
+  .strip .snd { font-size: 12px; font-weight: 600; line-height: 1.3; width: 100%; text-align: center; overflow-wrap: anywhere; min-height: 2.6em; }
+  .strip .rec { font-size: 11px; font-weight: 700; color: var(--dim); }
+  .strip .rec.on { color: var(--rec); }
+  .strip .rec:not(.on) .ic { visibility: hidden; }
+  .strip input.fader { writing-mode: vertical-lr; direction: rtl; width: 30px; height: 160px; accent-color: var(--tc); }
+  .strip .v { font-size: 12px; white-space: nowrap; }
+  .strip .pan { width: 100%; accent-color: var(--tc); }
+  .strip.muted .fader, .strip.muted .lv { opacity: .35; }
+  .strip button { width: 100%; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .strip button.selb:disabled { opacity: 1; background: none; border-color: transparent; color: var(--dim); }
+  #sysinfo th { padding-right: 16px; }
+  /* the Prophet's and CZ-1's own programs: each group a well, its values two to a row */
+  #p5controls, #czcontrols { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 12px; }
+  #p5controls fieldset, #czcontrols fieldset { margin: 0; border: 0; border-radius: 8px; background: var(--well); padding: 12px 14px; min-width: 0; }
+  #p5controls legend, #czcontrols legend { float: left; width: 100%; margin-bottom: 8px; font-size: 12px; font-weight: 700;
+                                           letter-spacing: .06em; color: var(--dim); text-transform: uppercase; }
+  #p5controls p, #czcontrols p { margin: 0 0 6px; clear: both; }
+  #p5controls label, #czcontrols label { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  #p5controls input[type=number], #czcontrols input[type=number] { width: 72px; }
+  /* a choice: the menu itself shows the value, large */
+  .page > .row:has(select) > .v { display: none; }
+  .page > .row > select { font-size: 18px; font-weight: 600; min-height: 36px; padding: 2px 6px; }
+
   .ic { font-family: "Fukiai"; font-style: normal; font-weight: 400; font-synthesis: none; line-height: 1; margin-right: .3em; }
   html:not(.fk) .ic { display: none; }
   /* wave choices: a page-drawn picker so the options can carry an icon (Chrome 135+); native menus get words only */
   @supports (appearance: base-select) {
     select.wave, select.wave::picker(select) { appearance: base-select; }
-    select.wave { padding: 1px 3px; min-block-size: 0; border: 1px solid var(--line); border-radius: 0; background: var(--bg); color: var(--fg); }
-    select.wave > button { font: inherit; background: none; color: inherit; padding: 0; text-align: start; }
-    select.wave::picker(select) { border: 1px solid var(--line); background: var(--bg); color: var(--fg); padding: 0; }
-    select.wave option { padding: 1px 6px; min-block-size: 0; }
-    select.wave option:checked { font-weight: 600; }
-    select.wave option:hover, select.wave option:focus-visible { background: var(--fg); color: var(--bg); }
+    select.wave { padding: 4px 8px; min-block-size: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--well); color: var(--fg); }
+    select.wave > button { font: inherit; background: none; color: inherit; padding: 0; text-align: start; border: 0; min-height: 0; }
+    select.wave::picker(select) { border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 4px; border-radius: 6px; }
+    select.wave option { padding: 4px 8px; min-block-size: 0; border-radius: 4px; }
+    select.wave option:checked { font-weight: 700; }
+    select.wave option:hover, select.wave option:focus-visible { background: var(--line); }
     select.wave option::checkmark { display: none; }
   }
-  /* tabs: a wrapping row of plain buttons, the open one inverted; header stays at the top on wide screens */
-  .top { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 4px 0 0; }
-  @media (max-width: 600px) { .top { position: static; } }
-  .tabs { display: flex; flex-wrap: wrap; gap: 0; border-bottom: 1px solid var(--fg); margin: 6px 0 0; }
-  .tabs button { background: none; color: var(--dim); padding: 4px 10px; border: 1px solid transparent; border-bottom: 0; white-space: nowrap; }
-  .tabs button:hover { color: var(--fg); }
-  .tabs button[aria-selected="true"] { background: var(--fg); color: var(--bg); }
-  .trackbar { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
-  .seg { display: inline-flex; flex-wrap: wrap; }
-  .seg button, button.tog { background: var(--bg); color: var(--fg); border: 1px solid var(--fg); padding: 1px 10px; }
-  .seg button + button { border-left: 0; }
-  .seg button[aria-pressed="true"], button.tog[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
-  .panel { margin: 12px 0; }
-  .hint { margin: 16px 0; color: var(--dim); }
-  /* sequencer: a step grid over the selected track (16 per row, 8 on a phone) */
-  .grid { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 2px; margin: 6px 0 12px; }
-  @media (max-width: 600px) { .grid { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
-  .grid button { background: var(--bg); color: var(--fg); border: 1px solid var(--line); padding: 2px; min-width: 0; height: 52px;
-                 display: flex; flex-direction: column; justify-content: flex-start; gap: 1px; text-align: left; overflow: hidden; font-size: 10px; line-height: 1.15; }
-  .grid button .n { color: var(--dim); }
-  .grid button .x { overflow: hidden; overflow-wrap: anywhere; flex: 1; }
-  .grid button.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-  .grid button.on .n { color: inherit; opacity: .6; }
-  .grid button.acc .x { font-weight: 700; }
-  .grid button.tie { border-style: dashed; border-color: var(--fg); }
-  .grid button.beat { border-left-color: var(--fg); }
-  #steps tr.hl td { outline: 1px solid var(--fg); }
-  /* mixer: four channel strips as on the device's TRACKS page */
-  .mixer { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; max-width: 640px; margin: 6px 0; }
-  .strip { border: 1px solid var(--line); padding: 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
-  .strip.sel { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
-  .strip .num { font-size: 18px; font-weight: 600; line-height: 1; }
-  .strip .snd { font-size: 11px; line-height: 1.3; width: 100%; text-align: center; overflow-wrap: anywhere; min-height: 2.6em; }
-  .strip .rec { font-size: 11px; color: var(--dim); }
-  .strip .rec.on { color: var(--fg); font-weight: 600; }
-  .strip .rec:not(.on) .ic { visibility: hidden; }
-  .strip input.fader { writing-mode: vertical-lr; direction: rtl; width: 28px; height: 150px; }
-  .strip .v { font-size: 11px; white-space: nowrap; }
-  .strip .pan { width: 100%; }
-  .strip.muted .fader, .strip.muted .lv { opacity: .35; }
-  .strip button { width: 100%; padding: 1px 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .strip button.selb:disabled { opacity: 1; background: none; color: var(--dim); }
-  #sysinfo th { padding-right: 16px; }
   [hidden] { display: none !important; }
-  .site { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-  .site .brand { font-size: 18px; font-weight: 600; }
-  .site .links { display: flex; gap: 16px; }
-  .site .links a { color: var(--dim); text-decoration: none; }
-  .site .links a:hover { color: var(--fg); }
-  .site .links a[aria-current="page"] { color: var(--fg); }
 </style>
 </head>
 <body>
-<main>
-  <button class="lang" id="lang"></button>
-  <nav class="site">
-    <span class="brand">Melodee</span>
-    <div class="links">
-      <a href="../editor/" aria-current="page">Patch Editor</a>
-      <a href="../installer/">Installer</a>
-      <a href="../manual/">Manual</a>
-    </div>
+<div class="app">
+<aside class="side">
+  <div class="site">
+    <svg width="34" height="34" viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="30" cy="80" rx="14" ry="10.5" transform="rotate(-22 30 80)" fill="var(--accent)"/><path d="M43,78 L43,10 C58,14 66,24 66,38 L66,54 A11,11 0 0 0 88,54 L88,44" stroke="var(--accent)" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke-width="8"/><path d="M88,44 L81,52" stroke="var(--accent)" stroke-linecap="round" fill="none" stroke-width="6"/></svg>
+    <span class="brand"><b>hookology</b><small>EDITOR</small></span>
+  </div>
+  <nav class="tabs" id="tabs" role="tablist" aria-orientation="vertical" aria-label="Editor pages">
+    <span class="grp" role="presentation">PLAY</span>
+    <button role="tab" data-tab="sound" data-t="sound" data-ic="symbol_audio"></button>
+    <button role="tab" data-tab="sequencer" data-t="tabSeq" data-ic="symbol_grid"></button>
+    <button role="tab" data-tab="tracks" data-t="tabTracks" data-ic="ui_slider_vertical"></button>
+    <span class="grp" role="presentation">SOUNDS</span>
+    <button role="tab" data-tab="library" data-t="library" data-ic="symbol_books"></button>
+    <button role="tab" data-tab="fm6" data-t="tabFm6" data-ic="ui_knob"></button>
+    <span class="grp" role="presentation">DEVICE</span>
+    <button role="tab" data-tab="projects" data-t="projects" data-ic="symbol_folder"></button>
+    <button role="tab" data-tab="settings" data-t="tabSettings" data-ic="symbol_cog"></button>
   </nav>
-  <h1>Editor</h1>
-  <!-- always visible: connection, version, sync mode, the tabs and (Sound / Sequencer / Tracks) the track selector -->
-  <header class="top">
+  <div class="conn">
     <div class="bar">
       <button id="connect" data-t="connect" data-ic="port_usb_c"></button>
-      <span id="version" class="dim"></span>
+      <span id="version"></span>
       <span id="live" class="dim"></span>
       <span id="mock" class="dim" hidden data-t="mock"></span>
     </div>
-    <div id="status"></div>
-    <nav class="tabs" id="tabs" role="tablist">
-      <button role="tab" data-tab="sound" data-t="sound" data-ic="symbol_audio"></button>
-      <button role="tab" data-tab="fm6" data-t="tabFm6" data-ic="ui_knob"></button>
-      <button role="tab" data-tab="sequencer" data-t="tabSeq" data-ic="symbol_grid"></button>
-      <button role="tab" data-tab="tracks" data-t="tabTracks" data-ic="ui_slider_vertical"></button>
-      <button role="tab" data-tab="library" data-t="library" data-ic="symbol_books"></button>
-      <button role="tab" data-tab="projects" data-t="projects" data-ic="symbol_folder"></button>
-      <button role="tab" data-tab="settings" data-t="tabSettings" data-ic="symbol_cog"></button>
-    </nav>
-    <div class="trackbar" id="trackbar" hidden><span class="dim" data-t="track"></span><span class="seg" id="trackbtns" role="group"></span></div>
+    <div class="links">
+      <a href="../installer/">Installer</a>
+      <a href="../manual/">Manual</a>
+    </div>
+    <button class="themebtn" id="themebtn" type="button"></button>
+    <button class="lang" id="lang" type="button"></button>
+  </div>
+</aside>
+<main>
+  <!-- the page: its title, the status line and (Sound / Sequencer / Tracks) the tracks -->
+  <header class="top">
+    <h1 id="pagetitle">Sound</h1>
+    <div id="status" aria-live="polite"></div>
+    <div class="trackbar" id="trackbar" hidden><span class="dim" data-t="track"></span><span class="seg" id="trackbtns" role="group" aria-label="Tracks"></span></div>
   </header>
   <p class="hint" id="hint" hidden></p>
 
@@ -244,33 +366,6 @@
     <div class="groups" id="groups"></div>
   </section>
 
-  <section class="panel" id="p-fm6" data-tab="fm6" data-dev hidden>
-    <p class="dim" data-t="fm6Help"></p>
-    <div class="group">
-      <h2 data-t="fm6Source" data-ic="symbol_folder"></h2>
-      <p class="bar"><label><span data-t="track"></span> <select id="fm6trk"></select></label>
-        <button id="fm6read" data-t="fm6ReadBtn"></button> <button id="fm6send" data-t="fm6SendBtn"></button>
-        <label><input type="checkbox" id="fm6live"> <span data-t="fm6Live"></span></label></p>
-      <p class="bar"><label><span data-t="slot"></span> <select id="fm6slot"></select></label>
-        <button id="fm6load" data-t="load"></button> <button id="fm6store" data-t="fm6StoreBtn"></button>
-        <button id="fm6erase" data-t="erase"></button></p>
-      <p class="bar"><button id="fm6import" data-t="fm6Import" data-ic="symbol_upload"></button>
-        <input type="file" id="fm6file" accept=".syx,.SYX,.bin,application/octet-stream" hidden>
-        <button id="fm6export" data-t="fm6Export" data-ic="symbol_download"></button>
-        <button id="fm6bankexp" data-t="fm6BankExport" data-ic="symbol_download"></button>
-        <button id="fm6init" data-t="fm6Init"></button></p>
-      <div id="fm6imported"></div>
-    </div>
-    <div class="group">
-      <h2 data-t="fm6Voice" data-ic="ui_knob"></h2>
-      <div id="fm6voice"></div>
-    </div>
-    <div class="group">
-      <h2 data-t="fm6Ops" data-ic="function_env_adsr_exp"></h2>
-      <div id="fm6ops"></div>
-    </div>
-  </section>
-
   <section class="panel" id="p-sequencer" data-tab="sequencer" data-dev hidden>
     <div class="groups" id="seqgroups"></div>
     <p id="patternbar" class="bar" hidden><label for="patternpick">Pattern</label><select id="patternpick"></select><span id="patternstate" class="dim"></span></p>
@@ -279,6 +374,23 @@
       <p class="bar"><button id="reloadsteps" data-t="reload" data-ic="control_arrow_loop"></button>
         <button id="clearseq" data-t="clearSeq" data-ic="symbol_trash"></button>
         <span class="dim" id="noteshelp"></span></p>
+      <!-- (Hookology, after SLOOP 2.5) the view: the steps' table or a piano roll; MIDI files in and out -->
+      <div class="bar seqtools">
+        <span class="seg" id="viewseg" role="group" aria-label="View"><button type="button" data-v="grid" data-t="viewGrid"></button><button type="button" data-v="roll" data-t="viewRoll"></button></span>
+        <button id="midiexp" type="button" data-t="midiExport" data-ic="symbol_download"></button>
+        <button id="midiimp" type="button" data-t="midiImportBtn" data-ic="symbol_upload"></button>
+        <input id="midifile" type="file" accept=".mid,.midi,audio/midi" hidden>
+      </div>
+      <div id="midiprev" class="midiprev" hidden></div>
+      <div id="roll" hidden>
+        <div class="bar">
+          <span class="dim" data-t="rollLen"></span><span class="seg" id="rolllen" role="group"></span>
+          <button id="rolldown" type="button" data-t="octDown"></button><button id="rollup" type="button" data-t="octUp"></button>
+          <span id="rollrange" class="dim"></span>
+        </div>
+        <div class="rollbox"><canvas id="rollcv" aria-label="Piano roll"></canvas></div>
+        <p class="dim" data-t="rollHelp"></p>
+      </div>
       <div class="grid" id="stepgrid"></div>
       <div class="stepcols" id="steptables"></div>
     </div>
@@ -356,11 +468,40 @@
     </div>
   </section>
 
+  <section class="panel" id="p-fm6" data-tab="fm6" data-dev hidden>
+    <p class="dim" data-t="fm6Help"></p>
+    <div class="group">
+      <h2 data-t="fm6Source" data-ic="symbol_folder"></h2>
+      <p class="bar"><label><span data-t="track"></span> <select id="fm6trk"></select></label>
+        <button id="fm6read" data-t="fm6ReadBtn"></button> <button id="fm6send" data-t="fm6SendBtn"></button>
+        <label><input type="checkbox" id="fm6live"> <span data-t="fm6Live"></span></label></p>
+      <p class="bar"><label><span data-t="slot"></span> <select id="fm6slot"></select></label>
+        <button id="fm6load" data-t="load"></button> <button id="fm6store" data-t="fm6StoreBtn"></button>
+        <button id="fm6erase" data-t="erase"></button></p>
+      <p class="bar"><button id="fm6import" data-t="fm6Import" data-ic="symbol_upload"></button>
+        <input type="file" id="fm6file" accept=".syx,.SYX,.bin,application/octet-stream" hidden>
+        <button id="fm6export" data-t="fm6Export" data-ic="symbol_download"></button>
+        <button id="fm6bankexp" data-t="fm6BankExport" data-ic="symbol_download"></button>
+        <button id="fm6init" data-t="fm6Init"></button></p>
+      <div id="fm6imported"></div>
+    </div>
+    <div class="group">
+      <h2 data-t="fm6Voice" data-ic="ui_knob"></h2>
+      <div id="fm6voice"></div>
+    </div>
+    <div class="group">
+      <h2 data-t="fm6Ops" data-ic="function_env_adsr_exp"></h2>
+      <div id="fm6ops"></div>
+    </div>
+  </section>
+
   <section class="panel" id="p-projects" data-tab="projects" data-dev hidden>
+    <div class="group">
     <h2 data-t="projects" data-ic="symbol_folder"></h2>
     <p class="dim" data-t="projHelp"></p>
     <div class="slots" id="slots"></div>
-    <div id="backup-panel" style="margin-top:16px">
+    </div>
+    <div id="backup-panel" class="group">
       <h2 data-t="backupTitle"></h2>
       <p class="bar"><button id="backup-export" data-t="backupExport"></button>
         <button id="backup-import" data-t="backupImport"></button><input id="backup-file" type="file" accept=".json,application/json" hidden></p>
@@ -393,12 +534,14 @@
     </div>
   </section>
 
-  <footer><a href="https://github.com/keremimo/melodee" target="_blank" rel="noopener">Melodee</a> by Ellic Studio,
+  <footer><b>Hookology</b>, a fork of <a href="https://github.com/keremimo/melodee" target="_blank" rel="noopener">Melodee</a> by Ellic Studio,
     based on <a href="https://github.com/hugelton/Felucca" target="_blank" rel="noopener">Felucca</a> by Leo Kuroshita (@kurogedelic),
-    <a href="https://hugelton.com" target="_blank" rel="noopener">Hügelton Instruments</a>. GPL-3.0.<br>
+    <a href="https://hugelton.com" target="_blank" rel="noopener">Hügelton Instruments</a>. Editor layout after
+    <a href="https://github.com/isod89/sloop-fm1" target="_blank" rel="noopener">SLOOP</a>. GPL-3.0.<br>
     <span data-t="foot"></span> M-VAVE and FM-1 are trademarks of their respective owners.<br>
-    <a href="FUKIAI-LICENSE.txt" data-t="iconsCredit"></a></footer>
+    <a href="FUKIAI-LICENSE.txt" data-t="iconsCredit"></a> · Fonts: Figtree, Unbounded (<a href="OFL-Figtree.txt">SIL OFL 1.1</a>)</footer>
 </main>
+</div>
 <script>
 "use strict";
 /*PROTO-BEGIN*/
@@ -2901,6 +3044,220 @@ function devicePresetRows(info, names, preferences) {
     .filter((row) => !preferences.state.filter || row.favorite);
 }
 
+/* ---- (Hookology) the piano roll and MIDI files, after SLOOP 2.5 (isod89/sloop-fm1, GPL-3.0) ----
+   A synth track's steps as a piano roll. A NOTE step starts a chord (up to 4 notes, one length for all of them:
+   the device ties every note of a step), the TIE steps after it hold it, a REST is silence. ROLL never changes
+   its input: it returns the steps to write, as a Map index -> new step. */
+const ROLL = {
+  DIV_PER_BAR: [4, 8, 16, 32, 12, 24, 2, 1, 0.5, 0.25],   /* steps in a 4/4 bar for DIV (params.c N_DIV) */
+  LENGTHS: [["len1", 1], ["len2", 1 / 2], ["len4", 1 / 4], ["len8", 1 / 8], ["len16", 1 / 16]],
+  steps: (frac, div) => Math.max(1, Math.round((ROLL.DIV_PER_BAR[div] ?? 16) * frac)),
+  rest: () => ({ n: 0, notes: [0, 0, 0, 0], time: 2, flags: 0, vel: 0, hit: 0, acc: 0 }),
+  tie: () => ({ n: 0, notes: [0, 0, 0, 0], time: 1, flags: 0, vel: 0, hit: 0, acc: 0 }),
+  isNote: (s) => !!s && s.time === 0 && s.n > 0,
+  chords(steps, len) {
+    const out = [];
+    for (let i = 0; i < len; i++) {
+      const s = steps[i];
+      if (!ROLL.isNote(s)) continue;
+      let d = 1;
+      while (i + d < len && steps[i + d] && steps[i + d].time === 1) d++;
+      out.push({ at: i, dur: d, notes: s.notes.slice(0, s.n), vel: s.vel, flags: s.flags });
+    }
+    return out;
+  },
+  owner(steps, i) {
+    for (let k = i; k >= 0; k--) {
+      const s = steps[k];
+      if (ROLL.isNote(s)) return k;
+      if (!s || s.time !== 1) return -1;
+    }
+    return -1;
+  },
+  _cutTies(steps, len, end, out) {
+    for (let k = end; k < len && steps[k] && steps[k].time === 1 && !out.has(k); k++) out.set(k, ROLL.rest());
+  },
+  /* note `pitch` at step `at` for `dur` steps: on a chord's first step added to it (at most 4); inside a held chord
+     that chord ends there and a new one starts; elsewhere a new chord */
+  place(steps, len, at, pitch, dur) {
+    const out = new Map(), s = steps[at];
+    if (at < 0 || at >= len) return out;
+    if (ROLL.isNote(s)) {
+      if (s.notes.slice(0, s.n).includes(pitch) || s.n >= 4) return out;
+      const notes = s.notes.slice(0, s.n).concat(pitch);
+      out.set(at, { ...s, n: notes.length, notes: notes.concat([0, 0, 0, 0]).slice(0, 4) });
+      return out;
+    }
+    out.set(at, { n: 1, notes: [pitch, 0, 0, 0], time: 0, flags: 0, vel: 96, hit: 0, acc: 0 });
+    let k = 1;
+    for (; k < dur && at + k < len; k++) {
+      if (ROLL.isNote(steps[at + k])) break;
+      out.set(at + k, ROLL.tie());
+    }
+    ROLL._cutTies(steps, len, at + k, out);
+    return out;
+  },
+  remove(steps, len, at, pitch) {
+    const out = new Map(), s = steps[at];
+    if (!ROLL.isNote(s)) return out;
+    const notes = s.notes.slice(0, s.n).filter((n) => n !== pitch);
+    if (notes.length === s.n) return out;
+    if (notes.length) { out.set(at, { ...s, n: notes.length, notes: notes.concat([0, 0, 0, 0]).slice(0, 4) }); return out; }
+    out.set(at, ROLL.rest());
+    ROLL._cutTies(steps, len, at + 1, out);
+    return out;
+  },
+  resize(steps, len, at, dur) {
+    const out = new Map();
+    if (!ROLL.isNote(steps[at])) return out;
+    let cur = 1;
+    while (at + cur < len && steps[at + cur] && steps[at + cur].time === 1) cur++;
+    dur = Math.max(1, Math.min(dur, len - at));
+    if (dur < cur) for (let k = dur; k < cur; k++) out.set(at + k, ROLL.rest());
+    else for (let k = cur; k < dur; k++) { if (ROLL.isNote(steps[at + k])) break; out.set(at + k, ROLL.tie()); }
+    return out;
+  },
+};
+
+/* Standard MIDI Files (format 0 out; format 0 / 1 in) */
+const SMF = {
+  PPQ: 96,
+  stepTicks: (div, ppq = SMF.PPQ) => Math.round(ppq * 4 / (ROLL.DIV_PER_BAR[div] ?? 16)),
+  vlq(n) { const a = [n & 0x7F]; while ((n >>= 7)) a.unshift(0x80 | (n & 0x7F)); return a; },
+  write(notes, { ppq = SMF.PPQ, bpm = 120, ch = 0, name = "" } = {}) {
+    const ev = [];
+    for (const n of notes) {
+      ev.push({ t: n.t, o: 1, b: [0x90 | ch, n.key & 0x7F, Math.max(1, Math.min(127, n.vel | 0))] });
+      ev.push({ t: n.t + Math.max(1, n.dur), o: 0, b: [0x80 | ch, n.key & 0x7F, 0] });
+    }
+    ev.sort((a, b) => a.t - b.t || a.o - b.o);
+    const us = Math.round(60000000 / Math.max(1, bpm));
+    const nm = Array.from(String(name), (c) => c.charCodeAt(0) & 0x7F);
+    const tr = [0, 0xFF, 0x51, 3, (us >> 16) & 255, (us >> 8) & 255, us & 255, 0, 0xFF, 0x58, 4, 4, 2, 24, 8];
+    if (nm.length) tr.push(0, 0xFF, 0x03, ...SMF.vlq(nm.length), ...nm);
+    let last = 0;
+    for (const e of ev) { tr.push(...SMF.vlq(e.t - last), ...e.b); last = e.t; }
+    tr.push(0, 0xFF, 0x2F, 0);
+    const u32 = (n) => [(n >>> 24) & 255, (n >> 16) & 255, (n >> 8) & 255, n & 255];
+    return Uint8Array.from([0x4D, 0x54, 0x68, 0x64, ...u32(6), 0, 0, 0, 1, (ppq >> 8) & 255, ppq & 255,
+      0x4D, 0x54, 0x72, 0x6B, ...u32(tr.length), ...tr]);
+  },
+  read(bytes) {
+    const d = bytes instanceof Uint8Array ? bytes : Uint8Array.from(bytes);
+    const str = (o) => String.fromCharCode(d[o], d[o + 1], d[o + 2], d[o + 3]);
+    const u32 = (o) => ((d[o] << 24) | (d[o + 1] << 16) | (d[o + 2] << 8) | d[o + 3]) >>> 0;
+    if (d.length < 14 || str(0) !== "MThd") throw new Error("not a MIDI file");
+    const format = (d[8] << 8) | d[9], ntrk = (d[10] << 8) | d[11], div = (d[12] << 8) | d[13];
+    if (div & 0x8000) throw new Error("SMPTE time is not supported");
+    let o = 8 + u32(4), bpm = 0;
+    const tracks = [];
+    for (let k = 0; k < ntrk && o + 8 <= d.length; k++) {
+      if (str(o) !== "MTrk") { o += 8 + u32(o + 4); k--; if (o >= d.length) break; continue; }
+      const end = Math.min(d.length, o + 8 + u32(o + 4));
+      let p = o + 8, t = 0, run = 0, name = "";
+      const on = new Map(), notes = [];
+      const vlq = () => { let n = 0, c; do { c = d[p++]; n = (n << 7) | (c & 0x7F); } while (c & 0x80 && p < end); return n; };
+      const off = (ch, key) => {
+        const q = on.get(ch * 128 + key);
+        if (q && q.length) { const n = q.shift(); n.dur = Math.max(1, t - n.t); notes.push(n); }
+      };
+      while (p < end) {
+        t += vlq();
+        let st = d[p];
+        if (st & 0x80) p++; else st = run;
+        if (st === 0xFF) {
+          const type = d[p++], len = vlq();
+          if (type === 0x51 && len === 3 && !bpm) bpm = 60000000 / ((d[p] << 16) | (d[p + 1] << 8) | d[p + 2]);
+          if (type === 0x03 && !name) name = String.fromCharCode(...d.subarray(p, p + len)).replace(/[^\x20-\x7E]/g, "");
+          p += len;
+          continue;
+        }
+        if (st === 0xF0 || st === 0xF7) { p += vlq(); continue; }
+        run = st;
+        const hi = st & 0xF0, ch = st & 15;
+        const a = d[p++], b = hi === 0xC0 || hi === 0xD0 ? 0 : d[p++];
+        if (hi === 0x90 && b) {
+          const q = on.get(ch * 128 + a) || [];
+          q.push({ t, dur: 0, key: a, vel: b, ch });
+          on.set(ch * 128 + a, q);
+        } else if (hi === 0x80 || (hi === 0x90 && !b)) off(ch, a);
+      }
+      for (const [, q] of on) for (const n of q) { n.dur = Math.max(1, t - n.t); notes.push(n); }
+      notes.sort((x, y) => x.t - y.t || x.key - y.key);
+      tracks.push({ name, notes });
+      o = end;
+    }
+    return { format, ppq: div || SMF.PPQ, bpm: Math.round(bpm || 120), tracks };
+  },
+  /* a synth track's steps -> notes (an accent plays at 127) */
+  fromSteps(steps, len, div, ppq = SMF.PPQ) {
+    const tk = SMF.stepTicks(div, ppq), out = [];
+    for (const c of ROLL.chords(steps, len)) {
+      const s = steps[c.at], vel = s.flags & 1 ? 127 : s.vel || 96;
+      for (const key of c.notes) out.push({ t: c.at * tk, dur: c.dur * tk - Math.max(1, tk >> 4), key, vel });
+    }
+    return out;
+  },
+  /* the DRUM track's steps -> GM notes on their lanes (a hit lasts a quarter of its step) */
+  fromDrums(steps, len, div, ppq = SMF.PPQ) {
+    const tk = SMF.stepTicks(div, ppq), out = [];
+    for (let i = 0; i < len; i++) {
+      const s = steps[i];
+      if (!s) continue;
+      const lanes = stepLanes(s), acc = stepAccents(s);
+      for (let l = 0; l < LANES.length; l++)
+        if (lanes >> l & 1) out.push({ t: i * tk, dur: Math.max(1, tk >> 2), key: LANE_NOTE[l], vel: acc >> l & 1 ? 127 : s.vel || 100 });
+    }
+    return out;
+  },
+  /* notes -> a track's steps at DIV div, at most nstep, and a report of what changed on the way */
+  toSteps(notes, ppq, div, nstep, drum = false) {
+    const tk = ppq * 4 / (ROLL.DIV_PER_BAR[div] ?? 16);
+    const rep = { notes: notes.length, steps: 0, moved: 0, chordCut: 0, overlap: 0, dropped: 0, merged: 0 };
+    const at = new Map();
+    for (const n of notes) {
+      const pos = n.t / tk, i = Math.round(pos);
+      if (Math.abs(pos - i) > 0.25) rep.moved++;
+      if (i >= nstep) { rep.dropped++; continue; }
+      if (!at.has(i)) at.set(i, []);
+      at.get(i).push({ ...n, end: Math.max(i + 1, Math.round((n.t + n.dur) / tk)) });
+    }
+    const steps = Array.from({ length: nstep }, ROLL.rest);
+    let last = -1;
+    if (drum) {                                       /* hits on the lanes; 116 and up accented */
+      for (const [i, list] of at) {
+        let hit = 0, acc = 0, vel = 0;
+        for (const n of list) {
+          const l = drumLane(n.key);
+          if (hit >> l & 1) { rep.merged++; continue; }
+          hit |= 1 << l; if (n.vel >= 116) acc |= 1 << l; vel = Math.max(vel, n.vel);
+        }
+        steps[i] = { n: 0, notes: [0, 0, 0, 0], time: 0, flags: 0, vel: Math.min(115, vel) || 100, hit, acc };
+        last = Math.max(last, i);
+      }
+      rep.steps = last + 1;
+      return { steps, len: Math.max(1, last + 1), report: rep };
+    }
+    const starts = [...at.keys()].sort((a, b) => a - b);
+    starts.forEach((i, k) => {
+      let list = at.get(i);
+      const keys = new Set();
+      list = list.filter((n) => (keys.has(n.key) ? (rep.merged++, false) : keys.add(n.key)));
+      if (list.length > 4) { rep.chordCut += list.length - 4; list = list.slice().sort((a, b) => b.vel - a.vel).slice(0, 4); }
+      list.sort((a, b) => a.key - b.key);
+      const vel = Math.max(...list.map((n) => n.vel));
+      let end = Math.min(nstep, Math.max(...list.map((n) => n.end)));
+      const next = k + 1 < starts.length ? starts[k + 1] : nstep;
+      if (end > next) { rep.overlap++; end = next; }
+      steps[i] = { n: list.length, notes: list.map((n) => n.key).concat([0, 0, 0, 0]).slice(0, 4), time: 0, flags: 0, vel, hit: 0, acc: 0 };
+      for (let j = i + 1; j < end; j++) steps[j] = ROLL.tie();
+      last = Math.max(last, end - 1);
+    });
+    rep.steps = last + 1;
+    return { steps, len: Math.max(1, last + 1), report: rep };
+  },
+};
+
 /*PROTO-END*/
 
 /* ===================================================================== UI === */
@@ -2999,6 +3356,19 @@ const TEXT = {
     load: "読込", save: "保存", used: "使用中", empty: "空", unknown: "—",
     steps: "ステップ", reload: "再読み込み", clearSeq: "シーケンスを消去",
     notesHelp: "ノートは C4 E4 G4 のように入力（最大 4 音、C4 = 60）。ヒットは DRUM のレーン名（KICK >SNARE HATCL、> はアクセント）。",
+    viewGrid: "ステップ", viewRoll: "ピアノロール", midiExport: "MIDI を書き出す", midiImportBtn: "MIDI を読み込む",
+    rollLen: "新しいノート", len1: "1/1", len2: "1/2", len4: "1/4", len8: "1/8", len16: "1/16", octUp: "オクターブ上", octDown: "オクターブ下",
+    rollHelp: "空いた所をクリックで選んだ長さのノート（和音の最初のステップなら音を追加、最大 4）。ノートをクリックで削除。右端をドラッグで長さを変更。変更はすぐ FM-1 へ。",
+    midiEmpty: "書き出すノートがありません。", midiSaved: "MIDI ファイルに保存しました。ノート: ", midiBad: "読めない MIDI ファイルです: ",
+    midiPreview: "読み込み", midiNoNotes: "このファイルにはノートがありません。", midiCancel: "キャンセル", midiTrack: "トラック", midiSource: "使うトラック",
+    midiNotes: "ノート {n}", midiGrid: "トラックの DIV（{div}）に配置", midiSteps: "{max} ステップ中 {n}",
+    midiMoved: "グリッド外の {n} ノートを最寄りのステップへ", midiChord: "1 ステップ 4 音を超える {n} ノートを省略",
+    midiOverlap: "{n} の和音が次で短くなります", midiMerged: "同じステップの重複 {n} ノートをまとめます",
+    midiDropped: "{max} ステップより後の {n} ノートを省略", midiClean: "そのままグリッドに収まります。",
+    midiHow: "このトラックのパターンを置き換えます。各ステップにそこで始まるノート（最大 4）、長さはタイで。",
+    midiHowDrum: "ドラムのパターンを置き換えます。GM ドラムノートをレーンへ（36 KICK、38 SNARE、42 HATCL …）、116 以上はアクセント。",
+    midiSetLen: "長さを {n} ステップに", midiImport: "読み込む", midiConfirm: "このトラックのパターンをファイルのノートで置き換えますか？",
+    midiDone: "読み込みました。ノート: ",
     notes: "ノート", hits: "ヒット", time: "タイム", acc: "アクセント", slide: "スライド", vel: "ベロシティ",
     foot: "Chrome か Edge で使えます。", iconsCredit: "アイコン: Fukiai（MIT）Hügelton Instruments",
     nomidi: "このブラウザでは使えません。Chrome か Edge で開いてください。",
@@ -3021,6 +3391,7 @@ const TEXT = {
     confirmErase: "USR{n} を消去しますか？", confirmUpload: "USR{n} に書き込みますか？ 今の内容は消えます。",
     layout: "（ファームウェアのパラメーター数が想定と違うため、簡易表示にしています）",
     ctlHelp: "スライダーはクリックしてからホイールか矢印キーで微調整（Shift で 10 ずつ）、ダブルクリックで初期値。",
+    dragHelp: "上下にドラッグで変更（Shift で細かく）、ダブルクリックで初期値",
     live: "● リアルタイム", polling: "○ ポーリング（古いファームウェア）",
     library: "ライブラリ", libSearch: "名前・タグで検索", allEngines: "全エンジン", allTags: "全タグ",
     sortModified: "更新順", sortCreated: "作成順", sortName: "名前順", sortEngine: "エンジン順",
@@ -3093,6 +3464,19 @@ const TEXT = {
     load: "Load", save: "Save", used: "used", empty: "empty", unknown: "—",
     steps: "Steps", reload: "Reload", clearSeq: "Clear sequence",
     notesHelp: "Enter notes like C4 E4 G4 (up to 4, C4 = 60). Hits are DRUM lanes: KICK >SNARE HATCL (> = accent).",
+    viewGrid: "Steps", viewRoll: "Piano roll", midiExport: "Export MIDI", midiImportBtn: "Import MIDI",
+    rollLen: "New note", len1: "1/1", len2: "1/2", len4: "1/4", len8: "1/8", len16: "1/16", octUp: "Octave up", octDown: "Octave down",
+    rollHelp: "Click an empty spot: a note of the chosen length (on a chord's first step: one more note of it, 4 at most). Click a note: it goes. Drag a note's right end: shorter or longer. Every change goes to the FM-1 at once.",
+    midiEmpty: "This track has no notes to export.", midiSaved: "Saved as a MIDI file. Notes: ", midiBad: "Not a MIDI file the editor can read: ",
+    midiPreview: "Import", midiNoNotes: "This file has no notes.", midiCancel: "Cancel", midiTrack: "track", midiSource: "Take the notes of",
+    midiNotes: "{n} notes", midiGrid: "placed on the track's DIV grid ({div})", midiSteps: "{n} of {max} steps",
+    midiMoved: "{n} notes off the grid move to the nearest step", midiChord: "{n} notes over 4 on a step are left out (the quietest)",
+    midiOverlap: "{n} chords are cut short by the next one", midiMerged: "{n} repeated notes on a step are merged",
+    midiDropped: "{n} notes after step {max} are left out", midiClean: "Everything fits the grid as it is.",
+    midiHow: "Replaces this track's pattern: each step gets the notes that start on it (up to 4), held over the steps they last.",
+    midiHowDrum: "Replaces this drum track's pattern: GM drum notes go to their lanes (36 KICK, 38 SNARE, 42 HATCL …), 116 and up accented.",
+    midiSetLen: "Set the length to {n} steps", midiImport: "Import", midiConfirm: "Replace this track's pattern with the file's notes?",
+    midiDone: "Imported. Notes: ",
     notes: "Notes", hits: "Hits", time: "Time", acc: "Accent", slide: "Slide", vel: "Velocity",
     foot: "Works in Chrome or Edge.", iconsCredit: "Icons: Fukiai (MIT), Hügelton Instruments",
     nomidi: "This browser cannot do it. Open the page in Chrome or Edge.",
@@ -3114,7 +3498,8 @@ const TEXT = {
     smpFail: "Sample upload failed: ", smpErased: "Erased USR",
     confirmErase: "Erase USR{n}?", confirmUpload: "Write to USR{n}? Its current contents will be replaced.",
     layout: "(The firmware has a different parameter count; showing a plain list.)",
-    ctlHelp: "Sliders: click, then fine-tune with the wheel or arrow keys (Shift: steps of 10); double-click resets.",
+    ctlHelp: "Drag a value up or down like a knob (Shift: fine). Sliders: the wheel or arrow keys (Shift: steps of 10). Double-click resets.",
+    dragHelp: "Drag up or down (Shift: fine). Double-click resets.",
     live: "● Live", polling: "○ Polling (older firmware)",
     library: "Library", libSearch: "Search name or tag", allEngines: "All engines", allTags: "All tags",
     sortModified: "Recently changed", sortCreated: "Recently added", sortName: "Name", sortEngine: "Engine",
@@ -3135,13 +3520,13 @@ const TEXT = {
     putDone: "Written to the device: slot ", storedSlot: "Stored on the device: slot ", erasedSlot: "Erased slot ",
     loadedUser: "Sound loaded (the sequence stays; its pattern is on the device under SEQ > PHRASES; hold EDIT to undo): ", reloaded: "The sound changed on the device: read again", readingBank: "Reading the slots",
     badEngine: "This firmware has no such engine: ", flashFail: "Write failed (rc {rc})",
-    installer: "Melodee installer",
+    installer: "Hookology installer",
     tabSeq: "Sequencer", tabTracks: "Tracks", tabSettings: "Settings",
     needDevice: "Connect the FM-1 to edit.", smpNone: "This firmware has no user sample slots.",
     bankConnect: "Connect the FM-1 to see its user presets too.", bankNone: "This firmware has no user presets.",
-    mixer: "Mixer", mixHelp: "The four tracks of the device's MIXER page. The fader is the level. Pan is written to any track without changing the selection (firmware 0.8: by selecting it for a moment). REC shows a track armed for live recording on the device.",
+    mixer: "Mixer", mixHelp: "The tracks of the device's MIXER page. The fader is the level. Pan is written to any track without changing the selection (firmware 0.8: by selecting it for a moment). REC shows a track armed for live recording on the device.",
     level: "Level", pan: "Pan", mute: "Mute", rec: "REC", selectTrack: "Select", selectedTrack: "Selected",
-    projHelp: "A project keeps the sounds and patterns of all four tracks, the song chain, the selected track and the global settings.",
+    projHelp: "A project keeps the sounds and patterns of every track, the song chain, the selected track and the global settings.",
     slot: "Slot", songTitle: "Song", songHelp: "Arrange patterns from saved slots and choose their repeats. The current sounds stay. Save a project above to keep the chain. Rows change at the end of track 1; the song stops at the end.", songAdd: "Add row", songRemove: "Remove last row", songPlay: "Play from start", songStop: "Stop", songReps: "repeats", songLoop: "Loop song", songEmpty: "Add a row first", songBusy: "Stop before editing", songInvalid: "Check slots and repeats", songPlaying: "Playing row", songSaved: "Chain changed. Save a project to keep it.",
     system: "System", firmware: "Firmware", sync: "Sync", tracksN: "Tracks", stepsN: "Steps", enginesL: "Engines",
     smpSlots: "Sample slots", userBank: "User presets", none: "none",
@@ -3166,10 +3551,22 @@ function applyLang() {
   renderPanels();
 }
 $("lang").addEventListener("click", () => { lang = lang === "ja" ? "en" : "ja"; applyLang(); });
+/* (Hookology) Stage (dark) or Daylight (light), kept in this browser */
+const THEME_KEY = "hookology-editor-theme";
+function applyTheme(v) {
+  document.documentElement.dataset.theme = v === "light" ? "light" : "dark";
+  $("themebtn").textContent = v === "light" ? "Stage (dark)" : "Daylight (light)";
+}
+try { applyTheme(localStorage.getItem(THEME_KEY)); } catch (e) { applyTheme("dark"); }
+$("themebtn").addEventListener("click", () => {
+  const v = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  applyTheme(v);
+  try { localStorage.setItem(THEME_KEY, v); } catch (e) { /* no storage */ }
+});
 
 /* ---------------------------------------------------------------- tabs --- */
 /* one panel at a time; the last one is remembered (localStorage) and in the URL hash (#sound ...) */
-const TABS = ["sound", "fm6", "sequencer", "tracks", "library", "projects", "settings"];
+const TABS = ["sound", "sequencer", "tracks", "library", "fm6", "projects", "settings"];   /* (the sidebar's order) */
 const TAB_KEY = "felucca-editor-tab";
 const TRACK_TABS = new Set(["sound", "sequencer", "tracks"]);
 let tab = (() => {
@@ -3209,13 +3606,15 @@ function renderPanels() {
     if (mine && "dev" in p.dataset && !dev) hint = "needDevice";   /* (while connecting the status line says it) */
     p.hidden = !show;
   }
+  const tb = $("tabs").querySelector(`button[data-tab="${want}"]`);   /* (Hookology) the page's title */
+  if (tb) $("pagetitle").textContent = [...tb.childNodes].filter((n) => !(n.classList && n.classList.contains("ic"))).map((n) => n.textContent).join("").trim();
   $("hint").hidden = !hint;
   if (hint) $("hint").textContent = t(hint);
   $("trackbar").hidden = !(ready && hasTracks() && TRACK_TABS.has(want));
 }
 $("tabs").addEventListener("click", (e) => { const b = e.target.closest("button[data-tab]"); if (b) showTab(b.dataset.tab); });
 $("tabs").addEventListener("keydown", (e) => {          /* arrow keys move between the tabs */
-  const dir = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+  const dir = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 1, ArrowUp: -1 }[e.key];
   if (!dir) return;
   const bs = [...$("tabs").querySelectorAll("button[data-tab]:not([hidden])")];
   const i = bs.findIndex((b) => b.getAttribute("aria-selected") === "true");
@@ -3513,13 +3912,22 @@ function buildUI() {
 /* the track selector (v3): the four parts; the editor shows the selected one */
 function renderTrackbar() {
   const box = $("trackbtns");
-  const ntrk = hasTracks() ? dev.info.ntrk : 0;
+  const ntrk = hasTracks() ? (dev.mix && dev.mix.ntrk) || dev.info.ntrk : 0;   /* (the tracks in use now: up to eight) */
   if (box.children.length !== ntrk || box.dataset.lang !== lang) {
     box.dataset.lang = lang;
-    box.replaceChildren(...Array.from({ length: ntrk }, (_, i) => el("button", { type: "button", "data-i": i,
-      onclick: () => selectTrack(i) }, String(i + 1))));
+    box.replaceChildren(...Array.from({ length: ntrk }, (_, i) => el("button", { type: "button", "data-i": i, class: `tc${i % 4 + 1}`,
+      onclick: () => selectTrack(i) }, el("span", { class: "badge", text: String(i + 1) }),
+      el("span", { class: "tn" }, el("b"), el("small")))));
   }
-  for (const b of box.children) b.setAttribute("aria-pressed", +b.dataset.i === (dev.sel || 0) ? "true" : "false");
+  for (const b of box.children) {                  /* (Hookology) each track: its sound and engine, from the mixer read */
+    const i = +b.dataset.i, x = dev.mix && dev.mix.tracks[i];
+    b.setAttribute("aria-pressed", i === (dev.sel || 0) ? "true" : "false");
+    const eng = x ? engineLabel(dev.info.engines, x.engine) : "";
+    const name = x ? (eng === "MIDI Track" ? `MIDI ${i + 1}` : (dev.names[x.engine] || [])[x.preset] || eng) : `${t("track")} ${i + 1}`;
+    b.querySelector(".tn b").textContent = name;
+    b.querySelector(".tn small").textContent = eng === "MIDI Track" ? "MIDI" : eng;
+    b.title = `${t("track")} ${i + 1}: ${name}`;
+  }
 }
 function selectTrack(i) {
   if (!dev || !hasTracks() || i === dev.sel) return;
@@ -3602,7 +4010,7 @@ function buildGroups() {
         if (!rows.length) continue;
         const tt = g.engine && (dev.titles[dev.dump.engine] || [])[g.pages.findIndex((x) => x[0] === title)];
         if (g.pages.length > 1) div.append(el("h3", { ic: PAGE_IC[tt || title], text: tt || title }));
-        div.append(...rows);
+        div.append(el("div", { class: "page" }, ...rows));   /* (Hookology) a page: four knob tiles, as on the FM-1 */
       }
       groups[g.tab || "groups"].push(div);
     }
@@ -3715,6 +4123,23 @@ function paramRow(s, id) {
   }
   input.title = d.label;
   const out = el("span", { class: "v" });
+  if (input.type === "range") {                    /* (Hookology) the value drags up / down like a knob; Shift: fine */
+    let y0 = 0, v0 = 0;
+    out.title = t("dragHelp");
+    out.addEventListener("pointerdown", (e) => {
+      if (e.button) return;
+      dragging = k; y0 = e.clientY; v0 = +input.value;
+      out.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    out.addEventListener("pointermove", (e) => {
+      if (dragging !== k || !out.hasPointerCapture(e.pointerId)) return;
+      const span = d.max - d.min, px = e.shiftKey ? 600 : Math.max(120, Math.min(260, span * 3));
+      const nv = Math.max(d.min, Math.min(d.max, Math.round(v0 + (y0 - e.clientY) * span / px)));
+      if (nv !== +input.value) { input.value = String(nv); userSet(s, id, nv, false); }
+    });
+    out.addEventListener("dblclick", () => { input.value = d.def; userSet(s, id, d.def, true); });
+  }
   const row = el("div", { class: "row" }, el("span", { text: d.label }), input, out);
   ctl.set(k, { input, out, desc: d, scope: s, id, row });
   showValue(k, s ? dev.dump.g[id] : dev.dump.p[id], true);
@@ -4019,7 +4444,7 @@ function renderSteps() {
   $("noteshelp").textContent = t("notesHelp");
   renderGrid();
   /* keep the rows the user is typing in */
-  if (box.contains(document.activeElement) && box.dataset.len === shape) { updateStepRows(); return; }
+  if (box.contains(document.activeElement) && box.dataset.len === shape) { updateStepRows(); renderSeqView(); return; }
   box.dataset.len = shape;
   const tables = [];
   for (let b = 0; b < len; b += 16) {
@@ -4028,7 +4453,7 @@ function renderSteps() {
     for (let i = b; i < Math.min(len, b + 16); i++) tb.append(stepRow(i));
     tables.push(tb);
   }
-  box.replaceChildren(...tables);
+  box.replaceChildren(...tables);  renderSeqView();
 }
 function stepRow(i) {
   const notes = el("input", { type: "text", placeholder: "—", spellcheck: "false" });
@@ -4089,7 +4514,7 @@ function renderGrid() {
     b.className = [on && "on", tie && "tie", on && s.flags & 1 && "acc", i % 4 === 0 && "beat"].filter(Boolean).join(" ");
     b.title = `${i + 1}: ${on ? txt : tie ? "TIE" : "REST"}${marks}`;
     b.replaceChildren(el("span", { class: "n", text: String(i + 1) + marks }), el("span", { class: "x", text: txt }));
-  }
+  }  if (typeof RV !== "undefined" && !$("roll").hidden) renderRoll();
 }
 function focusStep(i) {
   const tr = $("steptables").querySelector(`tr[data-i="${i}"]`);
@@ -4139,6 +4564,249 @@ $("clearseq").addEventListener("click", async () => {
   } catch (err) { report(err); } finally { releaseBusy(); }
 });
 
+/* ---- (Hookology) the piano roll and MIDI files, after SLOOP 2.5: ROLL and SMF are with the protocol (tested) ---- */
+const RV = { view: "grid", frac: 1 / 16, lo: null, rows: 25, trk: -1, drag: null, geo: null };
+try { if (localStorage.getItem("hookology-seq-view") === "roll") RV.view = "roll"; } catch (e) { /* no storage */ }
+const ROLL_ROW = 18, ROLL_LAB = 44;
+const isDrumTrack = () => !!dev && !!dev.dump && dev.info.engines[dev.dump.engine] === "DRUM";
+const curDiv = () => { const i = pById("DIV", -1); return Math.max(0, Math.min(ROLL.DIV_PER_BAR.length - 1, i >= 0 ? dev.dump.p[i] | 0 : 2)); };
+const gBpm = () => { const i = dev.gdesc.findIndex((d) => d && d.label === "BPM"); return i >= 0 ? dev.dump.g[i] : 120; };
+function setLen(v) {
+  if (!dev || !dev.dump) return;
+  v = Math.max(1, Math.min(dev.info.nstep, Math.round(v) || 1));
+  if (v !== stepLen()) userSet(0, pSlen(), v, true);
+}
+/* the view: the roll only for a synth track */
+function renderSeqView() {
+  if (!dev || !dev.dump) return;
+  const roll = RV.view === "roll" && !isDrumTrack();
+  $("viewseg").hidden = isDrumTrack();
+  for (const b of $("viewseg").children) b.setAttribute("aria-pressed", b.dataset.v === (roll ? "roll" : "grid") ? "true" : "false");
+  $("roll").hidden = !roll;
+  $("steptables").hidden = roll;
+  if (roll) renderRoll();
+}
+function setView(v) {
+  RV.view = v;
+  try { localStorage.setItem("hookology-seq-view", v); } catch (e) { /* no storage */ }
+  renderSeqView();
+}
+for (const b of $("viewseg").children) b.addEventListener("click", () => setView(b.dataset.v));
+
+function rollColors() {
+  const cs = getComputedStyle(document.documentElement), g = (v) => cs.getPropertyValue(v).trim();
+  return { well: g("--well"), surface: g("--surface"), line: g("--line"), dim: g("--dim"), fg: g("--fg"), bg: g("--bg"),
+    trk: g(`--t${(dev.sel || 0) % 4 + 1}`) || g("--accent") };
+}
+function rollFit(len) {                                  /* around the track's notes, the first time a track shows */
+  const tr = dev.sel || 0;
+  if (RV.trk === tr && RV.lo != null) return;
+  RV.trk = tr;
+  const ns = ROLL.chords(dev.steps, len).flatMap((c) => c.notes);
+  if (!ns.length) { RV.lo = 48; RV.rows = 25; return; }
+  const lo = Math.min(...ns), hi = Math.max(...ns);
+  RV.rows = Math.max(25, Math.min(49, hi - lo + 7));
+  RV.lo = Math.max(0, Math.min(128 - RV.rows, Math.round((lo + hi) / 2 - RV.rows / 2)));
+}
+function renderRollTools() {
+  const box = $("rolllen");
+  if (!box.children.length || box.dataset.lang !== lang) {
+    box.dataset.lang = lang;
+    box.replaceChildren(...ROLL.LENGTHS.map(([k, f]) => el("button", { type: "button", "data-f": String(f), onclick: () => { RV.frac = f; renderRollTools(); } }, t(k))));
+  }
+  for (const b of box.children) b.setAttribute("aria-pressed", +b.dataset.f === RV.frac ? "true" : "false");
+}
+function renderRoll() {
+  const cv = $("rollcv");
+  if (!dev || !dev.steps.length || $("roll").hidden) return;
+  const len = stepLen();
+  rollFit(len);
+  renderRollTools();
+  const lo = RV.lo, rows = RV.rows, hi = lo + rows - 1;
+  const avail = Math.max(320, (cv.parentElement.clientWidth || 800) - 2);
+  const cw = Math.max(14, Math.floor((avail - ROLL_LAB) / len));
+  const W = ROLL_LAB + cw * len, H = rows * ROLL_ROW, dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + "px"; cv.style.height = H + "px";
+  const g = cv.getContext("2d"), C = rollColors();
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  RV.geo = { lo, hi, cw, len };
+  g.fillStyle = C.well; g.fillRect(0, 0, W, H);
+  g.font = '700 11px Figtree, system-ui, sans-serif'; g.textBaseline = "middle";
+  for (let r = 0; r < rows; r++) {
+    const p = hi - r, black = [1, 3, 6, 8, 10].includes(p % 12);
+    g.fillStyle = black ? C.bg : C.surface; g.fillRect(ROLL_LAB, r * ROLL_ROW, W - ROLL_LAB, ROLL_ROW - 1);
+    g.fillStyle = black ? C.bg : C.line; g.fillRect(0, r * ROLL_ROW, ROLL_LAB - 2, ROLL_ROW - 1);
+    if (p % 12 === 0 || !black) { g.fillStyle = p % 12 === 0 ? C.fg : C.dim; if (p % 12 === 0 || rows <= 30) g.fillText(noteName(p), 6, r * ROLL_ROW + ROLL_ROW / 2); }
+  }
+  const per = ROLL.DIV_PER_BAR[curDiv()], beat = per / 4;
+  for (let i = 0; i <= len; i++) {
+    const bar = per >= 1 && i % per === 0, bt = Number.isInteger(beat) && beat >= 1 && i % beat === 0;
+    if (!bar && !bt) continue;
+    g.fillStyle = bar ? C.dim : C.line; g.fillRect(ROLL_LAB + i * cw - (bar ? 1 : 0), 0, bar ? 2 : 1, H);
+  }
+  for (const c of ROLL.chords(dev.steps, len)) {
+    const dur = RV.drag && RV.drag.at === c.at ? RV.drag.dur : c.dur, acc = dev.steps[c.at].flags & 1;
+    const x = ROLL_LAB + c.at * cw + 1, w = dur * cw - 2;
+    for (const p of c.notes) {
+      g.fillStyle = C.trk;
+      if (p > hi || p < lo) { g.fillRect(x, p > hi ? 0 : H - 3, w, 3); continue; }
+      const y = (hi - p) * ROLL_ROW + 2;
+      g.beginPath(); g.roundRect ? g.roundRect(x, y, w, ROLL_ROW - 5, 4) : g.rect(x, y, w, ROLL_ROW - 5); g.fill();
+      if (acc) { g.fillStyle = C.fg; g.fillRect(x + 2, y, w - 4, 2); }
+      g.fillStyle = "rgba(0,0,0,.35)"; g.fillRect(x + w - 5, y + 4, 2, ROLL_ROW - 13);   /* the grip: drag the end */
+    }
+  }
+  $("rollrange").textContent = `${noteName(lo)} – ${noteName(hi)}`;
+}
+function rollAt(e) {
+  const G = RV.geo, r = $("rollcv").getBoundingClientRect();
+  if (!G) return null;
+  const x = e.clientX - r.left - ROLL_LAB, y = e.clientY - r.top;
+  const i = Math.floor(x / G.cw), p = G.hi - Math.floor(y / ROLL_ROW);
+  return { i, p, fx: x / G.cw - i, inside: x >= 0 && i >= 0 && i < G.len && p >= G.lo && p <= G.hi };
+}
+function rollNoteAt(h) {
+  const own = ROLL.owner(dev.steps, h.i);
+  if (own < 0) return null;
+  const c = ROLL.chords(dev.steps, stepLen()).find((x) => x.at === own);
+  return c && c.notes.includes(h.p) ? c : null;
+}
+let rollWriting = false;
+async function rollApply(ch) {
+  if (!ch.size || rollWriting) { renderRoll(); return; }
+  rollWriting = true;
+  for (const [i, s] of ch) dev.steps[i] = { ...dev.steps[i], ...s, index: i };   /* (drawn at once, the device follows) */
+  renderGrid();
+  try { await writeSteps([...ch.keys()].sort((a, b) => a - b)); } catch (err) { report(err); }
+  finally { rollWriting = false; updateStepRows(); }
+}
+/* dev.steps[i] -> the device, keeping what it answers */
+async function writeSteps(idx) {
+  const release = beginBusy();
+  try {
+    for (const i of idx) {
+      const s = dev.steps[i];
+      stepEdit.set(i, performance.now());
+      dev.steps[i] = parse[CMD.STEP_SET](await rq(req.stepSet(i, { n: s.n, notes: s.notes, time: s.time, flags: s.flags,
+        vel: s.vel, hit: s.hit | 0, acc: s.acc | 0, ...(dev.info.chance ? { chance: s.chance ?? 100 } : {}) })));
+    }
+  } finally { release(); }
+}
+$("rollcv").addEventListener("pointerdown", (e) => {
+  if (!dev || rollWriting) return;
+  const h = rollAt(e);
+  if (!h || !h.inside) return;
+  const c = rollNoteAt(h), len = stepLen();
+  if (c) {
+    if (h.i === c.at + c.dur - 1 && h.fx > 0.55) {      /* the end of a note: drag its length */
+      RV.drag = { at: c.at, dur: c.dur };
+      $("rollcv").setPointerCapture(e.pointerId);
+      renderRoll();
+      return;
+    }
+    rollApply(ROLL.remove(dev.steps, len, c.at, h.p));
+    return;
+  }
+  rollApply(ROLL.place(dev.steps, len, h.i, h.p, ROLL.steps(RV.frac, curDiv())));
+});
+$("rollcv").addEventListener("pointermove", (e) => {
+  const h = rollAt(e);
+  if (RV.drag) {
+    if (!h) return;
+    const d = Math.max(1, Math.min(stepLen() - RV.drag.at, h.i - RV.drag.at + 1));
+    if (d !== RV.drag.dur) { RV.drag.dur = d; renderRoll(); }
+    return;
+  }
+  const c = h && h.inside ? rollNoteAt(h) : null;
+  $("rollcv").style.cursor = c && h.i === c.at + c.dur - 1 && h.fx > 0.55 ? "ew-resize" : "pointer";
+});
+$("rollcv").addEventListener("pointerup", () => {
+  if (!RV.drag) return;
+  const d = RV.drag;
+  RV.drag = null;
+  rollApply(ROLL.resize(dev.steps, stepLen(), d.at, d.dur));
+});
+$("rollcv").addEventListener("pointercancel", () => { RV.drag = null; renderRoll(); });
+$("rollup").addEventListener("click", () => { if (RV.lo != null) { RV.lo = Math.min(128 - RV.rows, RV.lo + 12); renderRoll(); } });
+$("rolldown").addEventListener("click", () => { if (RV.lo != null) { RV.lo = Math.max(0, RV.lo - 12); renderRoll(); } });
+window.addEventListener("resize", () => { if (RV.view === "roll") renderRoll(); });
+
+/* MIDI files: the selected track's pattern out as a .mid; a .mid in, a preview first */
+function midiExport() {
+  if (!dev || !dev.steps.length) return;
+  const len = stepLen(), div = curDiv(), tr = dev.sel || 0, drum = isDrumTrack();
+  const notes = drum ? SMF.fromDrums(dev.steps, len, div) : SMF.fromSteps(dev.steps, len, div);
+  if (!notes.length) { sayK("midiEmpty"); return; }
+  downloadBytes(`hookology-track${tr + 1}.mid`, SMF.write(notes, { bpm: gBpm(), ch: drum ? 9 : tr & 15, name: `Hookology track ${tr + 1}` }));
+  sayK("midiSaved", String(notes.length));
+}
+let MI = null;                                           /* the file being imported: {name, smf, src} */
+const midiPlan = () => SMF.toSteps(MI.smf.tracks[MI.src].notes, MI.smf.ppq, curDiv(), dev.info.nstep, isDrumTrack());
+function renderMidiPrev() {
+  const box = $("midiprev");
+  if (!MI || !dev || !dev.dump) { box.hidden = true; box.replaceChildren(); return; }
+  const srcs = MI.smf.tracks.map((x, k) => [x, k]).filter(([x]) => x.notes.length);
+  const cancel = el("button", { type: "button", onclick: () => { MI = null; renderMidiPrev(); } }, t("midiCancel"));
+  if (!srcs.length) {
+    box.replaceChildren(el("h3", { text: `${t("midiPreview")}: ${MI.name}` }), el("p", { text: t("midiNoNotes") }), el("p", { class: "bar" }, cancel));
+    box.hidden = false;
+    return;
+  }
+  if (!srcs.some(([, k]) => k === MI.src)) MI.src = srcs[0][1];
+  const plan = midiPlan(), R = plan.report;
+  const sel = el("select", { onchange: (e) => { MI.src = +e.target.value; renderMidiPrev(); } },
+    ...srcs.map(([x, k]) => el("option", { value: k, text: `${k + 1}: ${x.name || t("midiTrack")} (${x.notes.length})` })));
+  sel.value = String(MI.src);
+  const dd = dev.pdesc[pById("DIV", -1)], divName = dd && dd.names ? dd.names[curDiv()] || "" : "";
+  const info = [t("midiNotes").replace("{n}", R.notes), t("midiGrid").replace("{div}", divName),
+    t("midiSteps").replace("{n}", plan.len).replace("{max}", dev.info.nstep)];
+  const warn = [];
+  if (R.moved) warn.push(t("midiMoved").replace("{n}", R.moved));
+  if (R.chordCut) warn.push(t("midiChord").replace("{n}", R.chordCut));
+  if (R.overlap) warn.push(t("midiOverlap").replace("{n}", R.overlap));
+  if (R.merged) warn.push(t("midiMerged").replace("{n}", R.merged));
+  if (R.dropped) warn.push(t("midiDropped").replace("{n}", R.dropped).replace("{max}", dev.info.nstep));
+  const setlen = el("input", { type: "checkbox", id: "midisetlen" });
+  setlen.checked = true;
+  box.replaceChildren(
+    el("h3", { text: `${t("midiPreview")}: ${MI.name}` }),
+    el("p", { class: "bar" }, el("span", { text: t("midiSource") }), sel),
+    el("ul", {}, ...info.map((x) => el("li", { text: x }))),
+    warn.length ? el("ul", { class: "warn" }, ...warn.map((x) => el("li", { text: x }))) : el("p", { class: "dim", text: t("midiClean") }),
+    el("p", { class: "dim", text: t(isDrumTrack() ? "midiHowDrum" : "midiHow") }),
+    el("p", { class: "bar" }, el("label", {}, setlen, " " + t("midiSetLen").replace("{n}", plan.len)),
+      el("button", { type: "button", class: "pri", onclick: midiImport }, t("midiImport")), cancel));
+  box.hidden = false;
+}
+async function midiImport() {
+  if (!MI || !dev) return;
+  if (!confirm(t("midiConfirm"))) return;
+  const plan = midiPlan(), setlen = $("midisetlen").checked, n = dev.info.nstep;
+  try {
+    for (let i = 0; i < n; i++) dev.steps[i] = { ...dev.steps[i], ...plan.steps[i], index: i };
+    sayK("applying", `0/${n}`);
+    await writeSteps([...Array(n).keys()]);
+    MI = null;
+    renderMidiPrev();
+    if (setlen) setLen(plan.len);
+    RV.lo = null;
+    $("steptables").dataset.len = "";
+    renderSteps();
+    sayK("midiDone", String(plan.report.notes));
+  } catch (err) { report(err); }
+}
+$("midiexp").addEventListener("click", midiExport);
+$("midiimp").addEventListener("click", () => $("midifile").click());
+$("midifile").addEventListener("change", async (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!f || !dev) return;
+  try {
+    MI = { name: f.name, smf: SMF.read(new Uint8Array(await f.arrayBuffer())), src: 0 };
+    renderMidiPrev();
+  } catch (err) { MI = null; renderMidiPrev(); sayK("midiBad", err.message); }
+});
+
 /* ---------------------------------------------------------- mixer (v3) --- */
 /* dev.mix = TRACK reply + pan per track ({sel, ntrk, tracks: [{engine, preset, level, mute, armed, pan}]}).
    Read on connect, after every RELOAD / sound change, with the slow safety DUMP and when the tab opens.
@@ -4166,6 +4834,8 @@ async function readMixer(d = dev) {
     if (mixTouched("pan", i)) x.pan = o.pan;
   });
   d.mix = m;
+  if (m.ntrk && m.ntrk !== d.info.ntrk) d.info.ntrk = m.ntrk;   /* (Hookology) a track added or removed on the FM-1 */
+  if (d === dev) renderTrackbar();
   if (m.sel !== d.sel && !panning) { d.sel = m.sel; needReload = true; }   /* selected on the device, push missed */
   renderMixer();
 }
@@ -5216,7 +5886,7 @@ function renderFm6Imported() {
 function renderFm6() {
   if (!fm6Ok()) return;
   const ts = $("fm6trk"), keepT = ts.value, ss = $("fm6slot"), keepS = ss.value;
-  ts.replaceChildren(...Array.from({ length: dev.info.ntrk || 1 }, (_, i) => el("option", { value: i, text: String(i + 1) })));
+  ts.replaceChildren(...Array.from({ length: (dev.mix && dev.mix.ntrk) || dev.info.ntrk || 1 }, (_, i) => el("option", { value: i, text: String(i + 1) })));
   ts.value = keepT || (dev.sel ?? 0);
   const owned = dev.info.fm6.bank === 0;
   $("fm6store").hidden = owned; $("fm6erase").hidden = owned; $("fm6bankexp").hidden = owned;

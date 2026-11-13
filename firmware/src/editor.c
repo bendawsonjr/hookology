@@ -98,10 +98,12 @@ static uint32_t ed_eng(const track_t *t) { return t->eng_req % NENGINES; }
 #define ED_NV (P_COUNT + G_COUNT)
 /* v4: the parameters of the tracks that are not selected which TRACK_CHANGED follows (the mixer) */
 static const uint8_t ED_TIDS[3] = {P_LEVEL, P_PAN, P_MUTE};
-#define ED_TRK NROWS                                   /* the tracks the protocol lists (the web editor's four) */
+#define ED_TRK NTRK                                    /* the tracks the protocol can reach (Hookology: all eight; it lists
+                                                        * the ones in use, trk_n()) */
+#define ED_CHAIN_TRK NROWS                             /* the song chain's rows: four tracks each (its wire format) */
 #define ED_NT (ED_TRK * 3u)
 /* the selected track as the protocol lists the tracks: one of the MIDI-only ones (5..8) in the last place */
-static uint32_t ed_sel(void) { return song.sel < ED_TRK ? song.sel : ED_TRK - 1u; }
+static uint32_t ed_sel(void) { return song.sel < trk_n() ? song.sel : trk_n() - 1u; }
 static struct {
     uint8_t on, eng, preset, sel;
     uint8_t v4;                                          /* WATCH bit 1: TRACK_CHANGED pushes too */
@@ -206,7 +208,7 @@ static void ed_sync(void)                                /* main loop */
     for (i = 0; ed_w.v4 && i < ED_NT && n < ED_PUSH_MAX; i++) {   /* v4: the other tracks' mix */
         uint32_t k = (ed_w.tpos + i) % ED_NT, tr = k / 3u, id = ED_TIDS[k % 3u];
         int16_t v = trk[tr].p[id];
-        if (tr == song.sel || v == ed_w.tv[k] || (uint16_t)(now - ed_w.tt[k]) < 20u)
+        if (tr == song.sel || tr >= trk_n() || v == ed_w.tv[k] || (uint16_t)(now - ed_w.tt[k]) < 20u)
             continue;                                    /* (the selected track: CHANGED above) */
         if (!ed_room())
             return;
@@ -723,7 +725,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         ed_b(P_E0);
         for (i = 0; i < NENGINES; i++)
             ed_str(ENGINES[i]->name, 8);
-        ed_b(ED_TRK);                                     /* v3 */
+        ed_b(trk_n());                                    /* v3: the tracks in use (Hookology: up to eight) */
         ed_b(0);                                          /* project-based SONG retired: tagged bank SONG below */
         ed_b(0x55); ed_b(1); ed_b(ed_ui_caps());             /* tagged preferences v1: commands 34..38 */
         ed_b(0x4d); ed_b(2); ed_b(MOTION_MAX); ed_b(1); /* motion v2: native ids, chance v1 */
@@ -985,15 +987,15 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
                 ed_shadow();                               /* the editor re-reads it: no RELOAD for this */
         }
         ed_b(ed_sel());
-        ed_b(ED_TRK);
-        for (i = 0; i < ED_TRK; i++) {
+        ed_b(trk_n());
+        for (i = 0; i < trk_n(); i++) {
             ed_b(ed_eng(&trk[i]));
             ed_b(trk[i].preset);
             ed_v(trk[i].p[P_LEVEL]);
             ed_b(trk[i].p[P_MUTE] != 0);
             ed_b((song.rec >> i) & 1u);
         }
-        for (i = 0; i < ED_TRK; i++)                       /* the presets' high bits, last */
+        for (i = 0; i < trk_n(); i++)                      /* the presets' high bits, last */
             ed_b(trk[i].preset >> 7);
         break;
     case ED_TRACK_MIX: {                                   /* track [, level v14, mute] -> track, level, mute */
@@ -1076,7 +1078,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
             else if (chain_busy()) rc = 2;
             else {
                 for (uint32_t row = 0; row < a[1]; row++) {
-                    for (uint32_t k = 0; k < ED_TRK; k++) if (a[2u + row * 5u + k] > CHAIN_HOLD || (a[2u + row * 5u + k] == CHAIN_HOLD && (!row || a[2u + (row-1u) * 5u + k] == CHAIN_REST))) rc = 1;
+                    for (uint32_t k = 0; k < ED_CHAIN_TRK; k++) if (a[2u + row * 5u + k] > CHAIN_HOLD || (a[2u + row * 5u + k] == CHAIN_HOLD && (!row || a[2u + (row-1u) * 5u + k] == CHAIN_REST))) rc = 1;
                     if (!a[6u + row * 5u] || a[6u + row * 5u] > 16u) rc = 1;
                 }
                 if (!rc) {
@@ -1084,7 +1086,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
                     chain_defaults(&chain_config); chain_config.rsv[CHAIN_LOOP] = loop; memset(chain_patterns, 0, sizeof chain_patterns);
                     chain_config.count = a[1];
                     for (uint32_t row = 0; row < a[1]; row++) {
-                        memcpy(chain_patterns[row], a + 2u + row * 5u, ED_TRK);
+                        memcpy(chain_patterns[row], a + 2u + row * 5u, ED_CHAIN_TRK);
                         chain_config.row[row] = (chain_row_t){chain_patterns[row][0], a[6u + row * 5u]};
                     }
                     ui.song_row = 0; ui.force = 1;
@@ -1099,7 +1101,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         }
         ed_b(a[0]); ed_b(rc); ed_b(chain_config.count); ed_b(chain.running); ed_b(chain.row); ed_b(chain.remaining);
         for (uint32_t row = 0; row < chain_config.count; row++) {
-            for (uint32_t k = 0; k < ED_TRK; k++) ed_b(chain_patterns[row][k]);
+            for (uint32_t k = 0; k < ED_CHAIN_TRK; k++) ed_b(chain_patterns[row][k]);
             ed_b(chain_config.row[row].repeat);
         }
         ed_b(chain_config.rsv[CHAIN_LOOP]);
