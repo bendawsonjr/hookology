@@ -281,6 +281,25 @@ static volatile uint16_t seq_loops[NTRK];
 static volatile uint16_t seq_pend[NTRK];          /* a bit a bank (NPAT) */
 static volatile uint8_t seq_hush;
 static const step_t SEQ_HUSH_STEP = {.time = ST_REST};
+/* (Hookology) ARP MODE PULSE .. LADDER: ChoralRoot's 12 patterns (cr_engine.c CR_PATTERNS, GPL-3.0, Quixotic7): a byte
+ * a step, low nibble the held note (1 = the lowest, over OCT octaves; 0 a rest), high nibble the accent L: velocity
+ * 100 x (L + 1) / 16 */
+#define ARP_PAT_FIRST 7u
+static const uint8_t ARP_PAT[12][8] = {
+    {0xF1, 0x82, 0xB3, 0x84},                                 /* pulse */
+    {0xF1, 0x83, 0xB2, 0x83},                                 /* alberti */
+    {0xF1, 0x93, 0x92},                                       /* waltz */
+    {0xF4, 0x93, 0xB2, 0x91},                                 /* cascade */
+    {0xF1, 0x82, 0x93, 0xF4, 0x83, 0x92},                     /* updown */
+    {0xF1, 0x00, 0xC2, 0x93, 0x00, 0x81, 0xC3, 0x00},         /* syncopate */
+    {0xF1, 0x31, 0xC2, 0x31, 0xF3, 0x31, 0xC4, 0x31},         /* gallop */
+    {0xF1, 0x93, 0xB2, 0x94, 0xB3, 0x95},                     /* skip */
+    {0xF1, 0x00, 0x00, 0x93, 0xC2, 0x00, 0x83, 0x00},         /* ballad */
+    {0xF1, 0x00, 0xB3, 0x00, 0xC2, 0x00, 0xB4, 0x00},         /* stride */
+    {0xF1, 0x32, 0x81, 0x33, 0xC1, 0x34, 0x81, 0x32},         /* drive */
+    {0xF1, 0x82, 0x31, 0xB3, 0x31, 0xC4, 0x31, 0xB5},         /* ladder */
+};
+static const uint8_t ARP_PAT_LEN[12] = {4, 4, 3, 4, 6, 8, 8, 6, 8, 8, 8, 8};
 static void arp_step(track_t *t, uint32_t n, uint32_t gate_n)
 {
     uint32_t period, cnt, list[64], len = 0, i, j, o;
@@ -329,7 +348,17 @@ static void arp_step(track_t *t, uint32_t n, uint32_t gate_n)
         if (!len) return;
         if (t->p[P_AMODE] == 6) { list[0] = t->held[t->nheld - 1u]; len = 1; } /* REPEAT: last played note, no octave traversal */
         t->arp_idx++;
-        switch (t->p[P_AMODE]) {
+        uint32_t vel = 100u, rest = 0, pb = 0;
+        if ((uint32_t)t->p[P_AMODE] >= ARP_PAT_FIRST) {  /* (Hookology) a pattern: its note, its accent, or a rest */
+            uint32_t p = ((uint32_t)t->p[P_AMODE] - ARP_PAT_FIRST) % 12u;
+            pb = ARP_PAT[p][t->arp_idx % ARP_PAT_LEN[p]];
+            rest = !(pb & 15u);
+            vel = (100u * ((pb >> 4) + 1u) + 8u) / 16u;
+        }
+        switch ((uint32_t)t->p[P_AMODE] >= ARP_PAT_FIRST ? 99 : t->p[P_AMODE]) {
+        case 99:                                         /* (the pattern's note: the n-th up the list, wrapping) */
+            j = ((pb & 15u) ? (pb & 15u) - 1u : 0u) % len;
+            break;
         case 2:
             j = len - 1u - t->arp_idx % len;
             break;
@@ -347,12 +376,12 @@ static void arp_step(track_t *t, uint32_t n, uint32_t gate_n)
         }
         if (t->arp_note)
             arp_off(t);
-        if ((uint32_t)(rng() & 127u) <= (uint32_t)t->p[P_APROB]) {
+        if (!rest && (uint32_t)(rng() & 127u) <= (uint32_t)t->p[P_APROB]) {
             t->arp_note = (uint8_t)list[j];
             t->arp_off = period * (uint32_t)t->p[P_AGATE] / 128u;
             if (rec_on(t))
-                rec_note(t, t->arp_note, 100);           /* recording: what the arp plays */
-            trk_note_on(t, t->arp_note, 100);
+                rec_note(t, t->arp_note, vel);           /* recording: what the arp plays */
+            trk_note_on(t, t->arp_note, vel);
             chord_auto_observe(t, t->arp_note);
         }
         /* A recovered clock burst may cross several ARP steps. Consume them all
@@ -765,7 +794,7 @@ static void input_off(track_t *t, uint32_t note)
 static volatile uint8_t key_hit_vel;           /* a key's velocity while OCT- / OCT+ set the hit level (ui_input.c), 0: 100 */
 static void key_chord_tone(uint32_t k, track_t *t)
 {
-    uint32_t x = kb_chord[k][kb_chn[k]], held = midi_local_held(t, x), vel = key_hit_vel ? key_hit_vel : 100u;
+    uint32_t x = chord_tone_at(kb_chord[k], &kb_strum[k], kb_chn[k]), held = midi_local_held(t, x), vel = key_hit_vel ? key_hit_vel : 100u;
     kb_chn[k]++;
     if (held) return;
     input_on(t, x, vel);
@@ -791,7 +820,7 @@ static void key_off(uint32_t k, track_t *t)
     kb_strum[k].total = 0;
     kb_chn[k] = 0;
     for (i = 0; i < n; i++) {
-        uint32_t x = kb_chord[k][i];
+        uint32_t x = chord_tone_at(kb_chord[k], &kb_strum[k], i);
         if (midi_local_held(t, x)) continue;
         input_off(t, x);
         if (!midi_out_on(t)) midi_out_event(0x08u | (0x80u | mc) << 8 | x << 16);
@@ -801,7 +830,7 @@ static void key_off(uint32_t k, track_t *t)
 static void midi_chord_tone(mchord_t *m)
 {
     track_t *t = &trk[m->id - 1u];
-    uint32_t note = m->note[m->n];
+    uint32_t note = chord_tone_at(m->note, &m->strum, m->n);
     uint32_t held = midi_note_held(t, note) || midi_local_held(t, note);
     m->n++;
     /* MPC's duplicate drum pads are separate strikes, even while another pad holds that sound. */

@@ -32,7 +32,7 @@ int main(void)
     assert(render_hash(0)==render_hash(1));
     ui_power_on();project_t old;project_capture(&old);
     for(uint32_t k=0;k<NROWS;k++){
-        old.t[k].p[P_RESERVED35]=127;old.t[k].p[P_RESERVED34]=2;
+        old.t[k].p[P_RESERVED36]=127;   /* (Hookology: 34 and 35 are SLOP and RANGE now) */
         old.t[k].step[0]=(step_t){{60,64,67},3,ST_NOTE,0,100};
     }
     for(uint32_t i=0;i<G_COUNT;i++)if(global_reserved(i))old.g[i]=127;
@@ -45,7 +45,7 @@ int main(void)
     for(uint32_t i=0;i<G_COUNT;i++)if(global_reserved(i))assert(!song.g[i]);
     assert(motion_valid(&old.motion));assert(!motion_capture(TSEL,P_RESERVED36,100));
     uint32_t used=resource_used();midi_event(0xb0,0,91,127);midi_event(0xb0,0,93,127);
-    assert(!TSEL->p[P_RESERVED34] && !TSEL->p[P_RESERVED36] && used==resource_used());
+    assert(!TSEL->p[P_RESERVED36] && used==resource_used());
     for(uint32_t i=0;i<NPAGES;i++)assert(PAGES[i].fam<FAM_COUNT && !str_eq(PAGES[i].title,"SLICER"));
     ui_power_on();press(B_FX);assert(cur_page()->fam==FAM_FX);
     btn_down(B_FX);frames(800);assert(ui.layer==LAYER_FX);

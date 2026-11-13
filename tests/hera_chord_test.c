@@ -79,7 +79,7 @@ static void stored(void)
     /* an older project: 0 in the slot, set 1 */
     t=setup(); assert(!project_save(1)); t->p[P_CHSET]=9; project_load(1); assert(TSEL->p[P_CHSET]==0 && hera_set(TSEL)==0);
     /* the slot's old motion events stay inert and readable; the other retired slots stay retired */
-    assert(param_retired(P_CHSET) && !param_reserved(P_CHSET) && param_reserved(P_RESERVED34) && param_reserved(P_RESERVED35) && !param_reserved(P_CHEXT) && !param_reserved(P_CHBOR) && !param_reserved(P_VMAX) && !param_reserved(P_P5Q));
+    assert(param_retired(P_CHSET) && !param_reserved(P_CHSET) && param_reserved(P_RESERVED36) && !param_reserved(P_SLOP) && !param_reserved(P_SRANGE) && !param_reserved(P_CHEXT) && !param_reserved(P_CHBOR) && !param_reserved(P_VMAX) && !param_reserved(P_P5Q));
     assert(param_kept(P_CHSET));
     /* ECONOMY (Hookology): a project setting, saved and loaded with it; never a reserved slot */
     t=setup(); song.g[G_ECO]=1; assert(!project_save(2)); song.g[G_ECO]=0; project_load(2); assert(song.g[G_ECO]==1);

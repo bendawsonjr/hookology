@@ -24,7 +24,7 @@ enum { MI_COLOR, MI_FONT, MI_HOLD, MI_LIGHTS,
        MI_BLE,
 #endif
        MI_MIDI_OUT, MI_MIDI_KNOBS, MI_MIDI_MODE, MI_MIDI_LEARN,
-       MI_CLICK, MI_CLICK_LEVEL, MI_CLICK_SOUND, MI_COUNTIN, MI_REC_MODE, MI_PREVIEW, MI_ADD, MI_AUTOSAVE, MI_PICKER, MI_ACCEL, MI_HOME_SEL, MI_GLO_SEL, MI_TRACKS, MI_SCREEN, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
+       MI_CLICK, MI_CLICK_LEVEL, MI_CLICK_SOUND, MI_COUNTIN, MI_REC_MODE, MI_PREVIEW, MI_ADD, MI_CHORD_NAMES, MI_AUTOSAVE, MI_PICKER, MI_ACCEL, MI_HOME_SEL, MI_GLO_SEL, MI_TRACKS, MI_SCREEN, MI_PANEL, MI_ABOUT, MI_DESIGNER, MI_BACK,
        MI_COUNT };
 static const char *const MI_NAME[MI_COUNT] = {"COLOR", "FONT", "HOLD", "LIGHTS",
 #if MELODEE_USB_AUDIO
@@ -38,6 +38,7 @@ static const char *const MI_NAME[MI_COUNT] = {"COLOR", "FONT", "HOLD", "LIGHTS",
 #endif
                                               "MIDI OUT", "MIDI KNOBS", "MIDI MODE", "MIDI LEARN",
                                               "AUDIO CLICK", "CLICK LEVEL", "CLICK SOUND", "COUNT-IN", "REC MODE", "NOTE PREVIEW", "CHORD ENTRY",
+                                              "CHORD NAMES",
                                               "AUTOSAVE", "PICKER POPUPS", "KNOB ACCEL", "HOME SELECT", "GLO SELECT", "UNUSED TRACKS", "SCREEN OFF", "CALIBRATION", "ABOUT", "SOUND DESIGNER", "BACK"};
 #if MELODEE_USB_AUDIO
 /* USB AUDIO's four settings, as ua_off_want (UA_OFF_OUT | UA_OFF_IN) */
@@ -327,6 +328,7 @@ static void draw_menu(void)
                 if (i == MI_PICKER) value = PREF_BITS & PREF_PICK_OFF ? "OFF" : "ON";
                 if (i == MI_FONT) value = TY_PIXEL ? "PIXEL" : "RUBIK";
                 if (i == MI_AUTOSAVE) value = settings_autosave ? "ON" : "OFF";
+                if (i == MI_CHORD_NAMES) value = settings_sharps ? "SHARP" : "FLAT";   /* (Hookology: Ab or G#) */
                 if (i == MI_HOME_SEL) value = HS_NAME[home_select()];
                 if (i == MI_GLO_SEL) value = HS_NAME[glo_select()];
                 if (i == MI_TRACKS) value = GLO_SELECT & TRACKS_HIDE ? "HIDE" : "SHOW";
@@ -500,6 +502,10 @@ static void menu_input(uint32_t oct)                  /* oct: ui_input.c oct_tap
         if(m==MI_CLICK)settings_click=value;else if(m==MI_CLICK_SOUND)settings_click_soft=value;
         else if(m==MI_COUNTIN)settings_countin=value;else if(m==MI_PREVIEW)settings_preview=value;else settings_chord_add=value;
         ok=0;ui.force=1;
+    }
+    if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_CHORD_NAMES) {   /* KNOB 1 right SHARP, left FLAT; OCT+ toggles */
+        settings_sharps = (int16_t)(s > 0 ? 1 : s < 0 ? 0 : !settings_sharps);
+        ui.force = 1; ok = 0;
     }
     if ((s || ok) && ui.menu == 1 && ui.menu_sel == MI_AUTOSAVE) {
         settings_autosave = (uint8_t)(s > 0 ? 1u : s < 0 ? 0u : !settings_autosave);

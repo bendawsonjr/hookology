@@ -100,7 +100,7 @@ static int midi_local_held(const track_t *t, uint32_t note)
     for (k = 0; k < 27u; k++)
         if (kb_chn[k] && kb_trk[k] == trk_index(t))
             for (i = 0; i < kb_chn[k]; i++)
-                if (kb_chord[k][i] == note)
+                if (chord_tone_at(kb_chord[k], &kb_strum[k], i) == note)
                     return 1;
     return 0;
 }
@@ -117,13 +117,13 @@ static void midi_release(uint32_t ch, uint32_t note)
     if (id) {
         step_midi_edge(id - 1u, 0, 0, ch, note);
         mchord_t *m = mchord_of(ch, note, id);
-        uint8_t nn[CHORD_MAX];
+        uint8_t nn[2u * CHORD_MAX];                  /* (Hookology: a strum over two octaves) */
         uint32_t n = 1, i;
         nn[0] = (uint8_t)note;
         if (m) {                                  /* a chord: exactly the notes it started */
             n = m->n;
             for (i = 0; i < n; i++)
-                nn[i] = m->note[i];
+                nn[i] = (uint8_t)chord_tone_at(m->note, &m->strum, i);
             midi_strum_pending &= ~(1u << (uint32_t)(m - mchord));
             m->id = 0;
         }

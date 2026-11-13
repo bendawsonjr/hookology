@@ -159,7 +159,7 @@ static uint32_t pr_held(void)
     for (k = 0; k < 27u; k++)
         if (kb_chn[k] && kb_trk[k] == song.sel)
             for (i = 0; i < kb_chn[k]; i++) {
-                int32_t r = (int32_t)proll.lo + PR_ROWS - 1 - kb_chord[k][i];
+                int32_t r = (int32_t)proll.lo + PR_ROWS - 1 - (int32_t)chord_tone_at(kb_chord[k], &kb_strum[k], i);
                 if (r >= 0 && r < PR_ROWS)
                     m |= 1u << r;
             }
@@ -454,6 +454,11 @@ static void graph_chord(const track_t *t, uint16_t c)
     else if (t->p[P_CHRD] == CH_MELODY) chord_melody_name(b, (uint32_t)r, mask);
     else if (t->p[P_CHRD] == CH_AUTO) chord_auto_name(b, (uint32_t)r, mask);
     else chord_name(b, (uint32_t)r, mask);
+    if (!hera && n > 1u && nn[0] % 12u != (uint32_t)r % 12u && t->p[P_CHRD] != CH_MELODY &&   /* (Hookology) its bass: C/E */
+        str_len(b) + 1u + str_len(chord_note(nn[0])) < 12u) {
+        str_cpy(b + str_len(b), "/", 2);
+        str_cpy(b + str_len(b), chord_note(nn[0]), 4);
+    }
     cv_text_on(14, ty_y(18, name_font), name_font, b, T_TEXT, T_SURF);
     cv_text_r(226, ty_y(18, TY_LB), TY_LB, cap, T_MID, T_SURF);
     lo = nn[0] - nn[0] % 12u;

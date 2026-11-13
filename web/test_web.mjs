@@ -268,11 +268,11 @@ async function editorMock() {
     "editor: INFO");
   let descs = 0;
   for (let i = 0; i < info.pcount; i++) if (E.parse[E.CMD.DESC](await rq(E.req.desc(0, i))).label) descs++;
-  ok(descs === info.pcount-3, "editor: DESC for every parameter");
+  ok(descs === info.pcount-1, "editor: DESC for every parameter");   /* (Hookology: 34 SLOP, 35 RANGE; 36 the one blank) */
   {
     const v=E.parse[E.CMD.DESC](await rq(E.req.desc(0,47)));
-    ok(v.label==="VOICES" && E.parse[E.CMD.DESC](await rq(E.req.desc(0,46))).label==="QUALITY" && E.parse[E.CMD.DESC](await rq(E.req.desc(0,45))).label==="EXTRA" && E.parse[E.CMD.DESC](await rq(E.req.desc(0,33))).label==="BORROW","editor: 47 is VOICES, 46 a Prophet's QUALITY (Hookology)");
-    for(const id of [34,35,36]){
+    ok(v.label==="VOICES" && E.parse[E.CMD.DESC](await rq(E.req.desc(0,46))).label==="QUALITY" && E.parse[E.CMD.DESC](await rq(E.req.desc(0,45))).label==="EXTRA" && E.parse[E.CMD.DESC](await rq(E.req.desc(0,33))).label==="BORRW" && E.parse[E.CMD.DESC](await rq(E.req.desc(0,34))).label==="SLOP" && E.parse[E.CMD.DESC](await rq(E.req.desc(0,35))).label==="RANGE","editor: 47 is VOICES, 46 a Prophet's QUALITY (Hookology)");
+    for(const id of [36]){
       const d=E.parse[E.CMD.DESC](await rq(E.req.desc(0,id)));
       const r=E.parse[E.CMD.SET](await rq(E.req.set(0,id,127)));
       ok(!d.label && r.value===0,"editor: removed effect parameter is inert "+id);

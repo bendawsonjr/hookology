@@ -150,19 +150,19 @@ static void view_wheel(const uint32_t *on, const uint8_t *of, int faded)
                 const aafont_t *rf = TY_HR, *qf = TY_VL;
                 int32_t w, x, base = VW_CY + 4;
                 for (;;) {
-                    w = text_w(rf, N_NOTE[root]) + 1 + text_w(qf, q);
+                    w = text_w(rf, chord_note(root)) + 1 + text_w(qf, q);
                     if (root != bass)
-                        w += (q[0] ? 3 : 0) + text_w(rf, "/") + text_w(rf, N_NOTE[bass]);
+                        w += (q[0] ? 3 : 0) + text_w(rf, "/") + text_w(rf, chord_note(bass));
                     if (w <= 2 * VW_R - 8 || rf != TY_HR)
                         break;
                     rf = TY_VL, qf = TY_TX;                 /* (too wide for the ring: a size smaller) */
                 }
                 x = VW_CX - w / 2;
-                x = cv_text_on(x, base - rf->asc, rf, N_NOTE[root], c, T_BG);
+                x = cv_text_on(x, base - rf->asc, rf, chord_note(root), c, T_BG);
                 x = cv_text_on(x + (q[0] ? 1 : 0), base - qf->asc, qf, q, c, T_BG);
                 if (root != bass) {
                     x = cv_text_on(x + (q[0] ? 3 : 0), base - rf->asc, rf, "/", c, T_BG);
-                    cv_text_on(x, base - rf->asc, rf, N_NOTE[bass], c, T_BG);
+                    cv_text_on(x, base - rf->asc, rf, chord_note(bass), c, T_BG);
                 }
                 notes_fit(b, note, n, TY_LB, 2 * VW_R - 4);
                 cv_text_c(VW_CX, base + 6, TY_LB, b, cn, T_BG);

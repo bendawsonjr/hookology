@@ -391,7 +391,7 @@ static int test_sound_loads(void)
     bad += check("PRESETS on HOME loads the sound: steps, LEN, DIV untouched", t->preset == (uint8_t)((before.preset + 1u) % ENGINES[3]->npresets) &&
                  !memcmp(t->step, before.step, sizeof t->step) && t->p[P_SLEN] == 32 && t->p[P_SDIV] == 1);
     bad += check("..ARP, SCL, the SLICER and the mix stay the track's", t->p[P_AMODE] == 2 && t->p[P_AOCT] == 3 && t->p[P_SCALE] == 2 &&
-                 t->p[P_TRANS] == 5 && !t->p[P_RESERVED34] && !t->p[P_RESERVED35] && t->p[P_LEVEL] == 90 &&
+                 t->p[P_TRANS] == 5 && t->p[P_SLOP] == 1 && t->p[P_SRANGE] == 4 && t->p[P_LEVEL] == 90 &&   /* (Hookology: SLOP, RANGE the track's) */
                  t->p[P_P5Q] == 1 && t->p[P_VMAX] == 3);
     bad += check("..and no warning about the sequence", !msg_is("T1 SEQ REPLACED"));
     for (i = 0; i < ENGINES[3]->npresets; i++)
@@ -432,7 +432,7 @@ static int test_sound_loads(void)
     track_select(1);
     set_engine(trk[1].eng_req);                   /* Init sound */
     bad += check("Init sound: the sound only (steps and SLICER kept), a copy of T2", undo.trk == 2u &&
-                 !memcmp(trk[1].step, before.step, sizeof before.step) && !trk[1].p[P_RESERVED34]);
+                 !memcmp(trk[1].step, before.step, sizeof before.step) && trk[1].p[P_SLOP] == 2);   /* (Hookology: SLOP the track's) */
     track_select(0);
     set_engine_of(&trk[0], 3);                    /* (a general sound: the Prophet keeps its own slots) */
     my_steps(&trk[0]);

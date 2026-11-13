@@ -25,6 +25,7 @@ static uint32_t ngated(const track_t *t)
 static void reset(void)
 {
     ui_power_on();
+    settings_sharps = 1;                                 /* (Hookology: the names below are spelled with sharps; flats: names_flat) */
     set_engine_of(&trk[0], HOST_SYNTH);             /* (NPOLY voices: the chords, not a voice cap, are tested) */
     memset(kb_chn, 0, sizeof kb_chn); memset(mchord, 0, sizeof mchord); memset(chord_last, 0, sizeof chord_last);
     fm1_in.notes = kb_prev = 0; mo_w = mo_r = 0; usb.config = 1;
@@ -671,9 +672,111 @@ static int borrowed(void)
     return bad;
 }
 
+/* (Hookology, beta53) RANGE 2 OCT: the chord's strings and an octave above, in the stroke's order, released exactly;
+ * SLOP: the strings early or late but each within its gap, the sweep's first and order kept; the ARP patterns */
+static int strum_more(void)
+{
+    int bad = 0;
+    track_t *t = &trk[0];
+    reset(); t->p[P_CHRD] = CH_MAJ; t->p[P_STRUM] = 1; t->p[P_SRANGE] = 1;      /* (1/8: the sweep, six strings) */
+    key_down(K_C4);
+    int ok = kb_strum[K_C4].total == 6u && gate_note(t, 60) && ngated(t) == 1;
+    seq_advance(seq_beat_samples());
+    static const uint8_t want[6] = {60, 64, 67, 72, 76, 79};
+    for (uint32_t i = 0; i < 6; i++) ok &= gate_note(t, want[i]) && chord_tone_at(kb_chord[K_C4], &kb_strum[K_C4], i) == want[i];
+    ok &= ngated(t) == 6 && mo_w == 6;
+    key_up(K_C4); ok &= !ngated(t) && mo_w == 12;
+    bad += check("RANGE 2 OCT: C E G then an octave up, all six released with balanced MIDI", ok);
+    reset(); t->p[P_CHRD] = CH_MAJ; t->p[P_STRUM] = 1; t->p[P_SRANGE] = 1; t->p[P_STROKE] = 1;
+    key_down(K_C4); ok = gate_note(t, 79);
+    seq_advance(seq_beat_samples());
+    ok &= ngated(t) == 6 && chord_tone_at(kb_chord[K_C4], &kb_strum[K_C4], 5) == 60;
+    key_up(K_C4); ok &= !ngated(t);
+    bad += check("RANGE 2 OCT UP: from the top G down to C", ok);
+    t->p[P_SRANGE] = 0; t->p[P_STROKE] = 0;
+    /* SLOP: over 40 presses the strings' times vary, each within a gap of its even time, in order of firing */
+    uint32_t span = seq_beat_samples() / 2u, gap = span / 3u, varied = 0, within = 1;   /* (STRUM 1: 1/8) */
+    for (uint32_t press = 0; press < 40; press++) {
+        reset(); t->p[P_CHRD] = CH_MAJ7; t->p[P_STRUM] = 1; t->p[P_SLOP] = 127;
+        key_down(K_C4);
+        uint32_t at[4] = {0}, n = 1, now = 0;
+        while (now < 2u * span && n < 4u) {
+            seq_advance(64); now += 64;
+            while (n < ngated(t) && n < 4u) at[n++] = now;
+        }
+        for (uint32_t i = 1; i < 4; i++) {
+            int32_t d = (int32_t)at[i] - (int32_t)(gap * i);
+            if (d < -(int32_t)gap - 64 || d > (int32_t)gap + 64) within = 0;
+            if (d < -200 || d > 200) varied = 1;
+        }
+        key_up(K_C4);
+    }
+    t->p[P_SLOP] = 0;
+    bad += check("SLOP: the strings early or late at random, each within a gap of its time", within && varied);
+    reset(); t->p[P_CHRD] = CH_MAJ7; t->p[P_STRUM] = 1;
+    key_down(K_C4); seq_advance(gap - 1); ok = ngated(t) == 1; seq_advance(1); ok &= ngated(t) == 2; key_up(K_C4);
+    bad += check("SLOP 0: the even sweep as before", ok);
+    /* ARP patterns: PULSE 1 2 3 4 (the held notes from the lowest), WALTZ 1 3 2, SYNCO with its rests */
+    static const struct { int16_t mode; uint8_t want[8]; } P[] = {
+        {7, {60, 64, 67, 71, 60, 64, 67, 71}},                    /* pulse */
+        {9, {60, 67, 64, 60, 67, 64, 60, 67}},                    /* waltz */
+        {12, {60, 0, 64, 67, 0, 60, 67, 0}},                      /* syncopate */
+    };
+    for (uint32_t k = 0; k < NELEM(P); k++) {
+        reset(); t->p[P_CHRD] = 0; t->p[P_AMODE] = P[k].mode; t->p[P_ARATE] = 2; t->p[P_AOCT] = 1; t->p[P_APROB] = 127;
+        arp_add(t, 67); arp_add(t, 60); arp_add(t, 71); arp_add(t, 64);
+        uint32_t period = seq_div_samples(2);
+        ok = 1;
+        for (uint32_t i = 0; i < 8; i++) {
+            arp_step(t, i ? period : 0, i ? period : 0);
+            ok &= t->arp_note == P[k].want[i];
+        }
+        while (t->nheld) arp_remove(t, t->held[0]);
+        arp_step(t, period, period);
+        t->p[P_AMODE] = 0;
+        bad += check(k == 0 ? "ARP PULSE: the held notes 1 2 3 4 from the lowest" : k == 1 ? "ARP WALTZ: 1 3 2" : "ARP SYNCO: its rests silent", ok);
+    }
+    {   /* CHORD 2: EXTRA / BORROW where they apply, SLOP / RANGE while a strum is on (HERA too) */
+        int16_t *vp;uint32_t pg = page_titled("CHORD 2");
+        reset(); song.sel = 0; t->p[P_CHRD] = CHRD_HERA; t->p[P_STRUM] = 0;
+        ok = !page_visible(pg);
+        t->p[P_STRUM] = 2;
+        ok &= page_visible(pg) && !page_desc(&PAGES[pg], 0, &vp) && !page_desc(&PAGES[pg], 1, &vp) &&
+              !strcmp(page_desc(&PAGES[pg], 2, &vp)->label, "SLOP") && !strcmp(page_desc(&PAGES[pg], 3, &vp)->label, "RANGE");
+        t->p[P_CHRD] = CH_DIA3; t->p[P_STRUM] = 0;
+        ok &= page_visible(pg) && page_desc(&PAGES[pg], 0, &vp) && !page_desc(&PAGES[pg], 2, &vp);
+        t->p[P_CHRD] = 0; t->p[P_STRUM] = 2; ok &= !page_visible(pg);
+        t->p[P_STRUM] = 0;
+        bad += check("CHORD 2: EXTRA / BORROW where they apply, SLOP / RANGE while a chord strums", ok);
+    }
+    bad += check("ARP MODE names: the 12 patterns after REPEAT", !strcmp(N_AMODE[7], "PULSE") && !strcmp(N_AMODE[18], "LADDR") && NELEM(N_AMODE) == 19u);
+    return bad;
+}
+
+/* (Hookology, beta53) CHORD NAMES FLAT (the default): Ab, Bb, Eb, Db, Gb; SHARP as before; the slash bass */
+static int names_flat(void)
+{
+    int bad = 0;
+    char b[16];
+    reset(); settings_sharps = 0;
+    chord_name(b, 8, 0x91); int ok = !strcmp(b, "Ab");
+    chord_name(b, 10, 0x489); ok &= !strcmp(b, "Bbm7");
+    chord_name(b, 3, 0x891); ok &= !strcmp(b, "Ebmaj7");
+    chord_name(b, 6, 0x49); ok &= !strcmp(b, "Gbdim");
+    chord_name(b, 1, 0x91); ok &= !strcmp(b, "Db");
+    bad += check("CHORD NAMES FLAT: Ab, Bbm7, Ebmaj7, Gbdim, Db", ok);
+    settings_sharps = 1; chord_name(b, 8, 0x91); ok = !strcmp(b, "G#");
+    bad += check("CHORD NAMES SHARP: G#", ok);
+    ok = !strcmp(chord_note(4), "E") && !strcmp(chord_note(10), "A#");
+    settings_sharps = 0; ok &= !strcmp(chord_note(10), "Bb");
+    bad += check("the slash bass in the same spelling (E, A# or Bb)", ok);
+    settings_sharps = 1;
+    return bad;
+}
+
 int main(void)
 {
-    int bad = theory() + shapes_voicings() + keys() + arp_rec() + midi_in() + kits() + strumming() + strum_storage() + extras() + leading() + borrowed();
+    int bad = theory() + shapes_voicings() + keys() + arp_rec() + midi_in() + kits() + strumming() + strum_storage() + extras() + leading() + borrowed() + strum_more() + names_flat();
     printf("%s\n", bad ? "CHORD TEST FAILED" : "chord keys test passed");
     return bad != 0;
 }

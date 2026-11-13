@@ -5,7 +5,10 @@
 static const char *const N_LSYNC[] = {"OFF", "4BAR", "2BAR", "1/1", "1/2", "1/4", "1/8", "8T", "1/16", "16T", "1/32"};
 static const uint8_t LSYNC_DIV[11] = {0, 9, 8, 7, 6, 0, 1, 4, 2, 5, 3};
 static const char *const N_LWAVE[] = {"SIN", "TRI", "SAW", "SQR", "S&H"};
-static const char *const N_AMODE[] = {"OFF", "UP", "DN", "UPDN", "RND", "ORD", "REPEAT"};
+/* (Hookology) after REPEAT ChoralRoot's 12 patterns (seq.c ARP_PAT), five letters (the column): pulse, alberti, waltz,
+ * cascade, updown, syncopate, gallop, skip, ballad, stride, drive, ladder */
+static const char *const N_AMODE[] = {"OFF", "UP", "DN", "UPDN", "RND", "ORD", "REPEAT", "PULSE", "ALBRT", "WALTZ",
+                                      "CASCD", "UPDWN", "SYNCO", "GALOP", "SKIP", "BALAD", "STRID", "DRIVE", "LADDR"};
 static const char *const N_DIV[] = {"1/4", "1/8", "1/16", "1/32", "8T", "16T", "1/2", "1/1", "2BAR", "4BAR"};
 static const char *const N_RECQ[] = {"OFF", "1/4", "1/8", "1/16", "1/32", "8T", "16T", "1/2", "1/1", "2BAR", "4BAR"};
 static const char *const N_LTRIG[] = {"NOTE", "FREE"};
@@ -81,6 +84,7 @@ static const char *const N_STRUM[] = {"OFF", "1/8", "1/16", "1/32", "1/64", "1/1
 static const char *const N_STROKE[] = {"DOWN", "UP", "ALT"};
 static const char *const N_VOIC[] = {"CLOSE", "OPEN", "INV1", "INV2", "+OCT", "LEAD"};   /* VC_CLOSE .. VC_LEAD */
 static const char *const N_CHBOR[] = {"ON", "OFF"};   /* P_CHBOR: 0 ON (Hookology) */
+static const char *const N_SRANGE[] = {"1 OCT", "2 OCT"};   /* P_SRANGE: a strum's octaves (Hookology) */
 static const char *const N_CHEXT[] = {"OFF", "6", "9", "6/9", "SUS2", "SUS4"};   /* P_CHEXT: EX_OFF .. EX_SUS4 (Hookology) */
 static const char *const N_VOICE[] = {"POLY", "MONO", "LEG", "UNI"};   /* V_POLY .. V_UNISON */
 static const char *const N_VMAX[] = {"ALL", "1", "2", "3", "4", "5", "6", "7", "8"};   /* P_VMAX: VOICES */
@@ -102,6 +106,11 @@ static const char *const N_MIDI_INPUT[] = {"USB", "TRS"
 };
 static const char *const N_ROUTE[] = {"CH1-4", "SEL", "CH5-8", "CH9-12", "CH13-16", "CH1-8"}; /* Keep saved CH1-4/SEL ids; append ranges. */
 static const char *const N_NOTE[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+/* (Hookology) CHORD NAMES (the menu): FLAT spells the chords' roots and basses Db Eb Gb Ab Bb (the default), SHARP as
+ * N_NOTE. A device setting (settings_persist.c: the voice-weights row's flags) */
+static const char *const N_NOTE_FLAT[] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
+static int16_t settings_sharps;                         /* 0 FLAT, 1 SHARP */
+static const char *chord_note(uint32_t pc) { return (settings_sharps ? N_NOTE : N_NOTE_FLAT)[pc % 12u]; }
 static const char *const N_DASH[] = {"--"};
 static const char *const N_GO[] = {"--", "GO"};
 static const char *const N_BOOT[] = {"OFF", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32"};   /* (PROJ_SLOTS) */
@@ -261,9 +270,9 @@ static const param_desc_t TP[P_COUNT] = {
     [P_SDIV] = PE("DIV", N_DIV, 2),
     [P_SSWING] = PD("SWG", F_PCT, 0, 100, 0),
     [P_SGATE] = PD("GATE", F_PCT, 1, 127, 64),
-    [P_CHBOR] = PE("BORROW", N_CHBOR, 0),   /* (Hookology: chord.c, borrowed chords on the keys outside the scale) */
-    [P_RESERVED34] = PD("", F_INT, 0, 127, 0),
-    [P_RESERVED35] = PD("", F_INT, 0, 127, 0),
+    [P_SLOP] = PD("SLOP", F_PCT, 0, 127, 0),   /* (Hookology: chord.c, a strum's uneven timing) */
+    [P_SRANGE] = PE("RANGE", N_SRANGE, 0),     /* (Hookology: a strum over one or two octaves) */
+    [P_CHBOR] = PE("BORRW", N_CHBOR, 0),   /* (BORROW: five letters, CHORD 2's four columns) */   /* (Hookology: chord.c, borrowed chords on the keys outside the scale) */
     [P_RESERVED36] = PD("", F_INT, 0, 127, 0),
     [P_VOICE] = PE("VCE", N_VOICE, 0),
     [P_GLIDE] = PD("GLD", F_TIME, 0, 127, 0),
@@ -678,7 +687,8 @@ static const page_t PAGES[] = {
     {"SCALES", FAM_SCL, SC_TRACK, GR_SCALE_PICKER, {0xFF, P_SCALE, P_ROOT, P_QUANT}},
     {"SCL", FAM_SCL, SC_TRACK, GR_SCALE, {P_ROOT, 0xFF, P_QUANT, P_TRANS}}, /* K2: scale favorite */
     {"CHORD", FAM_SCL, SC_TRACK, GR_CHORD, {P_CHRD, P_VOIC, P_STRUM, P_STROKE}},   /* SCL again: the chord keys (chord.c) */
-    {"CHORD 2", FAM_SCL, SC_TRACK, GR_CHORD, {P_CHEXT, P_CHBOR, 0xFF, 0xFF}},   /* DIA3 / DIA7 / a shape only (page_visible): EXTRA, BORROW */
+    {"CHORD 2", FAM_SCL, SC_TRACK, GR_CHORD, {P_CHEXT, P_CHBOR, P_SLOP, P_SRANGE}},   /* (page_visible) EXTRA, BORROW: DIA3 / DIA7 / a
+                                                                                    * shape only; SLOP, RANGE: a strum (Hookology) */
     {"CHORD SET", FAM_SCL, SC_TRACK, GR_HERA, {P_CHSET, P_VOIC, P_STRUM, P_STROKE}},   /* CHRD HERA only (page_visible): the map */
     {"MPC", FAM_SCL, SC_TRACK, GR_NONE, {P_MPCDEG, 0xFF, 0xFF, 0xFF}},   /* the degree of each bank's pad 02: a row of SCL's list
                                                                           * (QNT MPC only), not a page of its own */
@@ -878,9 +888,14 @@ static const param_desc_t *fx_rack_desc(const page_t *pg, uint32_t slot, int16_t
     }
     return track_desc(TSEL, id);
 }
+static int chord_extra_on(const track_t *t);           /* chord.c */
 static const param_desc_t *page_desc(const page_t *pg, uint32_t slot, int16_t **valp)
 {
     uint32_t id = pg->id[slot];
+    if (pg->graph == GR_CHORD && pg->id[0] == P_CHEXT &&                     /* (Hookology) CHORD 2: what applies */
+        (((id == P_CHEXT || id == P_CHBOR) && !chord_extra_on(TSEL)) || ((id == P_SLOP || id == P_SRANGE) && !TSEL->p[P_STRUM]))) {
+        *valp = 0; return 0;
+    }
     if (midi_track_only(TSEL) && ((pg->fam == FAM_FX && pg->scope == SC_TRACK) ||
         ((pg->scope == SC_TRACK || pg->scope == SC_ENGINE) && midi_track_audio_disabled(TSEL->eng_req, id)))) {
         *valp = 0; return 0;
@@ -982,5 +997,5 @@ static const param_desc_t *page_desc(const page_t *pg, uint32_t slot, int16_t **
 static int param_kept(uint32_t i)
 {
     return i == P_LEVEL || i == P_PAN || i == P_MUTE || (i >= P_AMODE && i <= P_SGATE) ||
-           i == P_CHRD || i == P_CHSET || i == P_VMAX || i == P_P5Q || i == P_CHEXT || i == P_CHBOR || i == P_VOIC || i == P_STRUM || i == P_STROKE || i == P_MPCDEG || i == P_RECQ || param_fx(i) || param_fx_send(i);
+           i == P_CHRD || i == P_CHSET || i == P_VMAX || i == P_P5Q || i == P_CHEXT || i == P_CHBOR || i == P_SLOP || i == P_SRANGE || i == P_VOIC || i == P_STRUM || i == P_STROKE || i == P_MPCDEG || i == P_RECQ || param_fx(i) || param_fx_send(i);
 }

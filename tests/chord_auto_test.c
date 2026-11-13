@@ -201,6 +201,7 @@ static void integration(void)
 int main(void)
 {
     _Static_assert(CH_POW == 9 && CH_AUTO == 10, "old chord IDs stay unchanged");
+    settings_sharps = 1;                                 /* (Hookology: the names below are spelled with sharps) */
     musical_examples(); every_scale(); context(); integration();
     puts("AUTO chord tests passed");
     return 0;

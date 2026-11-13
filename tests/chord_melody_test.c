@@ -158,5 +158,6 @@ static void lifecycle(void)
 int main(void)
 {
     _Static_assert(CH_AUTO==10 && CH_MELODY==11,"AUTO stays compatible; AUTO2 is appended");
+    settings_sharps=1;   /* (Hookology: the names below are spelled with sharps) */
     examples();exhaustive();transposition();independence();lifecycle();puts("AUTO2 chord tests passed");return 0;
 }

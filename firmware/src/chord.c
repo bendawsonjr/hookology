@@ -32,7 +32,22 @@ static const int8_t CHORD_SHAPE[CH_POW - CH_MAJ + 1][CHORD_MAX] = {
 static uint8_t kb_chord[27][CHORD_MAX], kb_chn[27];   /* the notes key k started (kb_chn 0: none) */
 /* Pending tones are separate from started ownership: early release never emits
  * an unmatched note-off or lets an unplayed tone keep another source alive. */
-typedef struct { uint32_t pos, beat; uint8_t total, rate, vel; } chord_strum_t;
+/* rate: bits 0-2 the division (N_STRUM), (Hookology) bit 3 RANGE 2 OCT, bit 4 the stroke went up, bits 5-7 the chord's
+ * own notes (with RANGE 2 OCT its strings are those and an octave above them: chord_tone_at); slop: bits 4-7 SLOP
+ * 0..15, bits 0-3 the press's seed (chord_strum_due). In the struct's spare byte: no RAM to grow it */
+typedef struct { uint32_t pos, beat; uint8_t total, rate, vel, slop; } chord_strum_t;
+#define STRUM_DIV(s) ((s)->rate & 7u)
+#define STRUM_OCT2 8u
+#define STRUM_UP 16u
+/* string i of a strum over notes (Hookology: RANGE 2 OCT, the chord's own notes and an octave above, in the stroke's
+ * order) */
+static uint32_t chord_tone_at(const uint8_t *notes, const chord_strum_t *s, uint32_t i)
+{
+    if (!(s->rate & STRUM_OCT2)) return notes[i];
+    uint32_t n = (uint32_t)s->rate >> 5, hi = (s->rate & STRUM_UP) ? i < n : i >= n, x = notes[i % (n ? n : 1u)] + (hi ? 12u : 0u);
+    return x < 128u ? x : notes[i % (n ? n : 1u)];
+}
+
 static chord_strum_t kb_strum[27];
 static uint32_t kb_strum_pending, midi_strum_pending;
 static uint8_t chord_alternate[NTRK];
@@ -368,7 +383,7 @@ static void chord_name(char *b, uint32_t root, uint32_t mask)
     uint32_t s5 = (mask >> 8) & 1u, d7 = (mask >> 9) & 1u, m7 = (mask >> 10) & 1u, M7 = (mask >> 11) & 1u;
     uint32_t n9 = (mask >> 2) & 1u, b9 = (mask >> 1) & 1u;   /* with a third: the 9th, the b9 (EXTRA, Hookology) */
     const char *q, *x = "";
-    str_cpy(b, N_NOTE[root % 12u], 12);
+    str_cpy(b, chord_note(root), 12);
     if (mi && !ma && b5 && !p5)
         q = d7 ? "dim7" : m7 ? "m7b5" : "dim";
     else if (ma && !mi && s5 && !p5)
@@ -410,7 +425,7 @@ static int mchord_held(uint32_t id, uint32_t note)
     for (i = 0; i < MCHORD_N; i++)
         if (mchord[i].id == id)
             for (j = 0; j < mchord[i].n; j++)
-                if (mchord[i].note[j] == note)
+                if (chord_tone_at(mchord[i].note, &mchord[i].strum, j) == note)
                     return 1;
     return 0;
 }
@@ -435,6 +450,8 @@ static uint32_t chord_strum_begin(track_t *t, uint8_t *notes, uint32_t n, chord_
     if (!rate || rate >= NELEM(N_STRUM) || n < 2u || t->p[P_AMODE]) return n;
     uint32_t up = t->p[P_STROKE] == 1;
     if (t->p[P_STROKE] == 2) up = chord_alternate[trk_index(t)]++ & 1u;
+    static uint8_t seed;                                 /* (SLOP: each press its own unevenness) */
+    s->slop = (uint8_t)(((uint32_t)clamp(t->p[P_SLOP], 0, 127) * 15u / 127u) << 4 | (seed++ * 7u & 15u));
     if (up) for (uint32_t i = 0; i < n / 2u; i++) {
         uint8_t x = notes[i]; notes[i] = notes[n - 1u - i]; notes[n - 1u - i] = x;
     }
@@ -446,6 +463,10 @@ static uint32_t chord_strum_begin(track_t *t, uint8_t *notes, uint32_t n, chord_
         notes[0] = melody;
     }
     s->total = (uint8_t)n; s->rate = (uint8_t)rate; s->vel = (uint8_t)vel;
+    if (t->p[P_SRANGE] == 1 && t->p[P_CHRD] != CH_MELODY && n <= CHORD_MAX) {   /* (Hookology) RANGE 2 OCT */
+        s->total = (uint8_t)(2u * n);
+        s->rate = (uint8_t)(rate | STRUM_OCT2 | (up ? STRUM_UP : 0u) | n << 5);
+    }
     s->beat = seq_beat_samples();
     return 1u;
 }
@@ -460,6 +481,12 @@ static uint32_t chord_strum_due(chord_strum_t *s, uint32_t started, uint32_t ela
         s->beat = beat;
     }
     s->pos += elapsed;
-    uint32_t target = (beat / DEN[s->rate]) * started / (s->total - 1u);
+    uint32_t span = beat / DEN[STRUM_DIV(s)], target = span * started / (s->total - 1u);
+    if (started && (s->slop >> 4)) {                     /* (Hookology) SLOP: up to the gap early or late, at random */
+        uint32_t r = span / (s->total - 1u) * (s->slop >> 4) / 15u, h = (started * 2654435761u) ^ ((s->slop & 15u) * 40503u);
+        h ^= h >> 13; h *= 2246822519u; h ^= h >> 16;
+        int32_t j = (int32_t)(h % (2u * r + 1u)) - (int32_t)r;
+        target = (int32_t)target + j > 0 ? (uint32_t)((int32_t)target + j) : 0u;
+    }
     return s->pos < target ? target - s->pos : 0u;
 }

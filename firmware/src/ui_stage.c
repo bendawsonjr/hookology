@@ -155,11 +155,11 @@ static int stage_notes(int32_t x1, int32_t cy)
     bass = note[0] % 12u;
     q = micro_active(TSEL) ? 0 : chord_of(pcs, bass, &root);
     if (q) {
-        x = cv_text(x, ty_y(cy, tf), tf, N_NOTE[root], c);
+        x = cv_text(x, ty_y(cy, tf), tf, chord_note(root), c);
         x = cv_text(x, ty_y(cy, tf), tf, q, c);
         if (root != bass) {
             x = cv_text(x + 2, ty_y(cy, tf), tf, "/", c);
-            x = cv_text(x, ty_y(cy, tf), tf, N_NOTE[bass], c);
+            x = cv_text(x, ty_y(cy, tf), tf, chord_note(bass), c);
         }
         x += 10;
     }

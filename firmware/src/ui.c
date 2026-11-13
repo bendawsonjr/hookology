@@ -359,7 +359,8 @@ static int page_visible(uint32_t i)
     if (PAGES[i].graph == GR_PATGRID && !page_patterns_on) return 0;
     if (PAGES[i].graph == GR_SONG && !page_song_on) return 0;
     if (PAGES[i].graph == GR_HERA && (TSEL->p[P_CHRD] != CHRD_HERA || chord_kit(TSEL))) return 0;
-    if (PAGES[i].graph == GR_CHORD && PAGES[i].id[0] == P_CHEXT && !chord_extra_on(TSEL)) return 0;   /* CHORD 2 */
+    if (PAGES[i].graph == GR_CHORD && PAGES[i].id[0] == P_CHEXT &&       /* CHORD 2: EXTRA / BORROW, or a strum's SLOP / RANGE */
+        !chord_extra_on(TSEL) && !(TSEL->p[P_CHRD] && TSEL->p[P_STRUM] && !chord_kit(TSEL))) return 0;
     if (midi_track_only(TSEL)) {
         if (trk_midi_slot(song.sel) && PAGES[i].graph == GR_BROWSE) return 0;   /* (tracks 5..8: no other sound) */
         if (PAGES[i].fam == FAM_ENV || PAGES[i].fam == FAM_LFO) return 0;

@@ -143,6 +143,7 @@ static int settings_import(persist_t *p, int n)
         for (uint32_t k = 0; k < VOICE_KINDS; k++)
             settings_vpoints[k] = (int16_t)(tagged && w[2u + k] <= 15u ? w[2u + k] : 0u);
         settings_safety = (int16_t)(!tagged || !(w[7] & 1u));
+        settings_sharps = (int16_t)(tagged && (w[7] & 2u));   /* (Hookology: CHORD NAMES SHARP) */
     }
     return 1;
 }
@@ -199,12 +200,12 @@ static void settings_export(persist_t *p)
     memcpy(p->ext.glo, settings_glo, sizeof settings_glo);
     {
         uint8_t *w = p->favorites.factory[VOICE_PREF_ROW] + VOICE_PREF_BYTE;
-        uint32_t custom = !settings_safety;
+        uint32_t custom = !settings_safety || settings_sharps;
         for (uint32_t k = 0; k < VOICE_KINDS; k++)
             custom |= settings_vpoints[k] != 0;
         memset(w, 0, 8);
         if (custom) {
-            w[0] = 'W'; w[1] = 1u; w[7] = (uint8_t)!settings_safety;
+            w[0] = 'W'; w[1] = 1u; w[7] = (uint8_t)(!settings_safety | (settings_sharps ? 2u : 0u));
             for (uint32_t k = 0; k < VOICE_KINDS; k++)
                 w[2u + k] = (uint8_t)settings_vpoints[k];
         }

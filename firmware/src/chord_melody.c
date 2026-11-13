@@ -113,6 +113,6 @@ static void chord_melody_name(char *b, uint32_t root, uint32_t mask)
         for (uint32_t j = 0; j < 3u; j++) shape |= 1u << CH_MELODY_SHAPE[i].pitch[j];
         if (shape == mask) { name = CH_MELODY_SHAPE[i].name; break; }
     }
-    str_cpy(b, N_NOTE[root % 12u], 12);
+    str_cpy(b, chord_note(root), 12);
     str_cpy(b + str_len(b), name, 12 - str_len(b));
 }
