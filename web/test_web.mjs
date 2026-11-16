@@ -1253,6 +1253,22 @@ async function editorFm6() {
 }
 
 /* ------------------------------------------------- editor tabs and strings --- */
+/* (Hookology) the Sound page's ENV / LFO cards edit a Prophet field at once (PROPHET op 2) */
+async function editorProphetField() {
+  const m = E.makeMockDevice({ auto: false });
+  const link = new E.Link((d) => [...m.access.outputs.values()][0].send(d), { timeout: 100 });
+  [...m.access.inputs.values()][0].onmidimessage = (e) => link.receive(e.data);
+  const rq = (r) => link.request(r), C = E.CMD;
+  await rq(E.req.info());
+  m.state.tracks[0].engine = 19; m.state.tracks[0].p5 = E.P5.init();
+  const before = E.parse[C.PROPHET](await rq(E.req.prophetGet(0))).raw;
+  let r = E.parse[C.PROPHET](await rq(E.req.prophetSet(0, 43, 99)));       /* the filter envelope's attack */
+  const after = E.parse[C.PROPHET](await rq(E.req.prophetGet(0))).raw;
+  ok(!r.rc && after[43] === 99 && after.every((x, i) => i === 43 || x === before[i]), "Prophet card: one field changes on the track, the rest stays");
+  r = E.parse[C.PROPHET](await rq(E.req.prophetSet(0, 41, 5)));              /* VEL FLT is OFF / ON only */
+  ok(r.rc === 1, "Prophet card: a value out of the field's range is refused");
+}
+
 /* (Hookology) LIVE (command 81) against the mock */
 async function editorLivePage() {
   const m = E.makeMockDevice({ auto: false, advancedSong: true, songLoop: true, songSections: true, live: true });
@@ -1891,6 +1907,7 @@ await editorTrackParam();
 await editorSong();
 await editorSongSections();
 await editorLivePage();
+await editorProphetField();
 await editorSessions();
 await editorFm6();
 await editorFm4();

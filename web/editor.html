@@ -445,7 +445,7 @@
     <p class="dim" id="ctlhelp" data-t="ctlHelp"></p>
     <div id="p5panel" class="group" hidden>
       <h2>Prophet native programs</h2>
-      <p class="dim">Read the selected track before editing. Imported libraries stay browsable here; save programs in the shared user bank.</p>
+      <p class="dim">The selected track's program: every change goes to the FM-1 at once (its envelopes and LFO are on the ENV and LFO cards below). Imported libraries stay browsable here; Send to track loads a whole program; save programs in the shared user bank.</p>
       <p class="bar"><button id="p5import">Import .syx</button><input id="p5file" type="file" accept=".syx" hidden>
         <select id="p5voices" aria-label="Imported Prophet program"></select><button id="p5read">Read track</button><button id="p5send">Send to track</button>
         <button id="p5export">Export program .syx</button><button id="p5exportbank">Export imported library .syx</button><button id="p5library">Add to library</button></p>
@@ -1092,6 +1092,7 @@ function upName(s) { return String(s ?? "").replace(/[^\x20-\x7E]/g, "").trim().
 const req = {
   prophetGet: track => [CMD.PROPHET,[0,track]],
   prophetPut: (track,raw) => [CMD.PROPHET,[1,track,...P5.sysex(raw).slice(1,-1)]],
+  prophetSet: (track,id,v) => [CMD.PROPHET,[2,track,id&127,v&127]],   /* (one field, no note cut) */
   prophetEdit: (track,id,value) => [CMD.PROPHET,[2,track,id,value]],
   native: (engine,op,index,...args) => [CMD.NATIVE,[engine,op,index,...args]],
   czBank: bank => [CMD.CZ_BANK,[bank]],
@@ -3596,6 +3597,8 @@ const TEXT = {
     badEngine: "このファームウェアにないエンジンです: ", flashFail: "書き込みに失敗しました（rc {rc}）",
     installer: "Melodee インストーラー",
     tabSeq: "シーケンサー", tabTracks: "トラック", tabSettings: "設定",
+    envOwn: "このエンジンには専用のエンベロープがあります。", envCz: "CZ-1 のエンベロープ（各ラインのピッチ・波形・音量、各 8 ポイント）は上の CZ-1 パネルにあります。トラックの ENV は効きません。",
+    envFm6Ops: "各オペレーターのエンベロープは 6-OP FM ページ（FM-1 では ENV）にあります。トラックの ENV は FM6 では効きません。",
     tabLive: "ライブ", liveTap: "タップ", liveSwing: "スイング", livePlay: "再生", livePlaySong: "ソング再生", liveSections: "セクション",
     liveSecHelp: "セクションをタップ: ループの終わりから再生（停止中はすぐ）。再生中は塗りつぶし、次は点滅。",
     livePlaying: "再生中", liveReady: "準備", liveNext: "次", liveKeys: "鍵盤", liveBusy: "今はできません。ソングを停止するか録音を終えてください。",
@@ -3715,6 +3718,8 @@ const TEXT = {
     badEngine: "This firmware has no such engine: ", flashFail: "Write failed (rc {rc})",
     installer: "Hookology installer",
     tabSeq: "Sequencer", tabTracks: "Tracks", tabSettings: "Settings",
+    envOwn: "This engine has envelopes of its own.", envCz: "The CZ-1's envelopes (8 points each: pitch, waveform and amplitude of each line) are in the CZ-1 panel above; the track's ENV does nothing on it.",
+    envFm6Ops: "Each operator's envelope is on the 6-OP FM page (and ENV on the FM-1). The track's ENV does nothing on FM6.",
     tabLive: "LIVE", liveTap: "Tap", liveSwing: "SWING", livePlay: "Play", livePlaySong: "Play song", liveSections: "Sections",
     liveSecHelp: "Tap a section: it plays from the section's loop end (stopped: at once). The one playing is filled, the one coming blinks.",
     livePlaying: "Playing", liveReady: "Ready", liveNext: "Next", liveKeys: "Keys", liveBusy: "Not now: stop the song or finish the take first.",
@@ -4042,7 +4047,8 @@ async function load(d) {
     assertSession(d);
     if (d.info.ntrk) d.sel = parse[CMD.TRACK](await sessionRequest(d, req.track())).sel;   /* v3: the selected track */
     d.dump = await getDump(d);
-    if(d.dump.p5){p5Tone=d.dump.p5.slice();p5Render();}
+    if(d.dump.p5){p5Tone=d.dump.p5.slice();p5Live=true;p5Render();}
+    if (d.info.fm6 && d.info.engines[d.dump.engine] === "FM6") await fm6CardRead(d);
     if (d.info.chainRows) d.song = songParse(d, await sessionRequest(d, songRequest(d)));
     buildUI();
     renderPanels();
@@ -4188,6 +4194,114 @@ function modDst(d, txt) {
   return e && visible(e) ? e.label : txt;
 }
 
+/* ---- (Hookology) ENV and LFO as the FM-1's buttons: an engine with envelopes of its own (Prophet, FM6, CZ-1) shows
+   them on ENV instead of the track's ADSR and ENV DEST (which do nothing there), and its own LFO first on LFO.
+   Prophet: its program's fields, each sent as it moves (PROPHET op 2: no note cut). FM6: its voice, sent 150 ms
+   after the last move. CZ-1: its 8-point envelopes stay in the CZ-1 panel (a note says so). */
+const OWN_ENV = new Set(["PROPHET", "FM6", "CZ-1"]);
+const P5_ENV_PAGES = [["FILTER ENV", [[43, "ATK"], [45, "DEC"], [47, "SUS"], [49, "REL"]]],
+  ["AMP ENV", [[44, "ATK"], [46, "DEC"], [48, "SUS"], [50, "REL"]]],
+  ["ENV MOD", [[40, "ENV AMT"], [41, "VEL FLT"], [42, "VEL AMP"], [51, "RELEASE"]]]];
+const P5_LFO_PAGES = [["PROPHET LFO", [[21, "RATE"], [23, "SAW"], [24, "TRI"], [25, "SQUARE"]]],
+  ["WHEEL", [[22, "INITIAL"], [26, "N MIX"], [27, "FREQ A"], [28, "FREQ B"]]],
+  ["WHEEL 2", [[29, "PW A"], [30, "PW B"], [31, "FILTER"], [13, "GLIDE"]]]];
+const P5_CARD_IDS = new Set([...P5_ENV_PAGES, ...P5_LFO_PAGES].flatMap(([, f]) => f.map(([id]) => id)));
+const FM6_ENV_PAGES = () => [["PITCH EG", [0, 1, 2, 3].map((k) => [FM6.VI.PR1 + k, "R" + (k + 1)])],
+  ["PITCH LV", [0, 1, 2, 3].map((k) => [FM6.VI.PL1 + k, "L" + (k + 1)])]];
+const FM6_LFO_PAGES = () => [["FM LFO", [[FM6.VI.LFW, "WAVE", FM6_WAVES], [FM6.VI.LFS, "SPEED"], [FM6.VI.LFD, "DELAY"], [FM6.VI.LKS, "KSYNC", ["OFF", "ON"]]]],
+  ["FM LFO 2", [[FM6.VI.LPMD, "PMD"], [FM6.VI.LAMD, "AMD"], [FM6.VI.LPMS, "PMS"]]]];
+/* a knob tile for a native value: label, range (or a menu), its value; it drags like the others */
+function nativeRow(label, v, min, max, names, set) {
+  const out = el("span", { class: "v" });
+  let input;
+  const show = (x) => { out.textContent = names ? names[x - min] ?? String(x) : String(x); };
+  if (names) {
+    input = el("select", {}, ...names.map((n, i) => el("option", { value: min + i, text: n })));
+    input.addEventListener("change", () => { set(+input.value, true); show(+input.value); });
+  } else {
+    input = el("input", { type: "range", min, max, step: 1 });
+    input.addEventListener("input", () => { set(+input.value, false); show(+input.value); });
+    input.addEventListener("change", () => set(+input.value, true));
+    let y0 = 0, v0 = 0, drag = false;
+    out.title = t("dragHelp");
+    out.addEventListener("pointerdown", (e) => { if (e.button) return; drag = true; y0 = e.clientY; v0 = +input.value; out.setPointerCapture(e.pointerId); e.preventDefault(); });
+    out.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const span = max - min, px = e.shiftKey ? 600 : Math.max(120, Math.min(260, span * 3));
+      const nv = Math.max(min, Math.min(max, Math.round(v0 + (y0 - e.clientY) * span / px)));
+      if (nv !== +input.value) { input.value = String(nv); show(nv); set(nv, false); }
+    });
+    out.addEventListener("pointerup", () => { if (drag) { drag = false; set(+input.value, true); } });
+  }
+  input.value = String(v);
+  input.title = label;
+  show(v);
+  return el("div", { class: "row" }, el("span", { text: label }), input, out);
+}
+const nativePages = (pages, get, set) => pages.flatMap(([title, fields]) => [el("h3", { text: title }),
+  el("div", { class: "page" }, ...fields.map(([i, lab, names]) => {
+    const f = names ? { min: 0, max: names.length - 1 } : get.range(i);
+    return nativeRow(lab, get.value(i), f.min, f.max, names || get.names(i), (v, fin) => set(i, v, fin));
+  }))]);
+/* Prophet: a field to the FM-1 at once (throttled while dragging, the last value always sent) */
+const p5Pending = new Map();
+let p5Flush = null;
+let p5Live = true;                                       /* the panel shows the track's own program (not an import) */
+function p5Field(id, v, final) {
+  if (dev && dev.dump && dev.dump.p5) dev.dump.p5[id] = v;
+  if (p5Live) p5Tone[id] = v;
+  p5Pending.set(id, v);
+  if (!final && p5Flush) return;
+  clearTimeout(p5Flush);
+  p5Flush = setTimeout(async () => {
+    p5Flush = null;
+    const d = dev, tr = d && (d.sel || 0), items = [...p5Pending];
+    p5Pending.clear();
+    if (!d) return;
+    try { for (const [i, x] of items) { const r = parse[CMD.PROPHET](await rq(req.prophetSet(tr, i, x))); if (r.rc) throw Error("Prophet value rejected"); } }
+    catch (err) { report(err); }
+  }, final ? 0 : 60);
+}
+/* FM6: the selected track's voice (read with the track), sent whole 150 ms after the last move */
+let fm6Card = null, fm6CardTimer = null;
+async function fm6CardRead(d = dev) {
+  if (!d || !d.info.fm6 || engName() !== "FM6") { fm6Card = null; return; }
+  const r = parse[CMD.FM6_GET](await sessionRequest(d, req.fm6Get(FM6.TARGET.TRACK, d.sel || 0)));
+  if (r.rc) { fm6Card = null; return; }
+  fm6Card = FM6.unpack(r.packed);
+}
+function fm6CardSet(i, v) {
+  if (!fm6Card) return;
+  fm6Card[i] = Math.max(0, Math.min(FM6.max(i), v));
+  clearTimeout(fm6CardTimer);
+  fm6CardTimer = setTimeout(() => {
+    const d = dev;
+    if (!d || !fm6Card) return;
+    rq(req.fm6Put(FM6.TARGET.TRACK, d.sel || 0, FM6.pack(fm6Card))).then((a) => checkRc(parse[CMD.FM6_PUT](a).rc)).catch(report);
+  }, 150);
+}
+/* ENV / LFO cards for an engine of its own (null: the track's, as LAYOUT has them) */
+function ownEnvCard(eng) {
+  const head = el("h2", { ic: HEAD_IC.ENV, text: "ENV" });
+  if (eng === "PROPHET" && dev.dump.p5)
+    return el("div", { class: "group" }, head, ...nativePages(P5_ENV_PAGES,
+      { value: (i) => dev.dump.p5[i], range: (i) => P5.FIELDS.find((f) => f.id === i), names: (i) => P5.FIELDS.find((f) => f.id === i).names },
+      (i, v, fin) => p5Field(i, v, fin)));
+  if (eng === "FM6" && fm6Card)
+    return el("div", { class: "group" }, head, ...nativePages(FM6_ENV_PAGES(),
+      { value: (i) => fm6Card[i], range: (i) => ({ min: 0, max: FM6.max(i) }), names: () => null }, (i, v) => fm6CardSet(i, v)),
+      el("p", { class: "dim", text: t("envFm6Ops") }));
+  return el("div", { class: "group" }, head, el("p", { class: "dim", text: t(eng === "CZ-1" ? "envCz" : eng === "FM6" ? "envFm6Ops" : "envOwn") }));
+}
+function ownLfoPages(eng) {
+  if (eng === "PROPHET" && dev.dump.p5)
+    return nativePages(P5_LFO_PAGES, { value: (i) => dev.dump.p5[i], range: (i) => P5.FIELDS.find((f) => f.id === i), names: (i) => P5.FIELDS.find((f) => f.id === i).names },
+      (i, v, fin) => p5Field(i, v, fin));
+  if (eng === "FM6" && fm6Card)
+    return nativePages(FM6_LFO_PAGES(), { value: (i) => fm6Card[i], range: (i) => ({ min: 0, max: FM6.max(i) }), names: () => null }, (i, v) => fm6CardSet(i, v));
+  return [];
+}
+
 function buildGroups() {
   ctl.clear();
   dev.built = dev.dump.engine;
@@ -4196,9 +4310,12 @@ function buildGroups() {
   const groups = { groups: [], seqgroups: [], setgroups: [] };
   const { info } = dev;
   if (knownLayout(info)) {
+    const own = engName();
     for (const g of LAYOUT(info.pe0)) {
-      if (dev.dump.engine===15 && ["ENV","EDIT"].includes(g.t)) continue;
+      if (g.t === "ENV" && OWN_ENV.has(own)) { groups.groups.push(ownEnvCard(own)); continue; }   /* (Hookology: as the FM-1) */
+      if (dev.dump.engine===15 && g.t === "EDIT") continue;
       const div = el("div", { class: "group" }, el("h2", { ic: HEAD_IC[g.t], text: g.engine ? `EDIT ${info.engines[dev.dump.engine] || ""}` : g.t }));
+      if (g.t === "LFO") div.append(...ownLfoPages(own));                                  /* (its own LFO first) */
       if (g.mod != null) {                          /* MOD: slot number, SRC, DST, AMT in one row */
         for (let k = 0; k < 4; k++) {
           const r = [0, 1, 2].map((j) => paramRow(0, g.mod + 3 * k + j));
@@ -4422,10 +4539,12 @@ async function afterSoundChange(msg = "ready", d = dev) {
   assertSession(d);
   needReload = false;                               /* this re-reads everything a RELOAD asks for */
   d.dump = await getDump(d);
-  if(d.dump.p5){p5Tone=d.dump.p5.slice();p5Render();}
+  if(d.dump.p5){p5Tone=d.dump.p5.slice();p5Live=true;p5Render();}
+  if (d.info.fm6 && d.info.engines[d.dump.engine] === "FM6") await fm6CardRead(d); else fm6Card = null;
   await rereadEngineDesc(d);
   await rereadMpcDesc(d);
   updateBrowser();
+  if (OWN_ENV.has(engName())) buildGroups();        /* (Hookology: its ENV / LFO cards show this sound) */
   refreshAll();
   await loadSteps(d);                                /* (a sound load keeps them; read anyway after a RELOAD) */
   if (hasTracks()) await readMixer(d);               /* the sound names and the selected strip */
@@ -5728,13 +5847,14 @@ let p5Voices=[],p5Tone=P5.init();
 function p5Render(){
   $("p5name").value=P5.name(p5Tone);const root=$("p5controls");root.replaceChildren();
   const groups=[['Oscillator A',[0,3,4,8,10]],['Oscillator B',[1,2,5,6,7,9,11,12]],['Mixer',[14,15,16]],['Filter',[17,18,19,20,40]],['Filter envelope',[43,45,47,49,41]],['Amplifier envelope',[44,46,48,50,42,51]],['Poly-Mod',[32,33,34,35,36]],['LFO and wheel',[21,22,23,24,25,26,27,28,29,30,31]],['Performance',[13,37,38,39,52,53,54,86,87]]];
-  for(const [name,ids] of groups){const g=el("fieldset",{},el("legend",{},name));for(const id of ids){const f=P5.FIELDS.find(f=>f.id===id),input=f.names?el("select",{},...f.names.map((name,i)=>el("option",{value:i},name))):el("input",{type:"number",min:f.min,max:f.max,step:1});if(id===86){input.min=1;input.max=12;}input.value=p5Tone[id]+(id===86?1:0);input.addEventListener("change",()=>{const value=+input.value-(id===86?1:0);if(!Number.isInteger(value)||value<f.min||value>f.max){input.value=p5Tone[id]+(id===86?1:0);return;}p5Tone[id]=value;});g.append(el("p",{},el("label",{},f.label+" ",input)));}root.append(g);}
+  for(const [name,all] of groups){const ids=all.filter(id=>!P5_CARD_IDS.has(id));if(!ids.length)continue;   /* (Hookology: the ENV / LFO cards' fields are there) */
+    const g=el("fieldset",{},el("legend",{},name));for(const id of ids){const f=P5.FIELDS.find(f=>f.id===id),input=f.names?el("select",{},...f.names.map((name,i)=>el("option",{value:i},name))):el("input",{type:"number",min:f.min,max:f.max,step:1});if(id===86){input.min=1;input.max=12;}input.value=p5Tone[id]+(id===86?1:0);input.addEventListener("change",()=>{const value=+input.value-(id===86?1:0);if(!Number.isInteger(value)||value<f.min||value>f.max){input.value=p5Tone[id]+(id===86?1:0);return;}p5Tone[id]=value;if(p5Live&&dev&&dev.dump&&dev.dump.engine===19&&dev.dump.p5)p5Field(id,value,true);}   /* (Hookology: live, as the ENV / LFO cards) */);g.append(el("p",{},el("label",{},f.label+" ",input)));}root.append(g);}
 }
-$("p5name").addEventListener("change",()=>P5.setName(p5Tone,$("p5name").value));
+$("p5name").addEventListener("change",()=>{P5.setName(p5Tone,$("p5name").value);if(p5Live&&dev&&dev.dump&&dev.dump.engine===19){const nm=P5.name(p5Tone).trimEnd()||" ";rq([CMD.PROPHET,[3,dev.sel||0,...Array.from(nm,c=>c.charCodeAt(0)&127)]]).catch(report);}});
 $("p5import").addEventListener("click",()=>$("p5file").click());
-$("p5file").addEventListener("change",async()=>{const f=$("p5file").files[0];if(!f)return;try{const imported=P5.read(new Uint8Array(await f.arrayBuffer()));p5Voices=imported.voices;$("p5voices").replaceChildren(...p5Voices.map((v,i)=>el("option",{value:i},`${i+1}. ${v.name}`)));p5Tone=p5Voices[0].raw.slice();p5Render();say(`Imported ${p5Voices.length} Prophet programs`);}catch(e){say(e.message);}finally{$("p5file").value="";}});
-$("p5voices").addEventListener("change",()=>{p5Tone=p5Voices[+$("p5voices").value].raw.slice();p5Render();});
-$("p5read").addEventListener("click",()=>op(async()=>{const r=parse[CMD.PROPHET](await rq(req.prophetGet(dev.sel||0)));if(r.rc)throw Error("Cannot read Prophet program");p5Tone=r.raw;p5Render();say("Prophet program read from track");}));
+$("p5file").addEventListener("change",async()=>{const f=$("p5file").files[0];if(!f)return;try{const imported=P5.read(new Uint8Array(await f.arrayBuffer()));p5Voices=imported.voices;p5Live=false;$("p5voices").replaceChildren(...p5Voices.map((v,i)=>el("option",{value:i},`${i+1}. ${v.name}`)));p5Tone=p5Voices[0].raw.slice();p5Render();say(`Imported ${p5Voices.length} Prophet programs`);}catch(e){say(e.message);}finally{$("p5file").value="";}});
+$("p5voices").addEventListener("change",()=>{p5Tone=p5Voices[+$("p5voices").value].raw.slice();p5Live=false;p5Render();});
+$("p5read").addEventListener("click",()=>op(async()=>{const r=parse[CMD.PROPHET](await rq(req.prophetGet(dev.sel||0)));if(r.rc)throw Error("Cannot read Prophet program");p5Tone=r.raw;p5Live=true;p5Render();say("Prophet program read from track");}));
 $("p5send").addEventListener("click",()=>op(async()=>{const d=dev,r=parse[CMD.PROPHET](await rq(req.prophetPut(d.sel||0,p5Tone)));if(r.rc)throw Error("Prophet program rejected");await afterSoundChange("ready",d);}));
 $("p5export").addEventListener("click",()=>downloadBytes(`${fileSlug(P5.name(p5Tone))}.syx`,P5.sysex(p5Tone)));
 $("p5exportbank").addEventListener("click",()=>{if(!p5Voices.length){say("Import a library first");return;}const voices=p5Voices.map(v=>v.raw);voices[+$("p5voices").value]=p5Tone;downloadBytes(`prophet-library-${today()}.syx`,new Uint8Array(voices.flatMap(v=>Array.from(P5.sysex(v)))));});
