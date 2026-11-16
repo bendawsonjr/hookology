@@ -178,7 +178,8 @@
   .list .none { padding: 8px; color: var(--dim); }
   .list button { background: none; border: 0; min-height: 30px; padding: 0 8px; text-align: left; }
   .list button:hover { color: var(--accent); }
-  .list col.n { width: 60px; } .list col.e { width: 72px; } .list col.d { width: 78px; }
+  .list col.n { width: 60px; } .list col.c { width: 120px; }
+  .list select.catpick { min-height: 28px; padding: 2px 6px; width: 100%; } .list col.e { width: 72px; } .list col.d { width: 78px; }
 
   /* (Hookology) LIVE */
   .live-tp { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; }
@@ -698,7 +699,7 @@ const CMD = { INFO: 1, GET: 2, SET: 3, DUMP: 4, DESC: 5, STEP_GET: 6, STEP_SET: 
   TRACK_PARAM: 31, TRACK_CHANGED: 32, SONG: 33, PATTERN: 73, BANK_SONG: 74,
   UI_STATE: 34, UI_SET: 35, UI_PALETTES: 36, FAV_GET: 37, FAV_SET: 38,
   MOTION: 64, BACKUP_LIST: 65, BACKUP_GET: 66, BACKUP_PUT: 67,
-  FM6_GET: 68, FM6_PUT: 69, FM6_LIST: 70, FM6_ERASE: 71, CZ_GET: 75, CZ_PUT: 76, CZ_BANK: 77, NATIVE: 78, LIBRARY:80, LIVE: 81, PROPHET:95 };
+  FM6_GET: 68, FM6_PUT: 69, FM6_LIST: 70, FM6_ERASE: 71, CZ_GET: 75, CZ_PUT: 76, CZ_BANK: 77, NATIVE: 78, LIBRARY:80, LIVE: 81, UP_CAT: 83, PROPHET:95 };
 /* frames the device sends on its own (while WATCH is on); never replies */
 
 /*P5-FACTORY-BEGIN*/
@@ -898,6 +899,7 @@ const parse = {
     o.patterns = o.motionMax && o.backupCaps && trailer[11] === 0x50 && [1,2,3,4,5].includes(trailer[12]) && trailer[13] === 8 ? 8 : 0;
     o.songSections = !!o.motionMax && !!o.backupCaps && trailer[11] === 0x50 && trailer[12] >= 5;   /* (Hookology) the Song page: ops 5..7 */
     o.live = o.songSections && trailer[12] >= 6;                                                     /* (Hookology) LIVE: command 81 */
+    o.upCat = o.songSections && trailer[12] >= 7;                                                    /* (Hookology) categories: command 83 */
     if (o.patterns) o.chainRows = [16,64].includes(trailer[14]) ? trailer[14] : 0;
     o.songRests = !!o.patterns && trailer[12] >= 2;
     o.songBlocks = !!o.patterns && trailer[12] >= 3;
@@ -961,6 +963,12 @@ const parse = {
     return { track: a[0], op: a[1], rc: a[2], active: a[3], queued: a[4], count: a[5] };
   },
   /* (Hookology) LIVE (command 81): the transport, the sections, the solo, every track's mute and level */
+  /* (Hookology) the user sounds' categories (firmware browse.c CAT_*, 0 Auto): op 0 every slot's, op 1 one set */
+  [CMD.UP_CAT](a) {
+    if (a[0] === 1) { if (a.length !== 5) throw new Error("Invalid category reply"); return { op: 1, rc: a[1], slot: a[2] | a[3] << 7, cat: a[4] }; }
+    if (a.length < 2 || a.some((x, i) => i >= 2 && x > 13)) throw new Error("Invalid category reply");
+    return { op: 0, rc: a[1], cats: a.slice(2) };
+  },
   [CMD.LIVE](a) {
     const r = new Reader(a);
     const o = { op: r.b(), rc: r.b(), playing: !!r.b(), counting: !!r.b(), rec: r.b() | r.b() << 7, chain: !!r.b(), row: r.b(), count: r.b(),
@@ -1125,6 +1133,8 @@ const req = {
   },
   /* (Hookology) LIVE: 0 state, 1 PLAY / STOP, 2 REC, 3 section s, 4 solo mask, 5 note (track, note, velocity; 0 off) */
   live: (op = 0, ...a) => [CMD.LIVE, [op, ...a.map((x) => x & 0x7F)]],
+  upCats: () => [CMD.UP_CAT, [0]],
+  upCatSet: (slot, cat) => [CMD.UP_CAT, [1, slot & 0x7F, slot >> 7 & 0x7F, cat & 0x7F]],
   /* op 5 read, 6 write ({sec, repeat, src: the entry it was, or null}), 7 SONG MODE (value 0 / 1) */
   songSections: (op = 5, rows = [], value = 0) => [CMD.BANK_SONG, op === 6 ? [6, rows.length, ...rows.flatMap((r) => [r.sec & 0x7F, r.repeat, r.src == null ? 0x7F : r.src])]
     : op === 7 ? [7, value ? 1 : 0] : [5]],
@@ -1189,7 +1199,7 @@ function replyMatches(cmd, args, a) {
     case CMD.STEP_GET: case CMD.STEP_SET: case CMD.NAMES:
     case CMD.SMP_BEGIN: case CMD.SMP_END: case CMD.SMP_ERASE: return a[0] === args[0];
     case CMD.SMP_WRITE: return a[0] === args[0] && a[1] === args[1] && a[2] === args[2] && a[3] === args[3];
-    case CMD.BANK_SONG: case CMD.SONG: case CMD.LIVE: return a[0] === args[0];
+    case CMD.BANK_SONG: case CMD.SONG: case CMD.LIVE: case CMD.UP_CAT: return a[0] === args[0];
     case CMD.PATTERN: return a[0] === args[0] && a[1] === args[1];
     case CMD.PROPHET: return a[2]===args[1]&&a[0]===(args[0]<=1?1:args[0]);
     case CMD.LIBRARY: return a[0]===args[0]&&a[1]===args[1]&&a[2]===args[2];
@@ -2815,7 +2825,7 @@ function makeMockDevice(opt = {}) {
         if (!opt.legacy) b(NTRK);
         if (!opt.legacy && !opt.v3 && !opt.v5) {
           b(0);
-          if (st.uiCaps) { [0x55,1,st.uiCaps,0x4d,2,64,1,0x42,1,3,0x50,opt.live?6:opt.songSections?5:opt.songLoop?4:opt.advancedSong?3:1,8,opt.advancedSong?64:16].forEach(b); if (!opt.noFm6) [0x46,1,FM6.FACTORY_PK.length,FM6_BANK,0x43,1,16,1,0,0,0x35,1,19,16,17,18,20,0,1,0x4e,1,64,0,0,1].forEach(b); if(opt.shared)[0x55,1,0,3].forEach(b); }
+          if (st.uiCaps) { [0x55,1,st.uiCaps,0x4d,2,64,1,0x42,1,3,0x50,opt.upCat?7:opt.live?6:opt.songSections?5:opt.songLoop?4:opt.advancedSong?3:1,8,opt.advancedSong?64:16].forEach(b); if (!opt.noFm6) [0x46,1,FM6.FACTORY_PK.length,FM6_BANK,0x43,1,16,1,0,0,0x35,1,19,16,17,18,20,0,1,0x4e,1,64,0,0,1].forEach(b); if(opt.shared)[0x55,1,0,3].forEach(b); }
         }
         break;
       case CMD.GET: case CMD.SET: {
@@ -2933,6 +2943,12 @@ function makeMockDevice(opt = {}) {
         if(op){if(bank>7||op===2&&dest>7)rc=1;else if(op===2)t.patternBanks[dest]=bank===t.pattern?take():JSON.parse(JSON.stringify(t.patternBanks[bank]));
           else {t.patternBanks[t.pattern]=take();t.pattern=bank;const saved=t.patternBanks[bank];t.step=saved?JSON.parse(JSON.stringify(saved.step)):Array.from({length:NSTEP},()=>({...EMPTY,notes:[0,0,0,0],chance:100}));t.motion=saved?JSON.parse(JSON.stringify(saved.motion)):{on:false,events:[]};t.p.splice(29,4,...(saved?.timing||TP.slice(29,33).map(d=>d.def)));}}
         [tr,op,rc,t.pattern,127,8].forEach(b);break;
+      }
+      case CMD.UP_CAT: {                                 /* (Hookology) the user sounds' categories */
+        if(!opt.upCat||!a.length||a[0]>1)return null;const C=st.upCat??=Array(384).fill(0);
+        if(a[0]===1){const k=a[1]|a[2]<<7,used=!!st.bank[k];let rc=a.length!==4||k>=384||a[3]>13||!used?1:0;if(!rc)C[k]=a[3];[1,rc,a[1],a[2],C[k]??0].forEach(b);}
+        else{b(0);b(0);C.forEach((c,k)=>b(st.bank[k]?c:0));}
+        break;
       }
       case CMD.LIVE: {                                   /* (Hookology) LIVE: a small transport for the page */
         if(!opt.live||!a.length||a[0]>5)return null;let rc=0;const L=st.live??={playing:false,rec:0,sec:0,next:127,solo:0,idx:0,notes:[]};
@@ -3599,6 +3615,7 @@ const TEXT = {
     tabSeq: "シーケンサー", tabTracks: "トラック", tabSettings: "設定",
     envOwn: "このエンジンには専用のエンベロープがあります。", envCz: "CZ-1 のエンベロープ（各ラインのピッチ・波形・音量、各 8 ポイント）は上の CZ-1 パネルにあります。トラックの ENV は効きません。",
     envFm6Ops: "各オペレーターのエンベロープは 6-OP FM ページ（FM-1 では ENV）にあります。トラックの ENV は FM6 では効きません。",
+    category: "カテゴリー", catAuto: "自動", catRefused: "このサウンドにはカテゴリーを保存できません（古い CZ-1 形式）。", catSet: "カテゴリー:",
     tabLive: "ライブ", liveTap: "タップ", liveSwing: "スイング", livePlay: "再生", livePlaySong: "ソング再生", liveSections: "セクション",
     liveSecHelp: "セクションをタップ: ループの終わりから再生（停止中はすぐ）。再生中は塗りつぶし、次は点滅。",
     livePlaying: "再生中", liveReady: "準備", liveNext: "次", liveKeys: "鍵盤", liveBusy: "今はできません。ソングを停止するか録音を終えてください。",
@@ -3720,6 +3737,7 @@ const TEXT = {
     tabSeq: "Sequencer", tabTracks: "Tracks", tabSettings: "Settings",
     envOwn: "This engine has envelopes of its own.", envCz: "The CZ-1's envelopes (8 points each: pitch, waveform and amplitude of each line) are in the CZ-1 panel above; the track's ENV does nothing on it.",
     envFm6Ops: "Each operator's envelope is on the 6-OP FM page (and ENV on the FM-1). The track's ENV does nothing on FM6.",
+    category: "Category", catAuto: "Auto", catRefused: "This sound keeps no category (an old CZ-1 format).", catSet: "Category set:",
     tabLive: "LIVE", liveTap: "Tap", liveSwing: "SWING", livePlay: "Play", livePlaySong: "Play song", liveSections: "Sections",
     liveSecHelp: "Tap a section: it plays from the section's loop end (stopped: at once). The one playing is filled, the one coming blinks.",
     livePlaying: "Playing", liveReady: "Ready", liveNext: "Next", liveKeys: "Keys", liveBusy: "Not now: stop the song or finish the take first.",
@@ -3929,7 +3947,7 @@ async function connect() {
   sayK("connecting");
   try {
     if (!access) {
-      if (MOCK) { mock = makeMockDevice({ legacy: QS.get("legacy") === "1", auto: QS.get("mockauto") !== "0", advancedSong: true, songLoop: true, songSections: true, live: true }); access = mock.access; }
+      if (MOCK) { mock = makeMockDevice({ legacy: QS.get("legacy") === "1", auto: QS.get("mockauto") !== "0", advancedSong: true, songLoop: true, songSections: true, live: true, upCat: true, shared: true }); access = mock.access; }
       else {
         try { access = await navigator.requestMIDIAccess({ sysex: true }); }
         catch (e) { sayK("denied"); return; }
@@ -6147,14 +6165,16 @@ function renderBank() {
   $("bknativeimport").hidden=!dev.info.shared&&!poolEngine();
   const b = bankView(), used = b.slots.filter((x) => x.used).length;
   $("bankhead").textContent = `${used} / ${b.total} ${t("used")}`;
-  const tb = el("table", {}, el("colgroup", {}, el("col", { class: "n" }), el("col"), el("col", { class: "e" })),
-    el("tr", {}, el("th", { text: "#" }), el("th", { text: t("name") }), el("th", { text: t("engine") })));
+  const cats = upCatsFor(b);                       /* (Hookology) the sounds' categories, when the FM-1 keeps them */
+  const tb = el("table", {}, el("colgroup", {}, el("col", { class: "n" }), el("col"), el("col", { class: "e" }), ...(cats ? [el("col", { class: "c" })] : [])),
+    el("tr", {}, el("th", { text: "#" }), el("th", { text: t("name") }), el("th", { text: t("engine") }), ...(cats ? [el("th", { text: t("category") })] : [])));
   for (const x of b.slots) {
     const tr = el("tr", { "data-slot": x.slot, class: [x.slot === bankSel ? "sel" : "", x.used||x.old ? "" : "empty"].join(" ").trim() || null,
       draggable: x.used ? "true" : null },
       el("td", { text: slotName(x.slot) }), el("td", { text: x.used||x.old ? x.name : t("empty") }),
-      el("td", { text: x.used ? engineLabel(dev.info.engines, x.engine) : "" }));
-    tr.addEventListener("click", () => { bankSel = x.slot; renderBank(); renderLib(); });
+      el("td", { text: x.used ? engineLabel(dev.info.engines, x.engine) : "" }),
+      ...(cats ? [el("td", {}, x.used ? catPick(x.slot, cats[x.slot] || 0) : "")] : []));
+    tr.addEventListener("click", (e) => { if (e.target.closest("select")) return; bankSel = x.slot; renderBank(); renderLib(); });
     tr.addEventListener("dblclick", () => { if (x.used) bankLoad(x.slot); });
     tr.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/x-melodee-slot", String(x.slot)); e.dataTransfer.effectAllowed = "copy"; });
     tr.addEventListener("dragover", (e) => { if (e.dataTransfer.types.includes("text/x-melodee-lib")) { e.preventDefault(); tr.classList.add("over"); } });
@@ -6176,6 +6196,36 @@ function renderBank() {
   $("bkerase").disabled = !s || !s.used || !idle;
   $("bkrefresh").disabled = !idle;
   $("bkexport").disabled = !used || !idle;
+}
+
+/* (Hookology) the user sounds' categories (SAVE > USER > Category on the FM-1): Auto files a sound by its name */
+const CAT_NAMES = ["Auto", "BASS", "LEAD", "PAD", "PLUCK", "KEYS", "DRUM", "FX", "OTHER", "ORGAN", "STRING", "BRASS", "WIND", "BELL"];
+const CAT_LIST = [0, 1, 2, 3, 5, 9, 10, 11, 12, 4, 13, 6, 7, 8];   /* Auto, then the FM-1's LIST order */
+let upCatBusy = false;
+function upCatsFor(b) {
+  if (!dev || !dev.info || !dev.info.upCat || !dev.info.shared || b.total !== 384) return null;
+  if (dev.upCatFor !== dev.bank && !upCatBusy) {                    /* (the list was read again: so are they) */
+    upCatBusy = true;
+    const d = dev, for_ = dev.bank;
+    sessionRequest(d, req.upCats(), { quiet: true }).then((a) => {
+      const r = parse[CMD.UP_CAT](a);
+      if (d === dev) { d.upCats = r.cats; d.upCatFor = for_; renderBank(); }
+    }).catch((err) => report(err)).finally(() => { upCatBusy = false; });
+  }
+  return dev.upCats || null;
+}
+function catPick(slot, cat) {
+  const sel = el("select", { "aria-label": `${t("category")} ${slotName(slot)}`, class: "catpick" },
+    ...CAT_LIST.map((c) => el("option", { value: c, text: c ? CAT_NAMES[c] : t("catAuto") })));
+  sel.value = String(cat);
+  sel.addEventListener("click", (e) => e.stopPropagation());
+  sel.addEventListener("change", () => op(async () => {
+    const r = parse[CMD.UP_CAT](await rq(req.upCatSet(slot, +sel.value)));
+    if (r.rc) throw new Error(t("catRefused"));
+    dev.upCats[slot] = r.cat;
+    sayK("catSet", ` ${slotName(slot)}: ${r.cat ? CAT_NAMES[r.cat] : t("catAuto")}`);
+  }));
+  return sel;
 }
 /* a slot dropped on the library: copy it there */
 $("liblist").addEventListener("dragover", (e) => { if (e.dataTransfer.types.includes("text/x-melodee-slot")) { e.preventDefault(); $("liblist").classList.add("over"); } });

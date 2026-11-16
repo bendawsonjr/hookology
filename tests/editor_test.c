@@ -124,7 +124,7 @@ static int preferences(void)
     uint8_t a[4] = {0, 2, 0, 0};
     reset();
     uint32_t n = request(ED_INFO, a, 0);
-    const uint8_t caps[]={0,0x55,1,121,0x4d,2,MOTION_MAX,1,0x42,1,3,0x50,6,NPAT,CHAIN_ROWS,0x46,1,FM6_NFAC,0,0x43,1,16,1,0,0,0x35,1,19,16,17,18,20,0,1,0x4e,1,64,0,0,1,0x55,1,0,3};
+    const uint8_t caps[]={0,0x55,1,121,0x4d,2,MOTION_MAX,1,0x42,1,3,0x50,7,NPAT,CHAIN_ROWS,0x46,1,FM6_NFAC,0,0x43,1,16,1,0,0,0x35,1,19,16,17,18,20,0,1,0x4e,1,64,0,0,1,0x55,1,0,3};
     bad+=check("INFO preserves existing IDs and advertises the shared 384-slot library",ED_SONG==33&&ED_FAV_SET==38&&n>sizeof caps&&!memcmp(host_wire+n-sizeof caps-1,caps,sizeof caps));
     request(ED_UI_SET, a, 2);
     bad += check("UI_SET updates the actual palette and reports RAM-only saving",
@@ -734,6 +734,27 @@ static int midi_track_protocol(void)
                  TSEL->p[P_FXTYPE] == FX_OFF && !TSEL->p[P_FXSEND]);
     return bad;
 }
+/* (Hookology beta65) the sounds' categories over USB (ED_UP_CAT) */
+static int up_categories(void)
+{
+    int bad = 0;
+    uint8_t a[4] = {0};
+    reset();
+    up_store(5, "SOME SOUND");
+    a[0] = 1; a[1] = 5; a[2] = 0; a[3] = CAT_PAD;
+    request(ED_UP_CAT, a, 4);
+    bad += check("UP_CAT sets slot 6's category", host_wire[5] == 1 && host_wire[6] == 0 && host_wire[9] == CAT_PAD && up_category(5) == CAT_PAD);
+    a[0] = 0;
+    uint32_t n = request(ED_UP_CAT, a, 1);
+    bad += check("UP_CAT reads every slot's", n == 5u + 2u + UP_SLOTS + 1u && host_wire[7 + 5] == CAT_PAD && host_wire[7 + 6] == 0);
+    a[0] = 1; a[1] = 9; a[3] = CAT_BASS;
+    request(ED_UP_CAT, a, 4);
+    bad += check("UP_CAT refuses an empty slot", host_wire[6] == 1 && up_category(9) == 0);
+    a[3] = 14;
+    bad += check("UP_CAT past the last category is no command", !request(ED_UP_CAT, a, 4));
+    return bad;
+}
+
 /* (Hookology) the LIVE page: the FM-1's buttons from the editor (ED_LIVE) */
 static int live_protocol(void)
 {
@@ -833,7 +854,7 @@ static int track_count(void)
 int main(void)
 {
     int bad = midi_track_protocol() + library_transfers() + native_motion_protocol() + prophet_protocol() + bank_protocol() + preferences() + framing() + uart_recovery() + steps() + song_protocol() + malformed_saves() + names_whole() +
-              native_protocol() + shared_protocol() + fm6_patches() + user_preset_roundtrip() + cz_native_protocol() + cz_dedicated_banks() + cz_casio_sysex() + concert_pitch() + scale_catalogue() + project_scale_protocol() + track_count() + song_sections() + live_protocol();
+              native_protocol() + shared_protocol() + fm6_patches() + user_preset_roundtrip() + cz_native_protocol() + cz_dedicated_banks() + cz_casio_sysex() + concert_pitch() + scale_catalogue() + project_scale_protocol() + track_count() + song_sections() + live_protocol() + up_categories();
     printf("%s\n", bad ? "EDITOR TEST FAILED" : "editor test passed");
     return bad != 0;
 }

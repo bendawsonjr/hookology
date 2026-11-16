@@ -256,9 +256,34 @@ static int compact_save_parity(void)
     bad+=check("in-place save matches original bytes; all page/erase/readback cuts restore cache",safe);
     return bad;
 }
+/* (Hookology beta65) a user sound's category: chosen on its sheet, kept in a byte of its record, through reboots */
+static int categories(void)
+{
+    int bad=0;reset();up_boot();set_engine_of(TSEL,3);
+    bad+=check("a new sound's category is Auto",!up_store(10,"WARM THING") && up_category(10)==0u && entry_cat(USER_GENERAL,10)==CAT_OTHER);
+    bad+=check("its category can be set",!up_category_set(10,CAT_PAD) && up_category(10)==CAT_PAD && entry_cat(USER_GENERAL,10)==CAT_PAD);
+    up_boot();bad+=check("the category survives a reboot",up_category(10)==CAT_PAD && entry_cat(USER_GENERAL,10)==CAT_PAD);
+    bad+=check("the same sound saved again keeps its category",!up_store(10,"WARM THING") && up_category(10)==CAT_PAD);
+    up_boot();bad+=check("..through a reboot",up_category(10)==CAT_PAD);
+    bad+=check("a different sound saved there starts on Auto",!up_store(10,"COLD THING") && up_category(10)==0u);
+    up_category_set(10,CAT_LEAD);bad+=check("back to Auto",!up_category_set(10,0) && up_category(10)==0u);
+    up_boot();bad+=check("Auto survives a reboot",up_category(10)==0u);
+    bad+=check("an empty slot takes no category",up_category_set(11,CAT_BASS)==1);
+    set_engine_of(TSEL,ENGI_DRUM);drum_patch_of(0)->c[15][0]=-24;drum_patch_of(0)->c[15][3]=127;
+    up_store(20,"KIT A");bad+=check("a drum kit takes a category",!up_category_set(20,CAT_FX));
+    memset(drum_patch_of(0),0,sizeof(drum_patch_t));up_boot();up_load(20);
+    bad+=check("..kept through a reboot, its kit intact",up_category(20)==CAT_FX && drum_patch_of(0)->c[15][0]==-24 && drum_patch_of(0)->c[15][3]==127);
+    p5_patch_t p;p5_patch_init(&p);native_put(ENGI_PROPHET,30,(uint8_t *)&p);
+    bad+=check("a Prophet program takes a category",!up_category_set(30,CAT_BRASS));
+    up_boot();bad+=check("..kept, its program byte for byte",up_category(30)==CAT_BRASS && !memcmp(native_raw(ENGI_PROPHET,30),&p,sizeof p));
+    set_engine_of(TSEL,3);up_store(40,"PLAYING");song.playing=1;uint32_t before=erases;
+    bad+=check("a category set while playing waits, nothing erased",!up_category_set(40,CAT_KEYS) && up_category(40)==CAT_KEYS && erases==before);
+    song.playing=0;settings_poll();up_boot();bad+=check("..and is written when playback stops",up_category(40)==CAT_KEYS);
+    return bad;
+}
 int main(void)
 {
-    int bad=compact_save_parity()+fill(ENGI_CZ)+fill(ENGI_PROPHET)+fill(ENGI_FM6)+legacy_conversion()+wipe_recovery();
+    int bad=compact_save_parity()+fill(ENGI_CZ)+fill(ENGI_PROPHET)+fill(ENGI_FM6)+legacy_conversion()+wipe_recovery()+categories();
     reset();up_boot();p5_patch_t p;p5_patch_init(&p);uint8_t cz[CZ_BYTES];cz_patch_init(cz);
     bad+=check("Prophet occupies a shared slot",!native_put(ENGI_PROPHET,383,(uint8_t *)&p));
     bad+=check("CZ replaces Prophet in the identical slot",!native_put(ENGI_CZ,383,cz)&&native_used(ENGI_CZ,383)&&!native_used(ENGI_PROPHET,383));

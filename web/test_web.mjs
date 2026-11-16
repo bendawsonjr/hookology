@@ -1269,6 +1269,26 @@ async function editorProphetField() {
   ok(r.rc === 1, "Prophet card: a value out of the field's range is refused");
 }
 
+/* (Hookology) the user sounds' categories over USB (command 83) */
+async function editorUpCats() {
+  const m = E.makeMockDevice({ auto: false, advancedSong: true, songLoop: true, songSections: true, live: true, upCat: true, shared: true });
+  const link = new E.Link((d) => [...m.access.outputs.values()][0].send(d), { timeout: 100 });
+  [...m.access.inputs.values()][0].onmidimessage = (e) => link.receive(e.data);
+  const rq = (r) => link.request(r), C = E.CMD;
+  const info = E.parse[C.INFO](await rq(E.req.info()));
+  ok(info.upCat, "categories: INFO says the FM-1 keeps them");
+  const used = m.state.bank.findIndex((x) => x);
+  let r = E.parse[C.UP_CAT](await rq(E.req.upCatSet(used, 3)));
+  ok(!r.rc && r.slot === used && r.cat === 3, "categories: a used slot takes PAD");
+  r = E.parse[C.UP_CAT](await rq(E.req.upCats()));
+  ok(r.cats.length === 384 && r.cats[used] === 3, "categories: every slot's read back");
+  const empty = m.state.bank.findIndex((x) => !x);
+  r = E.parse[C.UP_CAT](await rq(E.req.upCatSet(empty, 1)));
+  ok(r.rc === 1, "categories: an empty slot is refused");
+  r = E.parse[C.UP_CAT](await rq(E.req.upCatSet(300, 0)));
+  ok(r.slot === 300, "categories: a slot past 127 travels whole (two bytes)");
+}
+
 /* (Hookology) LIVE (command 81) against the mock */
 async function editorLivePage() {
   const m = E.makeMockDevice({ auto: false, advancedSong: true, songLoop: true, songSections: true, live: true });
@@ -1907,6 +1927,7 @@ await editorTrackParam();
 await editorSong();
 await editorSongSections();
 await editorLivePage();
+await editorUpCats();
 await editorProphetField();
 await editorSessions();
 await editorFm6();

@@ -20,7 +20,7 @@ enum { ED_INFO = 1, ED_GET, ED_SET, ED_DUMP, ED_DESC, ED_STEP_GET, ED_STEP_SET, 
        ED_TRACK_PARAM, ED_TRACK_CHANGED, ED_SONG,
        ED_UI_STATE, ED_UI_SET, ED_UI_PALETTES, ED_FAV_GET, ED_FAV_SET,
        ED_MOTION = 64, ED_BACKUP_LIST, ED_BACKUP_GET, ED_BACKUP_PUT,                               /* v6: song chain */
-       ED_AUDIO_STATS = 72, ED_PATTERN, ED_BANK_SONG, ED_LIVE = 81 };   /* (75..78 CZ / native, 80 library: taken) */                                       /* USB audio diagnostics (68..71: FM6, editor_fm6.c) */
+       ED_AUDIO_STATS = 72, ED_PATTERN, ED_BANK_SONG, ED_LIVE = 81, ED_UP_CAT = 83 };   /* (75..78 CZ / native, 80 library: taken) */                                       /* USB audio diagnostics (68..71: FM6, editor_fm6.c) */
 #if MELODEE_CORE1_TEST && MELODEE_DUAL_CORE
 enum { ED_CORE1_TEST = 79 };                         /* test builds only: CPU1 failure injection */
 static void core1_test_stall(void *unused) { (void)unused; for (;;) ; }
@@ -343,6 +343,8 @@ static int ed_args_ok(uint32_t cmd, const uint8_t *a, uint32_t n)
     case ED_MOTION:
         return (n == 1u || (n == 2u && a[1] == 2u) || (n == 3u && a[1] == 1u && a[2] <= 1u) ||
                 (n == 6u && a[1] == 3u) || ((n == 4u || n == 6u) && a[1] == 4u)) && a[0] < NPART;
+    case ED_UP_CAT:                                     /* (Hookology beta65) 0 every user slot's category, 1 set one */
+        return n && (a[0] == 0u ? n == 1u : a[0] == 1u && n == 4u && (a[1] | (uint32_t)a[2] << 7) < UP_SLOTS && a[3] < UP_CAT_N);
     case ED_LIVE:                                       /* (Hookology) the editor's LIVE page */
         return n && (a[0] <= 2u ? n == 1u : a[0] == 3u ? n == 2u && a[1] < SEC_N : a[0] == 4u ? n == 3u :
                      a[0] == 5u ? n == 4u && a[1] < NTRK : 0);
@@ -873,8 +875,8 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         ed_b(0x55); ed_b(1); ed_b(ed_ui_caps());             /* tagged preferences v1: commands 34..38 */
         ed_b(0x4d); ed_b(2); ed_b(MOTION_MAX); ed_b(1); /* motion v2: native ids, chance v1 */
         ed_b(0x42); ed_b(1); ed_b(3); /* bounded full-backup read + restore */
-        ed_b(0x50); ed_b(6); ed_b(NPAT); ed_b(CHAIN_ROWS);     /* bank controls: 73/74 (5: the song by sections, ops 5..7;
-                                                               * 6: LIVE, command 81) */
+        ed_b(0x50); ed_b(7); ed_b(NPAT); ed_b(CHAIN_ROWS);     /* bank controls: 73/74 (5: the song by sections, ops 5..7;
+                                                               * 6: LIVE, command 81; 7: categories, command 83) */
         ed_b(0x46); ed_b(1); ed_b(FM6_NFAC); ed_b(0);   /* FM6 patches: cmds 68..71 */
         ed_b(0x43); ed_b(1); ed_b(CZ_BYTES & 127u); ed_b(CZ_BYTES >> 7); ed_b(0); ed_b(0); /* old CZ bank controls retired */
         ed_b(0x35);ed_b(1);ed_b(ENGI_PROPHET);ed_b(USER_GENERAL);ed_b(USER_NATIVE_FM);ed_b(USER_NATIVE_CZ);ed_b(USER_NATIVE_P5);ed_b(0);ed_b(1); /* legacy native clients see their addressable prefix */
@@ -1217,6 +1219,16 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
     case ED_LIVE:
         ed_live_state(a[0], ed_live(a));
         break;
+    case ED_UP_CAT: {                                      /* (beta65) the sounds' categories (browse.c CAT_*, 0 Auto) */
+        if (a[0] == 1u) {
+            uint32_t k = a[1] | (uint32_t)a[2] << 7, rc = up_category_set(k, a[3]) ? 1u : 0u;
+            ed_b(1); ed_b(rc); ed_b(a[1]); ed_b(a[2]); ed_b(up_category(k));
+        } else {
+            ed_b(0); ed_b(0);
+            for (uint32_t k = 0; k < UP_SLOTS; k++) ed_b(up_category(k));
+        }
+        break;
+    }
     case ED_BANK_SONG: {
         if (!na || a[0] > 7u) return;
         uint32_t rc = 0;

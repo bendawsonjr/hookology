@@ -124,8 +124,34 @@ static const sheet_row_t SHEET_PROJECT[] = {{"Load", 0, 0, sl_load, 0}, {"Save h
 static const sheet_row_t SHEET_TEMPLATE[] = {{"Load template", 0, 0, sl_load, 0}, {"Save as template", 0, 0, sl_save, 0}};
 static const sheet_row_t SHEET_IMPORT[] = {{"Import here",0,0,sysex_choose,0},{"Cancel import",0,0,sysex_cancel,0}};
 static const sheet_row_t SHEET_BULK[] = {{"Send selected",0,0,bulk_send,0},{"Erase selected",0,0,bulk_erase_ask,CF_BULK_ERASE},{"Clear selection",0,0,bulk_clear,0}};
+/* (Hookology beta65) the sound's category: Auto (from its name, shown in brackets) or one of the browser's, in LIST's
+ * order; kept with the sound (upreset.c), the Patches browser files it there */
+static void sl_cat_v(char *b)
+{
+    uint32_t k = slot_cur(SK_USER), c;
+    char nm[16];
+    if (!up_used(k)) { str_cpy(b, "-", 4); return; }
+    if ((c = up_category(k)) != 0) { str_cpy(b, CAT_NAME[c], 16); return; }
+    up_name(k, nm);
+    str_cpy(b, "Auto (", 16);
+    str_cpy(b + str_len(b), CAT_NAME[cat_guess(up_engine(k), nm)], 16 - str_len(b));
+    str_cpy(b + str_len(b), ")", 16 - str_len(b));
+}
+static void sl_cat_turn(int32_t s)
+{
+    uint32_t k = slot_cur(SK_USER), c, i;
+    int32_t at = 0, n = (int32_t)NELEM(CAT_ORDER);
+    if (!up_used(k)) { ui_message("EMPTY SLOT"); return; }
+    c = up_category(k);
+    for (i = 0; i < NELEM(CAT_ORDER); i++) if (CAT_ORDER[i] == c) at = (int32_t)i + 1;   /* 0: Auto */
+    at = s > 0 ? (at < n ? at + 1 : 0) : (at > 0 ? at - 1 : n);                          /* (wraps round) */
+    if (up_category_set(k, at ? CAT_ORDER[at - 1] : 0u)) ui_message("NO CATEGORY FOR THIS ONE");
+    ui.force = 1;
+}
+static void sl_cat_step(void) { sl_cat_turn(1); }
 static const sheet_row_t SHEET_USER[] = {{"Load", 0, 0, sl_load, 0}, {"Save here", 0, 0, sl_save, 0},
-    {"Rename", 0, 0, name_rename, 0}, {"Send",0,0,library_send_current,0}, {"Erase", 0, 0, sl_erase, CF_ERASE_USER}};
+    {"Rename", 0, 0, name_rename, 0}, {"Category", sl_cat_v, sl_cat_turn, sl_cat_step, 0},
+    {"Send",0,0,library_send_current,0}, {"Erase", 0, 0, sl_erase, CF_ERASE_USER}};
 static const sheet_row_t SHEET_STORE[] = {{"Save here", 0, 0, sl_save, 0}, {"Send", 0, 0, sl_send, 0},
     {"Init sound", 0, 0, sl_init, 0}};
 

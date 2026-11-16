@@ -62,6 +62,27 @@ typedef struct {
 } up_bank_t;
 _Static_assert(sizeof(up_rec_t) == 238, "user preset record layout");
 _Static_assert(P_COUNT <= UP_PMAX * 2u && P_COUNT < 128, "user preset record: P_COUNT");
+/* (Hookology beta65) a sound's category, chosen on its SAVE > USER sheet (browse.c CAT_*; 0 Auto: from its name), kept
+ * as 0xC0 + category in a byte no kind of record uses: the last extra byte (a native sound keeps 45 values there), a
+ * drum kit's last value byte (its patch ends 8 past np). The old CZ-1 layout (UP_VER_CZ) keeps none: Auto. No layout
+ * change: a record of before reads Auto */
+#define UP_CAT_TAG 0xC0u
+#define UP_CAT_N 14u
+_Static_assert(P_COUNT + 8u < UP_PMAX * 2u - 1u, "a drum kit record's category byte is free");
+static uint32_t up_cat_where(uint32_t ver, uint32_t engine)   /* 0 none, 1 cz_extra[45], 2 packed[143] */
+{ return ver == UP_VER_CZ ? 0u : engine == ENGI_DRUM && (ver == UP_VER_DRUM || ver == UP_VER_DRUM_GRID) ? 2u : 1u; }
+static uint32_t up_cat_decode(uint32_t b) { return (b & 0xF0u) == UP_CAT_TAG && (b & 15u) < UP_CAT_N ? b & 15u : 0u; }
+static uint32_t up_rec_cat(const up_rec_t *r)
+{
+    uint32_t w = up_cat_where(r->ver, r->engine);
+    return w == 1u ? up_cat_decode(r->cz_extra[45]) : w == 2u ? up_cat_decode(r->packed[UP_PMAX * 2u - 1u]) : 0u;
+}
+static void up_rec_cat_set(up_rec_t *r, uint32_t c)
+{
+    uint32_t w = up_cat_where(r->ver, r->engine);
+    uint8_t v = c ? (uint8_t)(UP_CAT_TAG | c) : 0u, *at = w == 1u ? &r->cz_extra[45] : w == 2u ? &r->packed[UP_PMAX * 2u - 1u] : 0;
+    if (at && (v || up_cat_decode(*at))) *at = v;      /* (Auto clears only a category it wrote) */
+}
 #if MELODEE_FLASH && !defined(UP_HOST)
 /* One main-loop bank cache holds whichever bank was asked for last: a user preset bank, a native FM6 or CZ-1 bank
  * (or the CZ-1 bank's older view, cz_bank_load) or a Prophet user bank (bank_buf, after native_presets.c). Each owner
@@ -85,12 +106,14 @@ static uint32_t up_index_ready;
 static uint32_t up_migrate;
 static uint8_t up_migration_error,up_converting;
 static uint32_t up_fav_dirty;
+static uint8_t up_cat_idx[UP_SLOTS] __attribute__((section(".pool")));   /* (beta65) the categories, as up_meta: indexed with
+                                                                         * a bank, a change written with its stars */
 /* Records this firmware does not read (written before 1.0: older record versions, a bank of another shape) stay as
  * they are: their slots show OLD FORMAT and a write there is refused (up_put) until the device's dialog lets it
  * (preset_old_write is scoped to that write). A bank of another shape is old as a whole. */
 static uint32_t up_bank_old;
 static up_bank_t *up_cache_bank(uint32_t b);
-static void up_cache_reset(void) { up_cached=255; memset(up_meta,0,sizeof up_meta); up_index_ready=0; up_bank_old=up_migrate=0; up_migration_error=up_converting=0;up_fav_dirty=0; }
+static void up_cache_reset(void) { up_cached=255; memset(up_meta,0,sizeof up_meta); memset(up_cat_idx,0,sizeof up_cat_idx); up_index_ready=0; up_bank_old=up_migrate=0; up_migration_error=up_converting=0;up_fav_dirty=0; }
 #else
 static up_bank_t up_banks_host[UP_BANKS] __attribute__((section(".pool")));
 static up_bank_t *up_cache_bank(uint32_t b) { return &up_banks_host[b]; }
@@ -132,8 +155,12 @@ static __attribute__((noinline)) int up_save_bank(uint32_t b)
         up_disk_rec_t r;
         memcpy(r.head,&bank->r[i],160u);memcpy(r.extra,bank->r[i].cz_extra,46u);
         uint32_t k=b*UP_PER_BANK+i;
-        if((up_fav_dirty>>b&1u) && k<UP_SLOTS && (r.head[0]&~UP_STAR)==UP_USED)
+        if((up_fav_dirty>>b&1u) && k<UP_SLOTS && (r.head[0]&~UP_STAR)==UP_USED){
             r.head[0]=(uint8_t)((r.head[0]&~UP_STAR)|(up_meta[k].favorite?UP_STAR:0));
+            uint32_t w=up_cat_where(r.head[1],r.head[2]);uint8_t v=up_cat_idx[k]?(uint8_t)(UP_CAT_TAG|up_cat_idx[k]):0u;
+            uint8_t *at=w==1u?&r.extra[45]:w==2u?&r.head[159]:0;       /* (packed[143]: head = used ver engine np name packed) */
+            if(at && (v || up_cat_decode(*at)))*at=v;                 /* (Auto clears only a category it wrote) */
+        }
         memcpy((uint8_t *)bank+8u+i*sizeof r,&r,sizeof r);
     }
     struct {uint32_t magic;uint16_t size,count;} disk_head={UP_DISK_MAGIC,sizeof(up_disk_rec_t),UP_PER_BANK};
@@ -242,7 +269,7 @@ static void up_cache_index(uint32_t b)
     for(uint32_t j=0;j<UP_PER_BANK;j++){
         uint32_t k=b*UP_PER_BANK+j; if(k>=UP_SLOTS)break; const up_rec_t *r=&up_cache.r[j];
         int valid = up_valid(r);
-        up_meta[k].used=(uint8_t)valid;if(!(up_fav_dirty>>b&1u))up_meta[k].favorite=(uint8_t)(!!(r->used&UP_STAR) && valid);
+        up_meta[k].used=(uint8_t)valid;if(!(up_fav_dirty>>b&1u)){up_meta[k].favorite=(uint8_t)(!!(r->used&UP_STAR) && valid);up_cat_idx[k]=(uint8_t)(valid?up_rec_cat(r):0u);}
         up_meta[k].old=(uint8_t)(((up_bank_old >> b) & 1u) || (r->used != 0 && !valid));
         up_meta[k].engine=up_native_cz(r)?ENGI_CZ:eng_sound_idx(r->engine);
         uint32_t n=0;
@@ -459,15 +486,25 @@ static int up_put(uint32_t k, const up_rec_t *r)
     bk->nslot = UP_PER_BANK;
     if (r) {
         uint8_t star=up_valid(up_rec(k)) ? up_rec(k)->used&UP_STAR : 0;
-        *up_rec(k) = *r;up_rec(k)->used|=star;
+        /* (beta65) the category: the record's own, else the slot's when the same sound (its name) is saved again */
+        uint32_t cat=up_rec_cat(r);
+        if(!cat && up_valid(up_rec(k)) && !memcmp(up_rec(k)->name,r->name,sizeof r->name)){
+#if MELODEE_FLASH
+            cat=up_cat_idx[k];                            /* (a change not yet written is there) */
+#else
+            cat=up_rec_cat(up_rec(k));
+#endif
+        }
+        *up_rec(k) = *r;up_rec(k)->used|=star;up_rec_cat_set(up_rec(k),cat);
 #if MELODEE_FLASH
         up_meta[k].favorite=(uint8_t)(favorite_before || !!(r->used&UP_STAR));
+        up_cat_idx[k]=(uint8_t)up_rec_cat(up_rec(k));
 #endif
     }
     else {
         memset(up_rec(k), 0, sizeof(up_rec_t));
 #if MELODEE_FLASH
-        up_meta[k].favorite=0;
+        up_meta[k].favorite=0;up_cat_idx[k]=0;
 #endif
     }
 #if MELODEE_FLASH

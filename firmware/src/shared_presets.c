@@ -28,6 +28,26 @@ static int up_favorite_set(uint32_t k,int on)
 #endif
     return 1;
 }
+/* (beta65) a user sound's category (browse.c CAT_*), 0 Auto: from its name. Changed: written with the bank's stars */
+static uint32_t up_category(uint32_t k)
+{
+    if(!up_used(k))return 0;
+#if MELODEE_FLASH
+    if(up_index_ready>>(k/UP_PER_BANK)&1u)return up_cat_idx[k];
+#endif
+    return up_rec_cat(up_rec(k));
+}
+static int up_category_set(uint32_t k,uint32_t c)        /* 0 done, 1 not this sound (none, or the old CZ-1 layout) */
+{
+    if(!up_used(k) || c>=UP_CAT_N || !up_cat_where(up_rec(k)->ver,up_rec(k)->engine))return 1;
+    if(up_category(k)==c)return 0;
+#if MELODEE_FLASH
+    up_cat_idx[k]=(uint8_t)c;up_fav_dirty|=1u<<(k/UP_PER_BANK);up_favorite_poll();up_gen++;
+#else
+    up_rec_cat_set(up_rec(k),c);up_gen++;
+#endif
+    return 0;
+}
 static uint32_t native_limit(uint32_t e)
 {
     return e==ENGI_PROPHET || e==ENGI_FM6 || e==ENGI_CZ ? UP_SLOTS : 0u;

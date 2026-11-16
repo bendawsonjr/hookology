@@ -15,6 +15,8 @@ enum { CAT_NONE, CAT_BASS, CAT_LEAD, CAT_PAD, CAT_PLUCK, CAT_KEYS, CAT_DRUM, CAT
 static const char *const CAT_NAME[CAT_N] = {"-", "BASS", "LEAD", "PAD", "PLUCK", "KEYS", "DRUM", "FX", "OTHER",
                                             "ORGAN", "STRING", "BRASS", "WIND", "BELL"};
 static const char CAT_LETTER[CAT_N + 1u] = "?BLPUKDFOGSRWE";   /* a letter's index is its CAT_* */
+static uint32_t up_category(uint32_t k);
+static int up_category_set(uint32_t k, uint32_t c);   /* (beta65, shared_presets.c) a user sound's chosen category, 0 Auto; CAT_N is upreset.c's UP_CAT_N */
 static const uint8_t CAT_ORDER[] = {CAT_BASS, CAT_LEAD, CAT_PAD, CAT_KEYS, CAT_ORGAN, CAT_STRING, CAT_BRASS, CAT_WIND,
                                     CAT_PLUCK, CAT_BELL, CAT_DRUM, CAT_FX, CAT_OTHER};   /* LIST's order */
 
@@ -148,6 +150,8 @@ static uint32_t entry_cat(uint32_t src, uint32_t k)
         cat_dyn_gen = up_gen;
     }
     c = (cat_dyn[i / 2u] >> (i % 2u * 4u)) & 15u;
+    if (!c && (c = up_category(k)) != 0)               /* (Hookology beta65) the category chosen on its sheet */
+        cat_dyn[i / 2u] |= (uint8_t)(c << (i % 2u * 4u));
     if (!c) {
         if (src == USER_GENERAL)
             up_name(k, nm);
