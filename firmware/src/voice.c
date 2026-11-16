@@ -157,7 +157,9 @@ static uint32_t voice_units(const track_t *t)
 #if !MELODEE_ADMISSION
     if (k == 1 || k == 3) return 6u;                    /* CZ, SID: 140 to 160 us */
     if (k == 2) return 4u;                              /* FM6: 80 to 130 us */
-    if (k == 4) return drum_is909(t) ? 5u : drum_isone(t) ? 6u : 3u;   /* 909 120 us, a kit on one voice 150, 808 65 */
+    if (k == 4) return drum_is909(t) ? 5u : drum_islane(t) ? drum_lane_units(t, 0) : drum_isone(t) ? 6u : 3u;
+                                                        /* 909 120 us, 808 65, SID 90 to 140 (its one voice); the lane
+                                                         * kits by their drums ringing (drum_lanes.c) */
 #endif
     return e->units ? e->units(t) : VOICE_SCALE * (trk_nvoice(t) > NPOLY ? 1u : 2u);
 }
@@ -212,6 +214,17 @@ static uint32_t voice_budget_points(void)
 #endif
 }
 
+/* what a new note of t adds: a voice's units; a lane kit's next drum only what one more drum adds (its one voice is
+ * counted in voices_busy already when it sounds) */
+static uint32_t voice_admit_units(const track_t *t)
+{
+#if !MELODEE_ADMISSION
+    const engine_t *e = ENGINES[t->engine];
+    if (e == &ENG_DRUM && drum_islane(t) && settings_vpoints[4] <= 0)
+        return t->v[0].active && t->v[0].stage != 4u ? drum_lane_units(t, 1) - drum_lane_units(t, 0) : drum_lane_units(t, 1);
+#endif
+    return voice_units(t);
+}
 static uint32_t voices_busy(void)                       /* budget units of all parts' sounding voices (not fading) */
 {
     uint32_t p, i, n, u = 0;
@@ -333,7 +346,7 @@ static void voice_capacity_kill(voice_t *v)
 /* the budget is full: free room for a voice of part t. 0 = nothing to take (soft) */
 static int voice_room(track_t *t, int soft)
 {
-    while (voices_busy() + voice_units(t) > voice_budget()) {
+    while (voices_busy() + voice_admit_units(t) > voice_budget()) {
         track_t *vp = 0;
         uint32_t k = voice_victim(t, soft, &vp);
         if (k == NVOICE)
@@ -357,14 +370,14 @@ static int voice_refused(track_t *t, uint32_t note)
 {
     uint32_t i, top = NVOICE;
     track_t *vp = 0;
-    if (ENGINES[t->engine]->oneshot || voices_busy() + voice_units(t) <= voice_budget())
+    if (ENGINES[t->engine]->oneshot || voices_busy() + voice_admit_units(t) <= voice_budget())
         return 0;
     for (i = 0; i < NVOICE; i++)
         if (t->v[i].active && t->v[i].stage != 4u && t->v[i].note == note)
             return 0;                                   /* a retrigger takes no new room */
     if (voice_fullest(&top) != (uint32_t)(t - trk) || note < t->v[top].note)
         return 0;
-    while (voices_busy() + voice_units(t) > voice_budget()) {
+    while (voices_busy() + voice_admit_units(t) > voice_budget()) {
         i = voice_victim(t, 0, &vp);
         if (i < NVOICE && vp == t && vp->v[i].gate) {
             voice_refusals++;                           /* no tail left, only this chord: its new top waits out */
@@ -406,7 +419,7 @@ static voice_t *voice_alloc(track_t *t, uint32_t note)
             return voice_reuse(t, &t->v[i]);
         nfree += !t->v[i].active;
     }
-    while (nfree && voices_busy() + voice_units(t) > voice_budget()) {
+    while (nfree && voices_busy() + voice_admit_units(t) > voice_budget()) {
         track_t *vp = 0;
         uint32_t k = voice_victim(t, 0, &vp);
         if (k < np && vp == t)

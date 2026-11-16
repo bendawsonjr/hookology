@@ -31,6 +31,23 @@ int main(void)
     fresh();
     poly(0,ENGI_PROPHET,0);poly(1,ENGI_FM6,0);poly(2,ENGI_CZ,0);poly(3,ENGI_DRUM,0);
     check("a Prophet voice costs most, FM6 least of the synths",voice_units(&trk[0])==9u&&voice_units(&trk[1])==4u&&voice_units(&trk[2])==6u);
+    /* (beta64) the drum kits: 808 3, 909 5, SID 6 a voice; a lane kit by its drums ringing (3, then 2 a drum; FM 3) */
+    trk[3].p[P_E0]=5;check("a 909 drum costs 5",voice_units(&trk[3])==5u);
+    trk[3].p[P_E0]=6;check("the SID kit's one voice costs 6",voice_units(&trk[3])==6u);
+    trk[3].p[P_E0]=4;check("an 808 drum costs 3",voice_units(&trk[3])==3u);
+    for(uint32_t kit=7;kit<=9;kit++){
+        trk[3].p[P_E0]=(int16_t)kit;
+        uint32_t one=voice_units(&trk[3]);
+        trk_note_on(&trk[3],36,110);trk_note_on(&trk[3],38,110);trk_note_on(&trk[3],42,110);trk_note_on(&trk[3],49,110);
+        blocks(2);
+        uint32_t four=voice_units(&trk[3]),per=kit==8?3u:2u;
+        check(kit==7?"CR78: 3 for a drum, 2 more for each further one ringing":kit==8?"FM kit: 3, then 3 for each further drum":"SAMPLE kit: 3, then 2 for each further drum",
+              one==3u&&four==3u+3u*per&&voices_busy()>=four);
+        trk_note_off(&trk[3],36);trk_note_off(&trk[3],38);trk_note_off(&trk[3],42);trk_note_off(&trk[3],49);
+        for(uint32_t i=0;i<NVOICE;i++)trk[3].v[i].active=0;
+        dlk_part_t *K=dlk_part(3);if(K)memset(K->ch,0,sizeof K->ch);
+    }
+    trk[3].p[P_E0]=4;
     check("no shared effect: the whole budget",voice_budget()==80u);
     song.g[G_MFXTYPE]=FX_ROOM;check("a shared effect takes 8 units off",voice_budget()==72u);
     song.g[G_MFXTYPE]=FX_REVERB;check("REVERB takes 15 units off",voice_budget()==65u);

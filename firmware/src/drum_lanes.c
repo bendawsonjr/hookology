@@ -45,6 +45,18 @@ _Static_assert(((sizeof(dlk_part_t) + 3u) & ~3u) != ((sizeof(drum909_part_t) + 3
                "the lane kits' state: its own size in the DRUM pool (resource_get keys on it)");
 static dlk_part_t *dlk_part(uint32_t part);   /* engines.c: the part's runtime pool */
 static uint32_t dlk_bytes(void) { return sizeof(dlk_part_t); }
+/* (Hookology beta64) the budget's units for a lane kit (CR78, FM, SAMPLE: its one voice): the first drum ringing 3, each
+ * further one 2 (FM 3). Measured on an FM-1 (2026-11-16, eight drums retriggered on one track): a drum 75 to 83 us,
+ * each further one 44 (CR78), 48 (SAMPLE), 63 us (FM). extra: drums about to start counted too */
+static uint32_t drum_lane_units(const track_t *t, uint32_t extra)
+{
+    const dlk_part_t *K = dlk_part((uint32_t)(t - trk));
+    uint32_t n = extra, l;
+    if (K && K->ready)
+        for (l = 0; l < DV_NLANE; l++) n += K->ch[l].on != 0;
+    if (!n) n = 1;
+    return 3u + (n - 1u) * (t->p[P_E0] == DK_FM ? 3u : 2u);
+}
 
 /* a hit's knobs: the part's, with the HIT page's edit of the drum's character (as the 808's: SNAP the snare's,
  * else TONE); its DECAY edit goes to the kit apart (DECY moves only some drums) */

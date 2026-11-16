@@ -30,6 +30,7 @@ from audio_cpu_take import take_spec, build_take, run_take, drum_channel
 
 MAX_RUNTIME_BYTES = 256 * 1024
 DK_SAMPLE = 9                                  # eng_drum.c
+KITS = dict(k808=4, k909=5, sid=6, cr78=7, fm=8, sample=9)   # eng_drum.c DK_*: the drum track's KIT (P_E0)
 AUDIO_FX = (1, 2, 3, 4, 5, 7, 8, 9, 12, 16, 17, 18, 19)   # core.h: the effects a shared slot can hold
 PREFERENCE_BYTES = 604
 
@@ -191,11 +192,12 @@ def configure_workload(d, categories, variant, notes):
     if d.cpu_drum_note is not None:
         notes = [(track, d.cpu_drum_note if categories[track] >= 4 else note)
                  for track, note in notes]
-    if getattr(d, 'cpu_sample_kit', False):
-        # The sampled kit plays every hit on one circuit: only one held lane.
+    kit = getattr(d, 'cpu_kit', None) or (DK_SAMPLE if getattr(d, 'cpu_sample_kit', False) else None)
+    if kit is not None:
+        # (Hookology) the drum tracks' KIT: every kit, its hits on their own lanes
         for track, category in enumerate(categories):
             if category >= 4:
-                d.params(track, dict(P_E0=DK_SAMPLE))
+                d.params(track, dict(P_E0=kit))
     return notes
 
 
@@ -288,6 +290,7 @@ def main():
     p.add_argument('--fx', action='store_true')
     p.add_argument('--fx-type', type=int, default=9, help='shared effect with --fx: an FX index from core.h (9 Chorus)')
     p.add_argument('--sample-kit', action='store_true', help='drum tracks use the sampled kit')
+    p.add_argument('--kit', choices=sorted(KITS), help='(Hookology) drum tracks use this KIT; any number of hits')
     p.add_argument('--retrigger', type=int, default=0, metavar='TICKS', help='restart every note together each TICKS status reads (0 off)')
     p.add_argument('--modulation', action='store_true')
     p.add_argument('--modulation-routing', choices=('voice', 'engine'), default='voice')
@@ -391,11 +394,12 @@ def main():
         d.cpu_source_churn = a.source_churn
         d.cpu_drum_note = a.drum_note
         d.cpu_sample_kit = a.sample_kit
+        d.cpu_kit = KITS[a.kit] if a.kit else None
         d.cpu_retrigger = a.retrigger
         d.cpu_sequence_bpm = a.sequence_bpm
         d.cpu_clock_jitter_ms = a.clock_jitter_ms
         d.cpu_sequence_clock = a.sequence_clock
-        if a.modulation or a.drum_note is not None or a.sample_kit:
+        if a.modulation or a.drum_note is not None or a.sample_kit or a.kit:
             d.performance_patch_hook = configure_workload
         if a.event_bursts or a.source_churn or a.retrigger:
             d.performance_step_hook = control_updates
