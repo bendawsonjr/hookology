@@ -31,6 +31,21 @@ static int32_t batt_shown(void)
     return batt_level();
 }
 
+/* (Hookology beta63) the battery at the right of the GLO pages' bottom line: FULL OK LOW EMPTY, or USB (the reading is
+ * then the cable's, not the battery's). glo_battery(): 0..4 as batt_shown, 9 when this page shows none */
+static uint32_t glo_battery(void) { return !ui.home && cur_page()->fam == FAM_GLO ? (uint32_t)batt_shown() : 9u; }
+static int32_t foot_battery(int32_t cy, uint32_t st)   /* drawn right-aligned at 236; the width it took (0: none) */
+{
+    static const char *const BW[5] = {"EMPTY", "LOW", "OK", "FULL", "USB"};
+    static const uint8_t BI[5] = {ICON_X_BAT0, ICON_X_BAT1, ICON_X_BAT3, ICON_X_BAT4, ICON_X_USB};
+    if (st > 4u) return 0;
+    uint16_t c = st <= 1u ? T_REC : T_SEC;
+    int32_t ww = text_w(TY_TX, BW[st]);
+    cv_text_r(236, ty_y(cy, TY_TX), TY_TX, BW[st], c, T_BG);
+    cv_icon_mid(236 - ww - 28, cy, 24, BI[st], c, T_BG);
+    return ww + 28 + 10;
+}
+
 /* REC: filled, the selected track ready/recording; outlined, waiting or another track armed. */
 static void draw_rec_mark(int32_t x, uint16_t bg)
 {
@@ -756,7 +771,10 @@ static void draw_foot(void)
         if (black_held(GK_ACC))
             str_cpy(b, "Accent", sizeof b);
     }
-    sig = str_hash(str_hash(str_hash(0x9E3779B9u + song.sel * 7u, ename), pn), b) + ux.gen * 977u + ux.pal * 31u;
+    /* (Hookology beta63) the GLO pages: the battery at the right, FULL OK LOW EMPTY or USB (batt_shown: 4 steps;
+     * on USB the reading is the cable's, not the battery's) */
+    uint32_t glo_bat = b[0] ? 9u : glo_battery();
+    sig = str_hash(str_hash(str_hash(0x9E3779B9u + song.sel * 7u, ename), pn), b) + ux.gen * 977u + ux.pal * 31u + glo_bat * 6151u;
     if (act_cols()) {                                  /* the hint, and whether OCT+ would act */
         char ha[16], hb[16];
         foot_hint(ha, hb);
@@ -788,6 +806,7 @@ static void draw_foot(void)
     } else {
         int32_t bw = b[0] ? text_w(TY_TX, b) + 12 : 0;
         char d[2] = {(char)('1' + song.sel % NTRK), 0};
+        if (glo_bat < 9u) bw = foot_battery(H_FOOT / 2, glo_bat);
         cv_rrect(4, H_FOOT / 2 - 11, 22, 22, 6, T_THEME, T_BG);   /* (as pv_sound_bar, the page at the right) */
         cv_text_c(15, ty_y(H_FOOT / 2, TY_LB), TY_LB, d, T_INK, T_THEME);
         cv_free_text(34, ty_y(H_FOOT / 2, TY_TX), TY_TX, pn[0] ? pn : ename, T_SEC, T_BG, 236 - bw - 34);

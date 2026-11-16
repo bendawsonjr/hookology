@@ -42,7 +42,7 @@
 #define MELODEE_ID "FM-1_900"    /* package identity (build.py: the .fwsc marker string) */
 #endif
 #ifndef MELODEE_VERSION
-#define MELODEE_VERSION "v1.1-beta62" /* shown in the menu, the console and the editor; build.py --release X.Y[.Z] */
+#define MELODEE_VERSION "v1.1-beta63" /* shown in the menu, the console and the editor; build.py --release X.Y[.Z] */
 #endif
 #if MELODEE_OTA && !MELODEE_FLASH
 #error "MELODEE_OTA needs MELODEE_FLASH"

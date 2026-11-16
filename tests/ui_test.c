@@ -3549,6 +3549,26 @@ static int test_cz1_factory(void)
     return bad;
 }
 
+/* beta63: the battery on the GLO pages' bottom line (its four steps; on USB the cable) */
+static int test_glo_battery(void)
+{
+    int bad = 0;
+    ui_power_on();
+    go_title("TEMPO"); frame();
+    uint8_t cfg = usb.config;
+    usb.config = 0;
+    song.batt_raw = 600; bad += check("battery: FULL on GLO", glo_battery() == 3u);
+    song.batt_raw = 570; bad += check("battery: OK", glo_battery() == 2u);
+    song.batt_raw = 540; bad += check("battery: LOW", glo_battery() == 1u);
+    song.batt_raw = 500; bad += check("battery: EMPTY", glo_battery() == 0u);
+    usb.config = 1; usb.suspended = 0;
+    bad += check("battery: on USB, the cable", glo_battery() == 4u);
+    go_title("EDIT 1"); frame();
+    bad += check("battery: not on other pages", glo_battery() == 9u);
+    usb.config = cfg;
+    return bad;
+}
+
 /* beta59: the header's tempo on MIXER and a moment after it changes only; HOME's pages as k/n; Settings > MIDI SYNC */
 static int test_head_beta59(void)
 {
@@ -6015,6 +6035,7 @@ int main(void)
     bad += test_name();
     bad += test_edit_cycle();
     bad += test_head_beta59();
+    bad += test_glo_battery();
     bad += test_cz1_pages();
     bad += test_cz1_factory();
     bad += test_fm6_pages();

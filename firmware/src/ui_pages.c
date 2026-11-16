@@ -238,15 +238,17 @@ static void pv_words(const char *label, const char *val, const char *unit, char 
 /* ---------------------------------------------------------- parts --- */
 /* the sound bar: the track's numeral (filled in its colour) and the sound's name (the text face, secondary), capitals
  * centred on the bar's middle row (en: a page of no track's, its words in the name's place when there is no name) */
-static void pv_sound_bar(int32_t y, uint32_t k, const char *en, const char *nm, uint16_t tc, uint16_t bg)
+static void pv_sound_bar_w(int32_t y, uint32_t k, const char *en, const char *nm, uint16_t tc, uint16_t bg, int32_t right)
 {
     const aafont_t *lf = TY_LB, *tf = TY_TX;
     char d[2] = {(char)('1' + k % NTRK), 0};
     int32_t cy = y + H_FOOT / 2;
     cv_rrect(4, cy - 11, 22, 22, 6, tc, bg);
     cv_text_c(15, ty_y(cy, lf), lf, d, T_INK, tc);
-    cv_free_text(34, ty_y(cy, tf), tf, nm[0] ? nm : en, T_SEC, bg, 236 - 34);
+    cv_free_text(34, ty_y(cy, tf), tf, nm[0] ? nm : en, T_SEC, bg, 236 - 34 - right);   /* (right: the battery's room) */
 }
+static void pv_sound_bar(int32_t y, uint32_t k, const char *en, const char *nm, uint16_t tc, uint16_t bg)
+{ pv_sound_bar_w(y, k, en, nm, tc, bg, 0); }
 /* the sound being edited: its track, engine and name (pv_sound_bar) */
 static void pv_sound(void)
 {
@@ -258,7 +260,8 @@ static void pv_sound(void)
     uint32_t all = cur_page()->fam == FAM_FX && cur_page()->scope == SC_GLOBAL;   /* a shared FX slot: every track's */
     if (all) nm[0] = 0;
     else sound_name(TSEL, nm);
-    sig = str_hash(str_hash(song.sel * 7u + ux.gen * 977u + ux.pal * 31u + all * 4099u, en), nm);
+    uint32_t bat = glo_battery();                       /* (Hookology beta63: the GLO pages show the battery) */
+    sig = str_hash(str_hash(song.sel * 7u + ux.gen * 977u + ux.pal * 31u + all * 4099u + bat * 6151u, en), nm);
     if (!ui.force && sig == pv.sound)
         return;
     pv.sound = sig;
@@ -270,7 +273,8 @@ static void pv_sound(void)
             cv_rrect(4 + (int32_t)(k & 1u) * 12, cy - 11 + (int32_t)(k >> 1) * 12, 10, 10, 3, T_TRK(k), T_BG);
         cv_free_text(34, ty_y(cy, TY_TX), TY_TX, "All tracks", T_SEC, T_BG, 236 - 34);
     } else {
-        pv_sound_bar(0, song.sel, en, nm, T_THEME, T_BG);
+        int32_t bw = foot_battery(H_FOOT / 2, bat);
+        pv_sound_bar_w(0, song.sel, en, nm, T_THEME, T_BG, bw);
     }
     cv_blit(0, PV_SOUND_Y);
 }
