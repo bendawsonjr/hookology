@@ -474,7 +474,8 @@ if sound && [ $TABLES = 1 ]; then
         -UMELODEE_RECORD_INDEX -DMELODEE_RECORD_INDEX=1 $FW -- "$OUT/capture_alloc_index" 400 nocost
     t "routing rebuild probes: full-state parity and rejected steady/changing costs" mod_churn_bench -O2 $FW
     t "SID filter output: exact full state across models/waves/stacks/modes and costs" sid_filter_test -O2 $FW
-    t "808/909 metal preparation: exact pitches, states and steady/changing costs" drum_prepare_test -O2 $FW
+    t "808/909 metal preparation: exact pitches, states and steady/changing costs" drum_prepare_test -O2 -DHOOKOLOGY_D9_QUIET_END=0 $FW
+    t "909 sound bit for bit: every voice, control and distortion, mono and stereo" drum909_exact_test -O2 $FW
     t "SID drum kernel: original PCM/state through digi, controls, steals and releases" drum_sid_fast_test -O2 $FW
     t "CZ native window: exact phase kernel and full renderer through live edits" cz_window_test -O2 $FW
     t "FM6 zero-level preparation: exact state and static/changing costs" fm6_prepare_test -O2 $FW

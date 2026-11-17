@@ -528,6 +528,14 @@ static void d9_warm(d9_biquad_t *f, const float *end)
         d9_biquad_tick(f, end[i]);
 }
 
+/* (Hookology) a voice ends once everything it plays has faded 80 dB (below one step of the FM-1's output, which
+ * scales the 909 by 12000), instead of running on to 9W9's -100 dB: about a fifth less time for each hit */
+#ifndef HOOKOLOGY_D9_QUIET_END
+#define HOOKOLOGY_D9_QUIET_END 1        /* 0: run each drum to 9W9's -100 dB, as 1.0 */
+#endif
+#define D9_QUIET 1.0e-4f
+static inline int d9_quiet(const d9_env_t *e) { return HOOKOLOGY_D9_QUIET_END && e->v < D9_QUIET; }
+
 /* Kick (er99_bt_render with the stock sweep, one shell) */
 static void d9_render_bd(d9_bt_t *v, const float *nz, const d9_bus_t *bus, int n)
 {
@@ -566,6 +574,8 @@ static void d9_render_bd(d9_bt_t *v, const float *nz, const d9_bus_t *bus, int n
         }
         d9_emit(bus, i, (body + click) * v->out_gain);
     }
+    if (m && v->amp_hold_left <= 0 && d9_quiet(&v->amp) && !(v->impulse > 0 || v->click_env.left))
+        v->mute = 0;                     /* (Hookology) faded out */
     if (!(v->impulse > 0 || v->click_env.left))
         v->click_stale = 1;
     if (v->click_stale && v->mute == 0) {  /* note over: freeze where 9W9's froze */
@@ -612,6 +622,8 @@ static void d9_render_sd(d9_bt_t *v, const float *nz, const d9_bus_t *bus, int n
         }
         d9_emit(bus, i, y * v->out_gain);
     }
+    if (HOOKOLOGY_D9_QUIET_END && m && v->amp.v <= D9_VCA_VT && (v->snappy <= 0.0f || v->noise_gated))
+        v->mute = 0;                     /* (Hookology) both parts below the VCA's threshold: it plays only 0 */
 }
 
 /* Toms (er99_tom909_render): three VCOs on their own envelopes + stick noise.
@@ -652,6 +664,9 @@ static void d9_render_tom(d9_tom_t *t, const d9_bt_t *p, const float *nz, const 
         y = d9_biquad_tick(&t->dc_block, y);
         d9_emit(bus, i, y * t->out_gain);
     }
+    if (m && d9_quiet(&t->env[0]) && (!t->env[1].left || d9_quiet(&t->env[1])) && (!t->env[2].left || d9_quiet(&t->env[2]))
+        && (!t->noise_env.left || d9_quiet(&t->noise_env)))
+        t->mute = 0;                     /* (Hookology) faded out */
     if (!t->noise_env.left)
         t->stick_stale = 1;
     if (t->stick_stale && t->mute == 0) {
@@ -679,6 +694,8 @@ static void d9_render_rim(d9_rim_t *v, const float *nz, const d9_bus_t *bus, int
         y = d9_biquad_tick(&v->hp, y);
         d9_emit(bus, i, y * g * v->accent);
     }
+    if (m && v->impulse <= 0 && d9_quiet(&v->amp))
+        v->mute = 0;                     /* (Hookology) faded out */
 }
 
 /* Hand clap (er99_clap909_render) */
@@ -709,6 +726,8 @@ static void d9_render_clap(d9_clap_t *v, const float *nz, const d9_bus_t *bus, i
         y = d9_biquad_tick(&v->hp, y);
         d9_emit(bus, i, y * v->level * v->accent);
     }
+    if (m && v->pulse_index >= 4 && d9_quiet(&v->burst) && d9_quiet(&v->tail))
+        v->mute = 0;                     /* (Hookology) faded out */
 }
 
 /* Sample-free metallic voices: six detuned pulse oscillators, band/high-pass
@@ -760,6 +779,7 @@ static void d9_render_smp(d9_smp_t *s, const d9_bus_t *bus, int n)
         y = d9_shape(&s->shape, y * 2.0f, s->crush_st) * d9_env_tick(&s->out);
         d9_emit(bus, i, y);
     }
+    if (m && d9_quiet(&s->out)) s->mute = 0;    /* (Hookology) faded out */
     if (!s->mute) s->playing = 0;
 }
 
