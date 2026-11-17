@@ -3,7 +3,7 @@
      Copyright (C) 2026 Kerem Kilic (Ellic Studio)
      Portions Copyright (C) 2026 Charles Vestal
      Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
-     Melodee's web installer: connect, choose, install, with the install itself in a screen of its own that asks the
+     Hookology's web installer: connect, choose, install, with the install itself in a screen of its own that asks the
      player to stay. After fm1-base's web/installer.html (its m-bootloader option, stock firmware and crash report).
      The firmware and m-bootloader come from bundled metadata (web/make_site.py); ?demo runs the
      same page against a simulated FM-1 (fakefm1.js). Logic: installer.js; transfer: transfer.js. -->
@@ -12,7 +12,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Install Melodee</title>
+<title>Install Hookology</title>
 <link rel="icon" id="favicon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4'/%3E%3C/svg%3E">
 <style>/*INSTALLER_STYLE*/</style>
 </head>
@@ -31,11 +31,11 @@
 <div class="demo" id="demo" hidden><span data-t="demo">Demo: a simulated FM-1. Nothing is written.</span> <a href="./" data-t="demoleave">Leave the demo</a></div>
 
 <header class="site">
-  <a class="brand" href="../editor/">Melodee</a>
+  <a class="brand" href="../editor/">Hookology</a>
   <nav>
     <a href="../editor/" data-t="navEditor">Editor</a>
     <a href="./" aria-current="page" data-t="navInstall">Install</a>
-    <a href="../manual/" data-t="navManual">Manual</a>
+    <a href="https://github.com/bendawsonjr/hookology/blob/main/docs/GUIDE.md" target="_blank" rel="noopener" data-t="navManual">Manual</a>
     <button type="button" class="lang" id="lang" lang="ja">日本語</button>
   </nav>
 </header>
@@ -43,7 +43,7 @@
 <main>
   <section class="hero">
     <p class="kicker" data-t="kicker">Firmware for the M-VAVE FM-1</p>
-    <h1><span data-t="title">Install Melodee</span> <span class="v" id="hver"></span></h1>
+    <h1><span data-t="title">Install Hookology</span> <span class="v" id="hver"></span></h1>
     <p class="lede" data-t="lede">Synths, sequencing and effects for the FM-1, installed over USB from this page.</p>
     <ul class="facts">
       <li data-t="factBrowser">Chrome or Edge</li>
@@ -152,7 +152,7 @@
     <p class="small" data-leave-t="stockBackup"></p>
     <p class="small"><label><input id="stock-skip-backup" type="checkbox"> <span data-leave-t="stockSkipBackup"></span></label></p>
     <p class="small"><label><input id="stock-recovery" type="checkbox"> <span data-leave-t="stockRecovery"></span></label></p>
-    <p class="small"><a href="https://github.com/keremimo/melodee/blob/next/docs/RECOVERY.md#return-to-stock-from-running-melodee" target="_blank" rel="noopener" style="color:inherit" data-leave-t="stockHelp"></a></p>
+    <p class="small"><a href="https://github.com/bendawsonjr/hookology/blob/main/docs/RECOVERY.md#return-to-stock-from-running-melodee" target="_blank" rel="noopener" style="color:inherit" data-leave-t="stockHelp"></a></p>
   </div></details>
 
 
@@ -178,12 +178,12 @@
   </section>
 </main>
 
-<footer>  <p class="small">Melodee by Ellic Studio, based on <a href="https://github.com/hugelton/Felucca" target="_blank" rel="noopener" style="color:inherit">Felucca</a>
+<footer>  <p class="small">Hookology, built on <a href="https://github.com/keremimo/melodee" target="_blank" rel="noopener" style="color:inherit">Melodee</a> by Ellic Studio, based on <a href="https://github.com/hugelton/Felucca" target="_blank" rel="noopener" style="color:inherit">Felucca</a>
     by Leo Kuroshita (@kurogedelic), <a href="https://hugelton.com" target="_blank" rel="noopener" style="color:inherit">Hügelton Instruments</a>, with its CrispyZebra waveforms and Fukiai icons (MIT).<br>
     Font: Inter Tight (The Inter Project Authors, SIL OFL 1.1). Samples: Versilian Studios VSCO-2 Community Edition and VCSL (CC0 1.0).<br>
     FM6 engine: msfa from Dexed (Google Inc., Pascal Gauthier, Apache-2.0). The package also holds three JieLi AC79 SDK files, uboot.boot, cfg_tool.bin and eq_cfg_hw.bin (JieLi Technology, Apache-2.0). <a href="../../firmware/LICENSING.md" style="color:inherit">Licences</a>: <a href="../../firmware/LICENSE" style="color:inherit">GPL-3.0</a>, <a href="../../firmware/LICENSES/Apache-2.0.txt" style="color:inherit">Apache-2.0</a>, <a href="../../firmware/LICENSES/" style="color:inherit">all</a>.<br>
     M-VAVE and FM-1 are trademarks of their respective owners.<br>
-    GPL-3.0-only. Without warranty. <a href="https://github.com/keremimo/melodee" target="_blank" rel="noopener" style="color:inherit">github.com/keremimo/melodee</a></p>
+    GPL-3.0-only. Without warranty. <a href="https://github.com/bendawsonjr/hookology" target="_blank" rel="noopener" style="color:inherit">github.com/bendawsonjr/hookology</a></p>
 <p>m-bootloader by Julius Vitkauskas (MIT).</p></footer>
 
 <dialog id="preflight" aria-labelledby="pfh">

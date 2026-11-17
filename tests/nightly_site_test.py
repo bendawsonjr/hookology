@@ -67,7 +67,7 @@ class NightlySite(unittest.TestCase):
         publish(self.site, self.normal, "next-abcdef0", "b" * 40, "2026-10-15T16:00:00Z")
 
     def test_nightly_workflow_is_runnable_and_reusable(self):
-        workflow = (ROOT / '.github/workflows/nightly.yml').read_text()
+        workflow = (ROOT / '.github/melodee-workflows/nightly.yml').read_text()  # (Hookology) parked
         self.assertIn('    branches: [nightly]', workflow)
         self.assertIn('  workflow_call:', workflow)
         self.assertIn('    runs-on: ubuntu-22.04', workflow)

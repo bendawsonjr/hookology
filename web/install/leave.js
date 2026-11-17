@@ -23,7 +23,7 @@ const TEXT = {
     direct: "USB ケーブルはパソコンに直接つないでください。Probe や Transporter などの機材は不要です。",
     brick: "起動保護付きファームウェアの更新が中断した場合は、電源を入れ直すか、OCT− だけを押しながら電源を入れてください。キーのライトが短く3回点滅したら更新モードです。USB を接続し直して、もう一度インストールしてください。以前のファームウェアや長い1回の点滅の場合は、USB 復旧手順を確認してください:",
     recoveryLink: "USB 復旧手順とダウンロード",
-    beta: "Melodee の不具合は GitHub で知らせてください。このカスタムファームウェアを使ったことで FM-1 が壊れたり不具合が起きたりしても、作者は一切の責任を負いません。自己責任でお使いください。",
+    beta: "Hookology の不具合は GitHub で知らせてください。このカスタムファームウェアを使ったことで FM-1 が壊れたり不具合が起きたりしても、作者は一切の責任を負いません。自己責任でお使いください。",
     transitTitle: "別のファームウェアへ切り替える",
     transitWhy: "別のカスタムファームウェアへ移る前に、TransitFM1をインストールしてください。切り替えのための中継用ファームウェアで、音は出ません。Baud Girlへ移る場合は、先に公式V15をインストールし、そこから専用インストーラーを使ってください。",
     transitFirst: "下のボタンでTransitFM1 0.1.3をインストールします。旧版0.1と配布中止の0.1.2は使わないでください。",
@@ -31,26 +31,26 @@ const TEXT = {
     transitGo: "バックアップしてTransitFM1をインストール",
     transitGoNoBackup: "バックアップせずTransitFM1をインストール",
     transitConfirm: "全体バックアップをパソコンに保存できましたか？ TransitFM1をインストールします。次は移行先のインストーラーを使ってください。",
-    transitConfirmNoBackup: "バックアップを作成せずTransitFM1をインストールしますか？ Melodeeの曲・音色・設定が失われる可能性があり、バックアップなしでは復元できません。続けますか？",
+    transitConfirmNoBackup: "バックアップを作成せずTransitFM1をインストールしますか？ Hookologyの曲・音色・設定が失われる可能性があり、バックアップなしでは復元できません。続けますか？",
     transitLoading: "TransitFM1をダウンロードして検証中",
     transitDone: "TransitFM1をインストールしました。FM-1のTRANSIT表示を確認し、移行先のインストーラーを開いてください。",
     transitSafety: "TransitFM1は移行先への書き込み中断に備えますが、最後のセクターは保護できない場合があります。Baud Girlなど書き込み範囲を超えるファームウェアには公式V15を経由してください。充電し、MIDIを送信するDAWなどを閉じ、書き込み中はUSBを抜かないでください。中断時は同じファームウェアで再開してください。",
     transitAbout: "TransitFM1の使い方・復旧手順", transitSource: "Quixotic7によるソース・ライセンス",
     back: "M-VAVEから公式FM-1 V15を取得し、未変更のFM-1.fwscを選んでください。ファイルはこのブラウザ内で検証し、サーバーへ送りません。ファイルは変更せず、M-VAVE公式の書き込みモードで書き込みます。",
     stockTitle: "公式V15に戻す", stockFile: "公式FM-1.fwsc", stockGo: "バックアップして公式V15へ戻す",
-    stockBackup: "現在の曲・保存曲・音色バンク・サンプル・設定を先に保存します。バックアップできない場合は、Melodeeを更新するか、データ消失を了承してバックアップを省略できます。復元はMelodeeを再インストールしてエディタから行います。",
-    stockSkipBackup: "バックアップを省略する（Melodeeの曲・音色・設定が失われる可能性があります）",
+    stockBackup: "現在の曲・保存曲・音色バンク・サンプル・設定を先に保存します。バックアップできない場合は、Hookologyを更新するか、データ消失を了承してバックアップを省略できます。復元はHookologyを再インストールしてエディタから行います。",
+    stockSkipBackup: "バックアップを省略する（Hookologyの曲・音色・設定が失われる可能性があります）",
     stockGoNoBackup: "バックアップせず公式V15へ戻す",
-    stockConfirmNoBackup: "バックアップを作成せず公式V15へ戻します。Melodeeの曲・音色・設定が失われる可能性があり、バックアップなしでは復元できません。続けますか？",
+    stockConfirmNoBackup: "バックアップを作成せず公式V15へ戻します。Hookologyの曲・音色・設定が失われる可能性があり、バックアップなしでは復元できません。続けますか？",
     stockRecovery: "更新中断の再開：全体バックアップはすでにパソコンへ保存済み",
-    stockValid: "公式V15を確認しました", stockConfirm: "全体バックアップファイルをパソコンに保存できましたか？ 続けると公式V15へ戻します。Melodeeの曲は公式V15では開けません。",
+    stockValid: "公式V15を確認しました", stockConfirm: "全体バックアップファイルをパソコンに保存できましたか？ 続けると公式V15へ戻します。Hookologyの曲は公式V15では開けません。",
     stockNeedBackup: "書き込みモードからはバックアップできません。保存済みバックアップがある場合は更新中断の再開にチェックするか、データ消失を了承してバックアップを省略してください。",
-    stockUnsupported: "このMelodeeは全体バックアップに未対応です。先に最新版をインストールするか、データ消失を了承して「バックアップを省略する」を選び、もう一度押してください。",
+    stockUnsupported: "このHookologyは全体バックアップに未対応です。先に最新版をインストールするか、データ消失を了承して「バックアップを省略する」を選び、もう一度押してください。",
     backup: "全体バックアップ保存中 ", stockError: "公式ファイルを確認できません: ",
-    stockHead: "FM-1 が CHECK HEAD で公式ファイルを拒否しました（FAILED -5）。起動データが V15 と異なります。何も書き込んでおらず、Melodee はそのまま使えます。別の方法で戻そうとしないでください。上の FAILED -5 のリンクを読み、GitHub で報告してください。",
+    stockHead: "FM-1 が CHECK HEAD で公式ファイルを拒否しました（FAILED -5）。起動データが V15 と異なります。何も書き込んでおらず、Hookology はそのまま使えます。別の方法で戻そうとしないでください。上の FAILED -5 のリンクを読み、GitHub で報告してください。",
     stockHelp: "FM-1 に FAILED -5 と表示された場合（理由と報告方法）",
     loaderStock: "FM-1 は M-VAVE 公式の書き込みモードで待機しています。このモードには公式FM-1.fwscしか書き込めません。何も送っていません。先に「公式V15に戻す」を完了してください。",
-    loaderMelodee: "FM-1 は Melodee の書き込みモードで待機しています。このモードには公式ファイルを送りません。何も送っていません。上の「インストール」で Melodee を完了してから、公式V15に戻してください。",
+    loaderMelodee: "FM-1 は Hookology の書き込みモードで待機しています。このモードには公式ファイルを送りません。何も送っていません。上の「インストール」で Hookology を完了してから、公式V15に戻してください。",
     loaderUnknown: "このインストーラーが知らない書き込みモードです。何も送っていません。この名前を添えて GitHub で報告してください: ",
     nomidi: "このブラウザでは使えません。Chrome か Edge で開いてください。", loadfail: "読み込めませんでした: ",
     start: "開始します", verify: "確認中", loader: "書き込みモードに切り替え中", write: "書き込み中",
@@ -84,34 +84,34 @@ const TEXT = {
     direct: "Connect the USB cable directly to the computer. No probe or Transporter is needed.",
     brick: "If an update is interrupted on firmware with boot protection, switch the FM-1 on again (or hold OCT− alone while switching on). Three short key-light flashes mean update mode: reconnect USB and press Install again. Older firmware and one long flash need the USB recovery instructions:",
     recoveryLink: "USB recovery instructions and downloads",
-    beta: "Please report Melodee problems on GitHub. The author accepts no responsibility if your FM-1 is damaged or misbehaves because of this custom firmware. Use it at your own risk.",
+    beta: "Please report Hookology problems on GitHub. The author accepts no responsibility if your FM-1 is damaged or misbehaves because of this custom firmware. Use it at your own risk.",
     transitTitle: "Switching to another firmware",
-    transitWhy: "Before leaving Melodee for another custom firmware, install TransitFM1. It is a temporary stop for switching firmware and makes no sound. For Baud Girl, install official V15 first, then use Baud Girl’s own installer.",
+    transitWhy: "Before leaving Hookology for another custom firmware, install TransitFM1. It is a temporary stop for switching firmware and makes no sound. For Baud Girl, install official V15 first, then use Baud Girl’s own installer.",
     transitFirst: "Install TransitFM1 0.1.3 using the button below. Do not use the old 0.1 or withdrawn 0.1.2.",
     transitNext: "Once the FM-1 shows TRANSIT, open the next firmware’s own installer and install it there.",
     transitGo: "Back up and install TransitFM1",
     transitGoNoBackup: "Install TransitFM1 without backup",
     transitConfirm: "Has the complete backup file been saved to this computer? Continue to install TransitFM1, then use the next firmware’s own installer.",
-    transitConfirmNoBackup: "Install TransitFM1 without creating a backup? Melodee music, sounds and settings may be lost and cannot be restored without a backup. Continue?",
+    transitConfirmNoBackup: "Install TransitFM1 without creating a backup? Hookology music, sounds and settings may be lost and cannot be restored without a backup. Continue?",
     transitLoading: "Downloading and verifying TransitFM1",
     transitDone: "TransitFM1 installed. Check that the FM-1 shows TRANSIT, then open the next firmware’s own installer.",
     transitSafety: "TransitFM1 guards the next firmware’s write against interruptions, except possibly its last sector. Baud Girl and other images beyond its write range require official V15 first. Charge the FM-1, close DAWs and other apps sending MIDI, and keep USB connected while writing. If interrupted, resume with the same firmware.",
     transitAbout: "TransitFM1 instructions and recovery", transitSource: "Source and licences by Quixotic7",
     back: "Get official FM-1 V15 from M-VAVE and select the unmodified FM-1.fwsc. The browser validates it locally; it is not sent to a server. The file is installed unchanged, with M-VAVE's own update loader.",
     stockTitle: "Return to official V15", stockFile: "Official FM-1.fwsc", stockGo: "Back up and return to official V15",
-    stockBackup: "Current music, saved music, sound banks, samples and settings are saved first. If backups are unavailable, update Melodee or choose to skip the backup and accept possible data loss. To restore an archive later, reinstall Melodee and use the editor.",
-    stockSkipBackup: "Skip backup (Melodee music, sounds and settings may be lost)",
+    stockBackup: "Current music, saved music, sound banks, samples and settings are saved first. If backups are unavailable, update Hookology or choose to skip the backup and accept possible data loss. To restore an archive later, reinstall Hookology and use the editor.",
+    stockSkipBackup: "Skip backup (Hookology music, sounds and settings may be lost)",
     stockGoNoBackup: "Return to official V15 without backup",
-    stockConfirmNoBackup: "Return to official V15 without creating a backup? Melodee music, sounds and settings may be lost and cannot be restored without a backup. Continue?",
+    stockConfirmNoBackup: "Return to official V15 without creating a backup? Hookology music, sounds and settings may be lost and cannot be restored without a backup. Continue?",
     stockRecovery: "Resume an interrupted update: I already saved a complete backup to this computer",
-    stockValid: "Official V15 verified", stockConfirm: "Has the complete backup file been saved to this computer? Continue to return to official V15. Official V15 cannot open Melodee music.",
+    stockValid: "Official V15 verified", stockConfirm: "Has the complete backup file been saved to this computer? Continue to return to official V15. Official V15 cannot open Hookology music.",
     stockNeedBackup: "An update loader cannot export a backup. Select resume if you already saved a complete backup, or choose Skip backup to continue and accept possible data loss.",
-    stockUnsupported: "This Melodee does not support complete backups. Install the current Melodee first, or select Skip backup to accept possible data loss and try again.",
+    stockUnsupported: "This Hookology does not support complete backups. Install the current Hookology first, or select Skip backup to accept possible data loss and try again.",
     backup: "Saving complete backup ", stockError: "Cannot validate official firmware: ",
-    stockHead: "The FM-1 refused the official file at CHECK HEAD (FAILED -5): its boot data differs from V15's. Nothing was written; Melodee stays installed. Do not try other ways to return to stock. Open the FAILED -5 link above and report it on GitHub.",
+    stockHead: "The FM-1 refused the official file at CHECK HEAD (FAILED -5): its boot data differs from V15's. Nothing was written; Hookology stays installed. Do not try other ways to return to stock. Open the FAILED -5 link above and report it on GitHub.",
     stockHelp: "If the FM-1 shows FAILED -5: why, and how to report it",
     loaderStock: "The FM-1 is waiting in M-VAVE's official update mode, which only accepts the official FM-1.fwsc. Nothing was sent. Finish Return to official V15 first.",
-    loaderMelodee: "The FM-1 is waiting in Melodee's update mode, which never receives the official file. Nothing was sent. Press Install above to finish Melodee first, then return to official V15.",
+    loaderMelodee: "The FM-1 is waiting in Hookology's update mode, which never receives the official file. Nothing was sent. Press Install above to finish Hookology first, then return to official V15.",
     loaderUnknown: "The FM-1 is in an update mode this installer does not know. Nothing was sent. Please report it on GitHub with this name: ",
     nomidi: "This browser cannot do it. Open the page in Chrome or Edge.", loadfail: "Could not load: ",
     start: "Starting", verify: "Verifying", loader: "Switching to update mode", write: "Writing",
@@ -129,8 +129,8 @@ const TEXT = {
     license: "GPL-3.0, no warranty. Source:",
   },
 };
-Object.assign(TEXT.en, {"kicker": "Firmware for the M-VAVE FM-1", "installTitle": "Install Melodee", "factTime": "About 3 minutes", "connectTitle": "Connect the FM-1", "connectHelp": "Switch it on, close music apps and other editor tabs, and allow MIDI access when asked.", "find": "Check connection", "chooseTitle": "Choose your version", "backupFirst": "Back up your music and sounds in the editor before updating.", "beforeStart": "Before you start", "stayHere": "Keep this tab open and in front", "stayWhy": "Stay on this page until it says Done.", "keepPower": "Keep the FM-1 connected and powered", "keepWhy": "Keep the cable connected. Plug your laptop into power.", "screenNormal": "UPDATING or a dark screen is normal during installation.", "backupAck": "I've saved a backup, or have nothing to keep.", "cancel": "Cancel", "startInstall": "Start installation", "runWarning": "Keep this tab open and in front. Don't unplug the FM-1.", "prepare": "Prepare", "stall": "Waiting for the FM-1. Keep the cable connected.", "resumeInstall": "Resume installation", "close": "Close", "details": "Details", "pendingInstall": "An installation did not finish. Select the same version and resume:", "differentPending": "Resume using the same selected build as the interrupted installation:", "busy": "Another tab is using the installer. Finish or close it there first.", "comeBack": "Come back to the installer", "installingTitle": "Installing Melodee", "etaSoon": "Less than a minute left", "etaMinutes": "minutes left", "backgroundKept": "The installation continued while you were away. Please stay here until it finishes.", "backgroundSlow": "The browser slowed this page while you were away. It is continuing; please stay here.", "end_done": "Installation complete", "end_safe": "Nothing was written", "end_paused": "Installation paused", "end_restart": "The FM-1 did not return as expected", "installedVerified": "The FM-1 restarted and reported the expected firmware.", "tip_done": "You can open the editor or unplug the FM-1.", "tip_safe": "Check the connection and other music apps, then try again.", "tip_paused": "Reconnect the FM-1 and resume the same build. The write starts again from the beginning.", "tip_restart": "Power-cycle the FM-1 and check its screen. If it stays in update mode, reconnect and resume the same build.", "badHash": "The firmware checksum does not match the published build. Reload the page."});
-Object.assign(TEXT.ja, {"kicker": "M-VAVE FM-1 用ファームウェア", "installTitle": "Melodee をインストール", "factTime": "約3分", "connectTitle": "FM-1 を接続", "connectHelp": "電源を入れ、音楽アプリや別のエディタタブを閉じてください。MIDI の許可を求められたら許可してください。", "find": "接続を確認", "chooseTitle": "バージョンを選ぶ", "backupFirst": "更新前にエディタで曲と音色をバックアップしてください。", "beforeStart": "開始前に確認", "stayHere": "このタブを開いたまま前面に保つ", "stayWhy": "完了と表示されるまで、このページから離れないでください。", "keepPower": "FM-1 の接続と電源を保つ", "keepWhy": "ケーブルを抜かず、パソコンも電源につないでください。", "screenNormal": "更新中は UPDATING 表示や画面の消灯が正常です。", "backupAck": "バックアップを保存済み、または保存するデータはありません。", "cancel": "キャンセル", "startInstall": "インストール開始", "runWarning": "このタブを前面に保ち、FM-1 を抜かないでください。", "prepare": "準備", "stall": "FM-1 の応答を待っています。接続を保ってください。", "resumeInstall": "インストールを再開", "close": "閉じる", "details": "詳細", "pendingInstall": "未完了のインストールがあります。同じバージョンを選んで再開してください：", "differentPending": "中断したインストールと同じビルドを選んで再開してください：", "busy": "別のタブでインストール中です。そのタブで完了するか閉じてください。", "comeBack": "インストーラに戻ってください", "installingTitle": "Melodee インストール中", "etaSoon": "残り1分未満", "etaMinutes": "分（残り）", "backgroundKept": "タブを離れた間も処理を続けました。完了までこのタブに留まってください。", "backgroundSlow": "タブを離れた間にブラウザが処理を遅くしました。再開しています。このタブに留まってください。", "end_done": "インストール完了", "end_safe": "書き込みは行われませんでした", "end_paused": "インストールを中断", "end_restart": "FM-1 の再起動を確認できませんでした", "installedVerified": "FM-1 の再起動と、指定したファームウェアの識別情報を確認しました。", "tip_done": "エディタを開くか、FM-1 を取り外せます。", "tip_safe": "接続と音楽アプリを確認して、もう一度お試しください。", "tip_paused": "FM-1 を再接続し、同じビルドで再開してください。書き込みは最初から始まります。", "tip_restart": "FM-1 の電源を入れ直して画面を確認してください。更新モードのままなら、再接続して同じビルドで再開してください。", "badHash": "ファームウェアのチェックサムが一致しません。ページを再読み込みしてください。"});
+Object.assign(TEXT.en, {"kicker": "Firmware for the M-VAVE FM-1", "installTitle": "Install Hookology", "factTime": "About 3 minutes", "connectTitle": "Connect the FM-1", "connectHelp": "Switch it on, close music apps and other editor tabs, and allow MIDI access when asked.", "find": "Check connection", "chooseTitle": "Choose your version", "backupFirst": "Back up your music and sounds in the editor before updating.", "beforeStart": "Before you start", "stayHere": "Keep this tab open and in front", "stayWhy": "Stay on this page until it says Done.", "keepPower": "Keep the FM-1 connected and powered", "keepWhy": "Keep the cable connected. Plug your laptop into power.", "screenNormal": "UPDATING or a dark screen is normal during installation.", "backupAck": "I've saved a backup, or have nothing to keep.", "cancel": "Cancel", "startInstall": "Start installation", "runWarning": "Keep this tab open and in front. Don't unplug the FM-1.", "prepare": "Prepare", "stall": "Waiting for the FM-1. Keep the cable connected.", "resumeInstall": "Resume installation", "close": "Close", "details": "Details", "pendingInstall": "An installation did not finish. Select the same version and resume:", "differentPending": "Resume using the same selected build as the interrupted installation:", "busy": "Another tab is using the installer. Finish or close it there first.", "comeBack": "Come back to the installer", "installingTitle": "Installing Hookology", "etaSoon": "Less than a minute left", "etaMinutes": "minutes left", "backgroundKept": "The installation continued while you were away. Please stay here until it finishes.", "backgroundSlow": "The browser slowed this page while you were away. It is continuing; please stay here.", "end_done": "Installation complete", "end_safe": "Nothing was written", "end_paused": "Installation paused", "end_restart": "The FM-1 did not return as expected", "installedVerified": "The FM-1 restarted and reported the expected firmware.", "tip_done": "You can open the editor or unplug the FM-1.", "tip_safe": "Check the connection and other music apps, then try again.", "tip_paused": "Reconnect the FM-1 and resume the same build. The write starts again from the beginning.", "tip_restart": "Power-cycle the FM-1 and check its screen. If it stays in update mode, reconnect and resume the same build.", "badHash": "The firmware checksum does not match the published build. Reload the page."});
+Object.assign(TEXT.ja, {"kicker": "M-VAVE FM-1 用ファームウェア", "installTitle": "Hookology をインストール", "factTime": "約3分", "connectTitle": "FM-1 を接続", "connectHelp": "電源を入れ、音楽アプリや別のエディタタブを閉じてください。MIDI の許可を求められたら許可してください。", "find": "接続を確認", "chooseTitle": "バージョンを選ぶ", "backupFirst": "更新前にエディタで曲と音色をバックアップしてください。", "beforeStart": "開始前に確認", "stayHere": "このタブを開いたまま前面に保つ", "stayWhy": "完了と表示されるまで、このページから離れないでください。", "keepPower": "FM-1 の接続と電源を保つ", "keepWhy": "ケーブルを抜かず、パソコンも電源につないでください。", "screenNormal": "更新中は UPDATING 表示や画面の消灯が正常です。", "backupAck": "バックアップを保存済み、または保存するデータはありません。", "cancel": "キャンセル", "startInstall": "インストール開始", "runWarning": "このタブを前面に保ち、FM-1 を抜かないでください。", "prepare": "準備", "stall": "FM-1 の応答を待っています。接続を保ってください。", "resumeInstall": "インストールを再開", "close": "閉じる", "details": "詳細", "pendingInstall": "未完了のインストールがあります。同じバージョンを選んで再開してください：", "differentPending": "中断したインストールと同じビルドを選んで再開してください：", "busy": "別のタブでインストール中です。そのタブで完了するか閉じてください。", "comeBack": "インストーラに戻ってください", "installingTitle": "Hookology インストール中", "etaSoon": "残り1分未満", "etaMinutes": "分（残り）", "backgroundKept": "タブを離れた間も処理を続けました。完了までこのタブに留まってください。", "backgroundSlow": "タブを離れた間にブラウザが処理を遅くしました。再開しています。このタブに留まってください。", "end_done": "インストール完了", "end_safe": "書き込みは行われませんでした", "end_paused": "インストールを中断", "end_restart": "FM-1 の再起動を確認できませんでした", "installedVerified": "FM-1 の再起動と、指定したファームウェアの識別情報を確認しました。", "tip_done": "エディタを開くか、FM-1 を取り外せます。", "tip_safe": "接続と音楽アプリを確認して、もう一度お試しください。", "tip_paused": "FM-1 を再接続し、同じビルドで再開してください。書き込みは最初から始まります。", "tip_restart": "FM-1 の電源を入れ直して画面を確認してください。更新モードのままなら、再接続して同じビルドで再開してください。", "badHash": "ファームウェアのチェックサムが一致しません。ページを再読み込みしてください。"});
 
 const t=k=>TEXT[getLanguage()][k] || k;
 const session=createInstallSession({t});
@@ -163,7 +163,7 @@ $("stock-file").addEventListener("change", async () => {
 });
 function saveArchive(archive) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(archive)], {type:"application/json"}));
-  const a = document.createElement("a"); a.href = url; a.download = `Melodee-backup-${new Date().toISOString().slice(0,10)}.json`;
+  const a = document.createElement("a"); a.href = url; a.download = `Hookology-backup-${new Date().toISOString().slice(0,10)}.json`;
   document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function archiveInfo(a) {

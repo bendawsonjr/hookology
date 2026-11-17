@@ -237,8 +237,8 @@ def main(pkg, version, out, nightly=None, installer_only=False, rc=None, manual=
     html = html.replace("/*INSTALLER_STYLE*/", (HERE / "install/installer.css").read_text(encoding="utf-8"))
     html = html.replace("/*INSTALLER*/", "(() => {\n" + strip_module((HERE / "install/installer.js").read_text()) + "\n})();")
     inst, ed, man, fw = out / "webapp" / "installer", out / "webapp" / "editor", out / "webapp" / "manual", out / "firmware"
-    man_src = Path(manual) if manual is not None else HERE / "manual"
-    if not installer_only:
+    man_src = Path(manual) if manual is not None else None   # (Hookology) no manual unless one is given (the tests)
+    if not installer_only and man_src is not None:
         require_manual(man_src)                     # before any write: a missing figure must leave the site untouched
     for d in (inst, ed, fw):
         d.mkdir(parents=True, exist_ok=True)
@@ -277,14 +277,17 @@ def main(pkg, version, out, nightly=None, installer_only=False, rc=None, manual=
     for n in names:
         shutil.copy(lic / n, fw / "LICENSES" / n)
     (fw / "LICENSES" / "index.html").write_text(    # the installer links this folder: Pages lists no folders
-        '<!doctype html><meta charset="utf-8"><title>Melodee licences</title><h1>Licence texts</h1><ul>'
+        '<!doctype html><meta charset="utf-8"><title>Hookology licences</title><h1>Licence texts</h1><ul>'
         + "".join(f'<li><a href="{n}">{n}</a></li>' for n in names)
         + '</ul><p><a href="../LICENSING.md">LICENSING.md</a> · <a href="../LICENSE">LICENSE (GPL-3.0)</a></p>\n',
         encoding="utf-8")
     for doc in ("LICENSE", "LICENSING.md"):
         shutil.copy(HERE.parent / doc, fw / doc)
     if not installer_only:
-        publish_manual(man_src, man, version, preserve_nightly=True)
+        if man_src is not None:
+            publish_manual(man_src, man, version, preserve_nightly=True)
+        elif man.exists():                          # (Hookology) the guide is docs/GUIDE.md on GitHub; Melodee's manual is not published
+            shutil.rmtree(man)
         shutil.copy(HERE / "editor.html", ed / "index.html")
         for f in ("fukiai.ttf", "FUKIAI-LICENSE.txt", "figtree.ttf", "unbounded.ttf", "OFL-Figtree.txt", "OFL-Unbounded.txt", "fm1backup.js", "fm1pkg.js", "fm1ota.js"):
             if (HERE / f).exists():
@@ -293,9 +296,9 @@ def main(pkg, version, out, nightly=None, installer_only=False, rc=None, manual=
         for f in ("transfer.js", "keepalive.js", "progress.js", "fakefm1.js", "installer.css"):
             shutil.copy(HERE / "install" / f, ed / "install" / f)
         (out / "index.html").write_text(
-            '<!doctype html><meta charset="utf-8"><title>Melodee</title>'
+            '<!doctype html><meta charset="utf-8"><title>Hookology</title>'
             '<meta http-equiv="refresh" content="0; url=webapp/installer/">'
-            '<a href="webapp/installer/">Melodee installer</a>\n', encoding="utf-8")
+            '<a href="webapp/installer/">Hookology installer</a>\n', encoding="utf-8")
     print(f"site: {out}: webapp/installer ({len(html)} B), webapp/editor, firmware/{name} ({len(raw)} B), {product}")
 
 

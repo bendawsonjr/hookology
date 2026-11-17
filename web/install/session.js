@@ -127,7 +127,7 @@ export function createInstallSession({ t }) {
     $('run-resume').onclick = () => { close();run.onResume?.(); };
     clearInterval(run.timer);
     active = null;
-    run.release();document.title = ok ? t('done') + ' · Melodee' : baseTitle;
+    run.release();document.title = ok ? t('done') + ' · Hookology' : baseTitle;
     banner();$('run-close').focus();
   }
   function resume() {

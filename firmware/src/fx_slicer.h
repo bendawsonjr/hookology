@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Kerem Kilic (Ellic Studio)
- * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Portions Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * Ported from SLOOP by isod89 (https://github.com/isod89/sloop-fm1, firmware/src/slicer.c at bac9c05), whose file
+ * carries the notice above. */
 /* (Hookology, beta51) SLICER: GATE and STUTTER, a track's INSERTs (fx.c fx_insert), ported from SLOOP's slicer.c: a
  * tempo-synced 16-step gate / stutter on the track's signal, before its LEVEL, PAN and sends.
  *   the slot's MIX   DEPTH: GATE how far a '.' step closes (100 % = silent); STUTTER the level of the repeat

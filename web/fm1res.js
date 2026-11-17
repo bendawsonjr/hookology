@@ -13,9 +13,9 @@ const resError = (code, msg, rc) => Object.assign(new Error(msg), { code, rc });
 
 // the header: this build's payload length and CRC-32
 export function resHeader(region) {
-  if (!region || region.length < 32) throw resError("resfile", "Not a Melodee resource file");
+  if (!region || region.length < 32) throw resError("resfile", "Not a Hookology resource file");
   const head = new DataView(region.buffer, region.byteOffset, 32);
-  if (head.getUint32(0, true) !== 0x3153524d) throw resError("resfile", "Not a Melodee resource file");
+  if (head.getUint32(0, true) !== 0x3153524d) throw resError("resfile", "Not a Hookology resource file");
   return { length: head.getUint32(4, true), crc: head.getUint32(8, true) };
 }
 

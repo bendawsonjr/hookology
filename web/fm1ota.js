@@ -187,7 +187,7 @@ export class Updater {
     const dev = await this.find((id) => !IS_OTA(id));
     if (!dev) throw fail("notfound", "FM-1 not found (USB cable, and no other app using it?)");
     const [model] = product.split("_");
-    if (dev.id.open) { dev.link.close(); throw fail("open", "Return from M-VAVE Open firmware to official firmware before installing Melodee."); }
+    if (dev.id.open) { dev.link.close(); throw fail("open", "Return from M-VAVE Open firmware to official firmware before installing Hookology."); }
     if (dev.id.model !== model) { dev.link.close(); throw fail("model", `the device is ${dev.id.text}, the package is for ${product}`); }
     step("start", dev.id.text);
     dev.link.send(UPGRADE);

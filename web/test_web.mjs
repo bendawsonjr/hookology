@@ -1893,7 +1893,7 @@ setupLeaving({getLanguage:()=>"en",isBusy:()=>writing,setBusy:on=>{writing=on;},
   r = await run({skip:true, installError:fail("stopped", {lastRead:0x40})});
   ok(r.status.startsWith("Stopped.") && !r.status.includes("FAILED -5"), "stock: other step-1 stops keep the generic message");
   r = await run({skip:true, installError:fail("wrongloader", {detail:MELODEE_LOADER})});
-  ok(r.status.includes("Melodee's update mode"), "stock: a Melodee loader started by step 1 gets nothing");
+  ok(r.status.includes("Hookology's update mode"), "stock: a Melodee loader started by step 1 gets nothing");
   r = await run({loader:STOCK_LOADER});
   ok(!r.calls.includes("resume") && r.status.includes("Skip backup"),
     "stock: interrupted updates still require saved backup or explicit skip");
@@ -1903,7 +1903,7 @@ setupLeaving({getLanguage:()=>"en",isBusy:()=>writing,setBusy:on=>{writing=on;},
   r = await run({loader:STOCK_LOADER, recovery:true});
   ok(r.calls.includes("resume") && r.calls.some(c => c.includes("Has the complete backup")),
     "stock: saved-backup recovery retains its existing confirmation");
-  for (const [other, says] of [[MELODEE_LOADER, "Melodee's update mode"], ["ota-FM-1_123", "ota-FM-1_123"]]) {
+  for (const [other, says] of [[MELODEE_LOADER, "Hookology's update mode"], ["ota-FM-1_123", "ota-FM-1_123"]]) {
     r = await run({loader:other, skip:true, recovery:true});
     ok(!r.writes.length && !r.calls.includes("confirm") && r.status.includes(says) && r.unlocked,
       `stock: never resumes in ${other}`);

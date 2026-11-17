@@ -11,8 +11,12 @@
 - Follow `docs/design/README.md` → “Status indicators” for new or changed indicators.
 - Ongoing state belongs in the shared header and follows the state lifetime; reserve toasts for brief explanations and dialogs for decisions.
 
+# Hookology
+
+- Hookology is a fork of Melodee 1.6.1. Mark Hookology changes with a `(Hookology)` comment and record them in `HOOKOLOGY.md`.
+- Its owner does not program: explain changes in plain language, and get designs approved before coding.
+- Never install firmware on the FM-1, commit, push, or make anything public without the owner's explicit go-ahead.
+
 # Releases
 
-- Release firmware must be built and attested by `zvenson/fm1-build/.github/workflows/build.yml@v1`, following its [README](https://github.com/zvenson/fm1-build#readme). Use a new reviewed version tag when upgrading the shared workflow.
-- Keep host/web tests blocking, verify the firmware attestations, and publish the draft only after the complete recovery set and checksums pass validation. Do not substitute a local build for the attested packages.
-- Follow [BUILDING.md → Releases](BUILDING.md#releases) for the release process and verification command.
+- Follow [BUILDING.md → Releasing Hookology](BUILDING.md#releasing-hookology). Melodee's release workflows are in `.github/melodee-workflows/` and are not used.

@@ -1,4 +1,6 @@
-# Building Melodee
+# Building Hookology
+
+Hookology builds exactly the way Melodee 1.6.1 does, so the file names below still say `melodee`.
 
 The build makes three files in `build/`:
 
@@ -103,43 +105,24 @@ release ships: the package, the app (`melodee-0.11.1-app.bin`), `SHA256SUMS`, `L
 `LICENSES/` (the package contains Apache-2.0 SDK files, so the licence texts travel with it).
 For example, `--release 1.0.0` uses the distinct identity `FM-1_91000`.
 
-## Releases
+## Releasing Hookology
 
-All future tagged releases, including release candidates, must use
-[zvenson/fm1-build](https://github.com/zvenson/fm1-build) through
-`.github/workflows/release.yml`. The firmware job calls the reviewed `@v1` reusable
-workflow, which installs the JieLi toolchain and SDK, runs our build and blocking
-host/web tests, and attests the resulting `.fwsc` and application binary. Keep the
-reviewed version tag when updating this integration; the Firmware Hub recognises
-the shared builder's identity. Local release builds are for development and do not
-replace these attested artifacts.
+Hookology releases are built on a Mac with the steps below. Melodee's GitHub workflows, which use Melodee's own
+shared builder, are kept in `.github/melodee-workflows/` for reference and do not run.
 
-1. Set the release version in the firmware and recovery tool, prepare
-   `docs/RELEASE_<version>.md`, and commit the release source.
-2. Push the matching `v<version>` tag. The workflow validates the version and notes,
-   then creates a draft (a prerelease for versions with a suffix). An existing public
-   release is refused; an interrupted draft can be retried.
-3. The shared builder builds, tests, attests and attaches the firmware to that draft.
-   Four native recovery builds run alongside it. The publish job downloads the shared
-   builder's artifacts without rebuilding firmware and verifies their signer, source
-   ref and source commit before validating application bytes and recovery checksums.
-4. After all checks pass, the workflow uploads the complete asset set, licence archive,
-   `BUILD_INFO.json` and final `SHA256SUMS`, then publishes the draft. Stable releases
-   update the stable installer and manual; RCs update only the candidate channel.
-   Stable manual screenshots travel through the shared artifact as a temporary archive,
-   which is removed from the draft before publication.
+1. Run the host and web tests: `tests/run_tests.sh` and `node web/test_web.mjs` (plus the other `web/test_*.mjs`).
+2. Build the release: `./build.sh --release 1.0`. This writes `build/release-1.0/` (the package, the app,
+   `SHA256SUMS` and the licence files) and `build/melodee-res.bin` (the resource region).
+3. Note the change in `HOOKOLOGY.md`, commit, merge into `main` and tag it `v1.0`.
+4. Make the GitHub release from the tag and attach the files in `build/release-1.0/` and
+   `build/melodee-res.bin` (renamed `melodee-1.0-res.bin`).
+5. Build the installer site into a checkout of the `gh-pages` branch and push it:
 
-For a downloaded package from a release using this workflow:
+   ```
+   python3 web/make_site.py build/melodee-1.0.fwsc 1.0 ../hookology-pages
+   ```
 
-```sh
-gh attestation verify melodee-<version>.fwsc --repo keremimo/melodee \
-  --signer-workflow zvenson/fm1-build/.github/workflows/build.yml \
-  --source-ref refs/tags/v<version>
-```
-
-Replace `<version>` with the actual version. The attestation ties those bytes to the
-source and shared builder; it does not establish hardware safety or musical behavior.
-Historical releases are unchanged. Nightly builds retain their separate workflow.
+   GitHub Pages then serves the installer at <https://bendawsonjr.github.io/hookology/>.
 
 ## Build options
 
@@ -270,7 +253,7 @@ signal), `SOUND=only` runs them alone.
 ## Install
 
 Use the web installer in Chrome or Edge:
-<https://keremimo.github.io/melodee/webapp/installer/>. It installs the released package.
+<https://bendawsonjr.github.io/hookology/>. It installs the released package.
 
 From the command line (needs `pip3 install mido python-rtmidi`):
 
@@ -288,7 +271,7 @@ Or, to install your own build from the web installer, make a local copy of the s
 
 - `webapp/installer/` — self-contained installer
 - `webapp/editor/` — patch editor
-- `webapp/manual/` — the stable manual from `web/manual/` (HTML and screenshots), published with a full release
+- (Hookology) no manual: the installer and editor link to [docs/GUIDE.md](docs/GUIDE.md) on GitHub instead.
 - `firmware/` — the dual-core `.fwsc` package, LICENSE texts
 
 The manual’s screenshots are generated into `web/manual/` (NIGHT palette only) and
