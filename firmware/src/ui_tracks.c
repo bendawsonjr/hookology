@@ -3,7 +3,7 @@
  * of the selected group's four tracks (its numeral, its sound, every step as Stage shows them, a line of 16 a bar,
  * stacked past 16 (ui_stage.c st_layout); a length waiting for the
  * loop end, NEXT and it in the accent colour). The first turn of a knob brings the selected track's four in as Stage's
- * strip, LEVEL, PAN, SWING, STEPS (ui_input.c tracks_knob), and under them that setting for every track of the group
+ * strip, LEVEL, PAN, MUTE, STEPS (ui_input.c tracks_knob), and under them that setting for every track of the group
  * side by side; TR_KNOB_MS after the last turn they go and the lanes are whole again. Under it all Stage's band. Each part redraws when what it
  * shows changes; the playhead moves the steps alone. Included by ui_draw.c */
 #define TR_ROW_Y 32
@@ -90,12 +90,12 @@ static void tr_row(uint32_t k)
 }
 
 /* ------------------------------------------------------- the knobs --- */
-/* the strip: the selected track's LEVEL, PAN, SWING, STEPS as Stage's cards */
+/* the strip: the selected track's LEVEL, PAN, MUTE (Hookology beta67, was SWING), STEPS as Stage's cards */
 static void tr_columns(void)
 {
-    static const char *const LABEL[4] = {"LEVEL", "PAN", "SWING", "STEPS"};
+    static const char *const LABEL[4] = {"LEVEL", "PAN", "MUTE", "STEPS"};
     const track_t *t = TSEL;
-    int32_t level = clamp(t->p[P_LEVEL], 0, 127), pan = clamp(t->p[P_PAN], -64, 63), sw = track_swing(t), steps = (int32_t)tr_steps(t);
+    int32_t level = clamp(t->p[P_LEVEL], 0, 127), pan = clamp(t->p[P_PAN], -64, 63), mute = t->p[P_MUTE] != 0, steps = (int32_t)tr_steps(t);
     uint32_t c, midi = midi_track_only(t);
     if (tracks.lane) {                                  /* a drum key held: that drum's LEVEL (EDIT > LANES), TUNE DECAY
                                                          * TONE (EDIT > DRUM SOUND) */
@@ -119,7 +119,7 @@ static void tr_columns(void)
         int32_t ratio;
         if (c == 0u) { param_format(&TP[P_LEVEL], level, v, &unit); ratio = level * 1000 / 127; }
         else if (c == 1u) { param_format(&TP[P_PAN], pan, v, &unit); ratio = (pan + 64) * 1000 / 127; }
-        else if (c == 2u) { fmt_int(v, sw); ratio = sw * 10; }
+        else if (c == 2u) { str_cpy(v, mute ? "ON" : "OFF", sizeof v); ratio = mute ? 1000 : 0; }
         else { fmt_int(v, steps); ratio = (steps - 1) * 1000 / 63; }
         draw_column(c, LABEL[c], v, unit, midi && c < 2u ? T_DIM : c == 3u && t->slen_next ? T_ACCENT : VAL(c), ratio, ICON_NONE);
     }
@@ -183,7 +183,7 @@ static void tr_compare(void)
             cv_text_c(19, ty_y(y + rh / 2, TY_LB), TY_LB, d, T_INK, tc);
             if (c == 0u) { v = clamp(t->p[P_LEVEL], 0, 127); param_format(&TP[P_LEVEL], v, val, &unit); ratio = v * 1000 / 127; }
             else if (c == 1u) { v = clamp(t->p[P_PAN], -64, 63); param_format(&TP[P_PAN], v, val, &unit); ratio = (v + 64) * 1000 / 127; }
-            else if (c == 2u) { v = track_swing(t); fmt_int(val, v); ratio = v * 10; }
+            else if (c == 2u) { v = t->p[P_MUTE] != 0; str_cpy(val, v ? "ON" : "OFF", sizeof val); ratio = v ? 1000 : 0; }
             else { v = (int32_t)tr_steps(t); fmt_int(val, v); ratio = (v - 1) * 1000 / 63; }
             if (c < 2u && midi_track_only(t)) { str_cpy(val, "MIDI", sizeof val); unit = ""; ratio = -1; }
             if (unit[0] && str_len(val) + str_len(unit) + 1u < sizeof val) { str_cpy(val + str_len(val), unit, sizeof val - str_len(val)); }

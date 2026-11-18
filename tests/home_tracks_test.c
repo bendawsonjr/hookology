@@ -24,15 +24,17 @@ static void knobs(void)
 {
     track_t *t=setup(), *other=&trk[1];
     int16_t ol=other->p[P_LEVEL], op=other->p[P_PAN], os=other->p[P_SSWING], lv=t->p[P_LEVEL], pan=t->p[P_PAN];
-    tracks_knob(2,1); assert(t->p[P_SSWING]==1);
+    int16_t sw=t->p[P_SSWING];
+    tracks_knob(2,1); assert(t->p[P_MUTE]==1 && t->p[P_SSWING]==sw);   /* (Hookology beta67: KNOB 3 MUTE, was SWING) */
+    tracks_knob(2,-1); assert(t->p[P_MUTE]==0);
     tracks_knob(0,-1); assert(t->p[P_LEVEL]==lv-1);
     tracks_knob(1,1); assert(t->p[P_PAN]==pan+1);
     tracks_knob(3,1); assert(t->p[P_SLEN]==17 && !t->slen_next);
-    assert(other->p[P_LEVEL]==ol && other->p[P_PAN]==op && other->p[P_SSWING]==os && !song.g[G_SWING]);
+    assert(other->p[P_LEVEL]==ol && other->p[P_PAN]==op && other->p[P_SSWING]==os && !other->p[P_MUTE] && !song.g[G_SWING]);
     /* the track's swing and the song's add up, as before, and only this track's clock moves */
     t->p[P_SSWING]=30; song.g[G_SWING]=20; assert(track_swing(t)==50 && track_swing(other)==20+other->p[P_SSWING]);
     t->p[P_SSWING]=100; assert(track_swing(t)==SWING_MAX);
-    puts("TRACKS: level, pan, swing and steps (KNOB 1..4) of the selected track alone passed");
+    puts("TRACKS: level, pan, mute and steps (KNOB 1..4) of the selected track alone passed");
 }
 /* (Hookology, beta45) STEPS at once, playing too: the track takes its place on the shared song clock, so what plays
  * after the change is what STOP and PLAY play (a take recorded over it lands where it was heard) */

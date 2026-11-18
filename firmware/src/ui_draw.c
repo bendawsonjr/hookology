@@ -469,16 +469,19 @@ static void draw_head(void)
             }
             if (x + 6 + text_w(TY_LB, b) <= 236 - cw - (low ? 22 : 0) - hw - 6)
                 cv_text_on(x + 6, ty_y(H_HEAD / 2, TY_LB), TY_LB, b, T_MID, T_BG);
+        } else if (!ui.home && cur_page()->graph == GR_SECTIONS) {   /* SECTIONS: HOME's last page (Hookology beta67) */
+            head_count(x + 6, 236 - cw - (low ? 22 : 0) - hw, home_count() - 1u, home_count());
         } else if (!ui.home) {                          /* a page: where it is in its family */
             head_pages(x + 6, 236 - cw - (low ? 22 : 0) - hw);
-        } else {                                        /* HOME: which of its pages, as the other pages (k/n) */
+        } else {                                        /* HOME: which of its pages, as the other pages (k/n), SECTIONS
+                                                         * counted last */
             uint32_t i, n = 0, k = 0;
             for (i = 0; i < 4u; i++)
                 if (home_pg_on(HOME_ORDER[i])) {
                     if (HOME_ORDER[i] == ui.home_pg) k = n;
                     n++;
                 }
-            head_count(x + 6, 236 - cw - (low ? 22 : 0) - hw, k, n);
+            head_count(x + 6, 236 - cw - (low ? 22 : 0) - hw, k, n + 1u);
         }
         if (low)                                        /* the battery, only when it runs low */
             cv_icon_mid(236 - cw - 20, H_HEAD / 2, 16, batt_level() ? ICON_X_BAT1 : ICON_X_BAT0, T_REC, T_BG);
@@ -796,12 +799,9 @@ static void draw_foot(void)
         cv_key_row(8, 232, (H_FOOT - KC_PH) / 2, kh, 2, act_ready() ? 3u : 2u, T_BG);
     } else if (roll && live_rec_sel()) {
         cv_key_hint(8, (H_FOOT - KC_PH) / 2, KC_EDIT, seq_erase_active(t) ? "RELEASE TO STOP" : "HOLD TO ERASE", 1, T_BG);
-    } else if (roll) {
-        uint32_t start = notes_manual_start(t);
-        int selected = notes_selected(t) < RECORD_MAX || (start < NSTEP && t->step[start].n);
-        int moving = bulk.on || ui.note_move || ui.note_copy;
-        khint_t hints[2] = {{selected || moving ? KC_OCTUP : KC_KEYS, selected || moving ? "NOTE MENU" : "ADD"},
-                            {moving ? KC_OCTDN : KC_EDIT, moving ? "DONE" : "DELETE"}};
+    } else if (roll && (bulk.on || ui.note_move || ui.note_copy)) {   /* moving or copying notes: how to finish (else,
+                                                         * Hookology beta67: the track and its sound, as other pages) */
+        khint_t hints[2] = {{KC_OCTUP, "NOTE MENU"}, {KC_OCTDN, "DONE"}};
         cv_key_row(8, 232, (H_FOOT - KC_PH) / 2, hints, 2, 3u, T_BG);
     } else {
         int32_t bw = b[0] ? text_w(TY_TX, b) + 12 : 0;

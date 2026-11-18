@@ -106,8 +106,15 @@ static uint8_t home_stage_on = HOOKOLOGY_STAGE_PAGE;
 #define HOOKOLOGY_VIEW_PAGE 0
 #endif
 static uint8_t home_view_on = HOOKOLOGY_VIEW_PAGE;
+/* MIXER hidden too (Hookology beta67: TRACKS' KNOB 3 mutes; SECTIONS takes its place on HOME); HOOKOLOGY_MIXER_PAGE=1
+ * brings it back after TRACKS */
+#ifndef HOOKOLOGY_MIXER_PAGE
+#define HOOKOLOGY_MIXER_PAGE 0
+#endif
+static uint8_t home_mixer_on = HOOKOLOGY_MIXER_PAGE;
 static const uint8_t HOME_ORDER[4] = {HP_TRACKS, HP_MIXER, HP_STAGE, HP_VIEW};   /* HOME's turn */
-static int home_pg_on(uint32_t pg) { return pg == HP_STAGE ? home_stage_on : pg == HP_VIEW ? home_view_on : 1; }
+/* (inlined: the hidden pages' code, the chord view's 4 KB, then drops out of the build) */
+static inline __attribute__((always_inline)) int home_pg_on(uint32_t pg) { return pg == HP_STAGE ? home_stage_on : pg == HP_VIEW ? home_view_on : pg == HP_MIXER ? home_mixer_on : 1; }
 static uint32_t home_step(uint32_t pg, uint32_t dir)   /* the next page shown (dir 1) or the one before (3) */
 {
     uint32_t i = 0;
@@ -119,6 +126,10 @@ static uint32_t home_step(uint32_t pg, uint32_t dir)   /* the next page shown (d
     return HP_TRACKS;
 }
 static uint32_t home_next(uint32_t pg) { return home_step(pg, 1u); }
+/* (Hookology beta67) SECTIONS is HOME's last page: a page of its own (FAM_HOME in PAGES, ui.home 0), after HOME's
+ * pages in HOME's turn and in the header's count */
+static uint32_t home_count(void) { uint32_t n = 1; for (uint32_t i = 0; i < 4u; i++) n += (uint32_t)home_pg_on(HOME_ORDER[i]); return n; }
+static int home_last(uint32_t pg) { return home_next(pg) == HOME_ORDER[0] || home_next(pg) == pg; }
 static uint32_t home_prev(uint32_t pg) { return home_step(pg, 3u); }
 /* HOME SELECT (the menu): what SELECT turns on HOME, kept in favorites.factory[15][25] (0, any other: BPM) */
 /* PAGES (Hookology): HOME's pages, as SELECT turns the other sections' (HOME SELECT only: GLO SELECT skips it) */
@@ -706,13 +717,29 @@ static void open_global(void)
     page_entered();
 }
 
+static uint8_t home_sections_on;                /* (Hookology beta67) HOME was left from SECTIONS: HOME returns there */
 static void go_home(void)
 {
     if (song_picker.active) song_preset_cancel();
+    home_sections_on = 0;
     ui.home = 1;
     ui.entry_open = 0;
     ui.hot_t = 0;
     song.seq_mode = 0;
+    ui.force = 1;
+}
+
+/* (Hookology beta67) HOME's last page: SEQ's SECTIONS page, HOME lit (its family FAM_HOME) */
+static void home_sections(void)
+{
+    uint32_t k;
+    if (song_picker.active) song_preset_cancel();
+    for (k = 0; k < NPAGES && PAGES[k].graph != GR_SECTIONS; k++) {}
+    if (k >= NPAGES) { go_home(); return; }
+    ui.home = 0;
+    ui.page = (uint8_t)k;
+    home_sections_on = 1;
+    page_entered();
     ui.force = 1;
 }
 

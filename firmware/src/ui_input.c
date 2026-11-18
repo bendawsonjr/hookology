@@ -598,7 +598,7 @@ static void mixer_knob(uint32_t slot, int32_t steps)
     ui_say(a, b);
 }
 
-/* HOME's TRACKS (ui_tracks.c): the selected track's KNOB 1 SWING, 2 LEVEL, 3 STEPS, 4 PAN. ALGORITHM picks the track */
+/* HOME's TRACKS (ui_tracks.c): the selected track's KNOB 1 LEVEL, 2 PAN, 3 MUTE, 4 STEPS. ALGORITHM picks the track */
 /* REC MODE FREE, for the audio side (free_take.c): the setting, the buttons a take watches, whether a note would start
  * one: armed and stopped on the internal clock, no notes in any pattern. What a take ended in, in the header */
 static int project_no_notes(void)
@@ -663,7 +663,8 @@ static void tracks_steps(track_t *t, int32_t s)
     fmt_int(v, to);
     ui_say("STEPS ", v);
 }
-/* TRACKS: KNOB 1 LEVEL, 2 PAN, 3 SWING, 4 STEPS (the strip comes in, ui_tracks.c) */
+/* TRACKS: KNOB 1 LEVEL, 2 PAN, 3 MUTE (Hookology beta67, was SWING: SEQ > PATTERN has it), 4 STEPS (the strip comes in,
+ * ui_tracks.c) */
 /* TRACKS: the lowest drum key held on the selected drum track: its note + 1 (0: none, not a drum track) */
 static uint32_t tracks_held_drum(const track_t *t)
 {
@@ -696,12 +697,16 @@ static void tracks_knob(uint32_t k, int32_t s)
     tracks_knob_touch(k);
     if (note) { tracks_drum_knob(t, note - 1u, k, s); return; }
     tracks.lane = 0;                                    /* (no key: the strip's own cards) */
-    if (k >= 2u && chain_busy()) {                      /* (the song owns the timing, as on SEQ) */
+    if (k == 2u) {                                      /* MUTE: right on, left off (as MIXER's KNOB 4), playing too */
+        t->p[P_MUTE] = (int16_t)(s > 0);
+        ui.force = 1;
+        return;
+    }
+    if (k == 3u && chain_busy()) {                      /* (the song owns the timing, as on SEQ) */
         ui_message("STOP TO EDIT");
         return;
     }
-    if (k == 2u) tracks_value(t, P_SSWING, k, s);
-    else if (k == 3u) tracks_steps(t, s);
+    if (k == 3u) tracks_steps(t, s);
     else if (!midi_track_only(t)) tracks_value(t, k == 0u ? P_LEVEL : P_PAN, k, s);
 }
 
@@ -2192,7 +2197,9 @@ static void select_turn(uint32_t hs, int32_t s)
     int32_t x;
     switch (hs) {
     case HS_PAGES:                                      /* HOME's pages, both ways (wraps), as SELECT turns a section's */
-        if (ui.home) {
+        if (ui.home && ((s > 0 && home_last(ui.home_pg)) || (s < 0 && ui.home_pg == HOME_ORDER[0])))
+            home_sections();                            /* (SECTIONS, HOME's last page: Hookology beta67) */
+        else if (ui.home) {
             ui.home_pg = (uint8_t)(s > 0 ? home_next(ui.home_pg) : home_prev(ui.home_pg));
             ui.force = 1;
         }
@@ -2726,19 +2733,26 @@ static void ui_input(void)
     }
     if (lytap)                                          /* a layer's button acts on release (held: the layer) */
         layer_tap(lytap);
-    if (seq == BT_HOLD) {                               /* SEQ held: PATTERNS, the song under it (SONG: SELECT); PATTERNS
-                                                         * hidden (Hookology): SECTIONS */
-        uint32_t g = page_patterns_on ? GR_PATGRID : GR_SECTIONS;
-        for (k = 0; k < NPAGES; k++) if (PAGES[k].graph == g) break;
+    if (seq == BT_HOLD && page_patterns_on) {           /* SEQ held: PATTERNS, the song under it (SONG: SELECT) (Hookology
+                                                         * beta67: PATTERNS hidden, no shortcut; SECTIONS is HOME's) */
+        for (k = 0; k < NPAGES; k++) if (PAGES[k].graph == GR_PATGRID) break;
         ui.home = 0; ui.page = (uint8_t)k; ui.fam_last[FAM_SEQ] = ui.page; page_entered();
-    } else if (seq == BT_TAP) {
+    } else if (seq == BT_TAP) {                         /* (a hold alone does nothing: it is SEQ + key's) */
         open_family(FAM_SEQ);
     }
-    if (home == BT_TAP && ui.home && !pop.on) {         /* HOME acts on release (a hold opens the menu); on HOME: its */
-        ui.home_pg = (uint8_t)home_next(ui.home_pg);   /* the next page */
+    if (home == BT_TAP && ui.home && !pop.on && home_last(ui.home_pg)) {   /* HOME acts on release (a hold opens the
+                                                         * menu); on its last page: SECTIONS (Hookology beta67) */
+        home_sections();
+    } else if (home == BT_TAP && ui.home && !pop.on) {  /* on HOME: its next page */
+        ui.home_pg = (uint8_t)home_next(ui.home_pg);
         ui.force = 1;
+    } else if (home == BT_TAP && sections_page() && !pop.on) {   /* SECTIONS: back round to HOME's first page */
+        home_sections_on = 0;
+        ui.home_pg = HOME_ORDER[0];
+        go_home();
     } else if (home == BT_TAP) {
-        go_home();                                      /* (to the page it was on) */
+        if (home_sections_on) home_sections();          /* (to the page it was on: SECTIONS too) */
+        else go_home();
     }
     cursor_fix();                                       /* LEN may have changed (knob, editor, load) */
     if (step_page() && live_rec_sel() && !ui.step_mods) { /* armed: follow recording
@@ -2994,6 +3008,10 @@ static void ui_input(void)
             if (pattern_request(TSEL, (uint32_t)clamp((int32_t)from + s, 0, (int32_t)trk_npat(song.sel) - 1))) ui_message("STOP SONG TO SWITCH");
             ui.force = 1;
         } else if (step_gesture(s)) {                   /* ENV / SCL / a key held: the note's length, its place */
+        } else if (sections_page() && home_select() == HS_PAGES) {   /* SECTIONS, HOME's last page (Hookology beta67):
+                                                         * SELECT turns on round HOME's pages, both ways */
+            ui.home_pg = (uint8_t)(s > 0 ? HOME_ORDER[0] : home_prev(HOME_ORDER[0]));
+            go_home();
         } else if (!ui.home) {                          /* the section's pages (BPM: SEQ > TEMPO; the notes, the hits:
                                                          * KNOB 1) */
             page_scroll(s);

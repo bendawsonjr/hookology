@@ -217,11 +217,13 @@ static void song_list(void)
     press(B_PLAY); units_block(0);
     puts("SECTIONS: the song list's knobs, '*', undo and PLAY passed");
 }
-/* the build's SEQ (Hookology): PATTERNS and SONG hidden, SEQ held opens SECTIONS, TEMPO on GLO after MIXER */
+/* the build's SEQ (Hookology): PATTERNS and SONG hidden; SECTIONS is HOME's (beta67: HOME turns TRACKS > SECTIONS, HOME
+ * lit there; SEQ never shows it, SEQ held alone does nothing); TEMPO first on GLO */
 static void seq_pages(void)
 {
     uint32_t seen = 0, i;
     ui_power_on(); page_patterns_on = HOOKOLOGY_PATTERNS_PAGE; page_song_on = HOOKOLOGY_SONG_PAGE;
+    home_stage_on = HOOKOLOGY_STAGE_PAGE; home_view_on = HOOKOLOGY_VIEW_PAGE; home_mixer_on = HOOKOLOGY_MIXER_PAGE;   /* (the build's HOME) */
     go_home(); press(B_SEQ);
     for (i = 0; i < 12u; i++) {
         uint32_t g = cur_page()->graph;
@@ -229,12 +231,21 @@ static void seq_pages(void)
         if (g == GR_SECTIONS) seen |= 1u;
         press(B_SEQ);
     }
-    assert(seen == 1u);
-    go_home(); hold(B_SEQ); assert(!ui.home && cur_page()->graph == GR_SECTIONS);
+    assert(seen == 0u);
+    go_home(); hold(B_SEQ); assert(ui.home);       /* (no shortcut any more) */
+    go_home(); ui.home_pg = HP_TRACKS; press(B_HOME); assert(!ui.home && cur_page()->graph == GR_SECTIONS && cur_fam() == FAM_HOME);
+    press(B_SEQ); assert(cur_page()->fam == FAM_SEQ);
+    press(B_HOME); assert(!ui.home && cur_page()->graph == GR_SECTIONS);   /* (HOME from elsewhere: back where it was) */
+    press(B_HOME); assert(ui.home && ui.home_pg == HP_TRACKS);
+    HOME_SELECT = HS_PAGES; turn(EN_SELECT, 1); assert(!ui.home && cur_page()->graph == GR_SECTIONS);   /* HOME SELECT PAGES */
+    turn(EN_SELECT, 1); assert(ui.home && ui.home_pg == HP_TRACKS);
+    turn(EN_SELECT, -1); assert(!ui.home && cur_page()->graph == GR_SECTIONS);
+    turn(EN_SELECT, -1); assert(ui.home && ui.home_pg == HP_TRACKS);
+    HOME_SELECT = 0;
     go_home(); press(B_GLO); assert(str_eq(cur_page()->title, "TEMPO"));   /* (the mixer is HOME's) */
     press(B_GLO); assert(str_eq(cur_page()->title, "GLOBAL"));
-    page_patterns_on = page_song_on = 1;
-    puts("SEQ: PATTERNS and SONG hidden, SEQ held opens SECTIONS, TEMPO first on GLO passed");
+    page_patterns_on = page_song_on = 1; home_stage_on = home_view_on = home_mixer_on = 1;
+    puts("SEQ: PATTERNS and SONG hidden, SECTIONS on HOME after TRACKS, TEMPO first on GLO passed");
 }
 /* a DAW's Start on SECTIONS (CLK USB): the song from its first entry, in time; elsewhere, or CLK INT: the loop */
 static void daw(uint32_t status) { midi_enqueue(0xFu | status << 8, 1u); units_block(0); }

@@ -774,7 +774,7 @@ static const page_t PAGES[] = {
     {"NOTES", FAM_SEQ, SC_STEP, GR_ROLL, {0, 1, 2, 3}},
     {"PATTERN", FAM_SEQ, SC_TRACK, GR_STEPS, {P_SLEN, P_SDIV, P_SSWING, P_SGATE}},
     {"PATTERNS", FAM_SEQ, SC_GLOBAL, GR_PATGRID, {0xFF, 0xFF, 0xFF, 0xFF}},   /* the 4 x 8 grid: KNOB k track k's (ui_stage.c) */
-    {"SECTIONS", FAM_SEQ, SC_GLOBAL, GR_SECTIONS, {0xFF, 0xFF, 0xFF, 0xFF}},   /* A..H: patterns 1..8 (ui_song_sections.c) */
+    {"SECTIONS", FAM_HOME, SC_GLOBAL, GR_SECTIONS, {0xFF, 0xFF, 0xFF, 0xFF}},   /* A..H: patterns 1..8 (ui_song_sections.c) */
     {"SONG", FAM_SEQ, SC_GLOBAL, GR_SONG, {0xFF, 0xFF, 0xFF, 0xFF}},
     {"MOTION", FAM_SEQ, SC_TRACK, GR_MOTION, {0xFF, 0xFF, 0xFF, 0xFF}},
     {"DRUM HIT",FAM_SEQ,SC_DRUMHIT,GR_DRUMHIT,{0,1,2,3}},

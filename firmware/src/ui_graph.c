@@ -130,9 +130,11 @@ static void graph_steps(const track_t *t, uint16_t c)
  * page, else centres on the cursor's note, and follows in steps (a third of the way per frame); graph_signature()
  * holds it, so a page that does not change is not drawn again. */
 #define PR_TOP Y_GRAPH                              /* the panel's top on the screen (ui_pages.c: NOTES, under the strip) */
-#define PR_H 154                                    /* .. its rows (84 .. 237) */
+#define PR_H H_GRAPH                                /* .. its rows (84 .. 207; Hookology beta67: the sound bar under it,
+                                                     * as a drum track's NOTES; was 154, to 237) */
 #define PR_ROWS 13                                  /* semitones shown (an octave and its top note) */
-#define PR_RH 11                                    /* px per row */
+#define PR_RH 9                                     /* px per row (Hookology beta67: 9, was 11: the octave fits over the
+                                                     * sound bar, on a drum track's NOTES too) */
 #define PR_Y0 4                                     /* the top row (panel y) */
 #define PR_X0 32                                    /* the first step column */
 #define PR_CW 12                                    /* px per step */

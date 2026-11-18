@@ -9,7 +9,8 @@
  * CURVE (ENV, LFO, LFO 2): the curve is the picture (the panel, 124 rows).
  * RINGS (the pages of plain values: EDIT, the engines' own ..): what the page shapes: a filter's
  * response (a page with a cutoff), FM6's algorithm (its chart), else the sound itself (the scope, smooth, live).
- * NOTES (SEQ > STEP; a melodic track): the roll the whole height (PR_TOP, PR_H: ui_graph.c, in two slices),
+ * NOTES (SEQ > STEP; a melodic track): the roll over the sound bar (PR_TOP, PR_H: ui_graph.c, in two slices; Hookology
+ * beta67: draw_foot under it, the track and its sound),
  * the knobs as chips under it (the one turning filled).
  * HOME's MIXER (mixer_draw): a channel strip a track, its sound sideways beside its fader and meter, PAN and SEND
  * sliders, MUTE, armed; the selected track's lifted, the knob just turned (its control) in TEXT.
@@ -1013,6 +1014,7 @@ static void pv_draw(void)
                     cv_blit(0, (uint32_t)(PR_TOP + top));
             }
         }
+        draw_foot();                                    /* (Hookology beta67) the track and its sound under it */
         return;
     }
     if (kind == PV_GRID) {

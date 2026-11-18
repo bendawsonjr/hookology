@@ -167,7 +167,7 @@ static void ui_power_on(void)
     memset(&song, 0, sizeof song);
     memset(&chain, 0, sizeof chain);
     chain_defaults(&chain_config);
-    pattern_init(); sec_reset(); scs.build = 0; tracks.knob_ms = 0; tracks.out = 0; tracks.clr = 0; trc.t0 = 0; page_patterns_on = page_song_on = 1; home_stage_on = home_view_on = 1;   /* (their tests: hidden in the build, ui.c) */
+    pattern_init(); sec_reset(); scs.build = 0; tracks.knob_ms = 0; tracks.out = 0; tracks.clr = 0; trc.t0 = 0; page_patterns_on = page_song_on = 1; home_stage_on = home_view_on = home_mixer_on = 1;   /* (their tests: hidden in the build, ui.c) */
     memset(&ui, 0, sizeof ui);
     memset(&boot_work, 0, sizeof boot_work);
     memset(&step_history, 0, sizeof step_history);
@@ -1138,6 +1138,9 @@ static int test_home_view(void)
     go_home(); frame();
     press(B_HOME);
     bad += check("HOME on Stage: the second page (the chord view)", ui.home && ui.home_pg == 1u);
+    press(B_HOME);
+    bad += check("  HOME again: SECTIONS, HOME's last page (Hookology beta67), HOME lit", !ui.home && cur_page()->graph == GR_SECTIONS &&
+                 cur_fam() == FAM_HOME);
     press(B_HOME);
     bad += check("  HOME again: TRACKS", ui.home && ui.home_pg == HP_TRACKS);
     press(B_HOME);
@@ -2919,7 +2922,7 @@ static int test_product_ux(void)
     go_home(); hold(B_SEQ);
     bad += check("long SEQ goes directly to PATTERNS (the song under it) with no tap on release", cur_page()->graph == GR_PATGRID);
     turn(EN_SELECT, 1);
-    bad += check("  SELECT: SECTIONS next to it", cur_page()->graph == GR_SECTIONS);
+    bad += check("  SELECT: SONG next to it (SECTIONS is HOME's: Hookology beta67)", cur_page()->graph == GR_SONG);
     song.rec = 1; chain.armed = 1; press(B_REC);
     bad += check("REC cannot write borrowed patterns while SONG is armed", song.rec == 1 && msg_is("STOP TO RECORD"));
     ui_power_on(); open_family(FAM_EDIT);
@@ -5593,9 +5596,7 @@ static int test_pattern_page_keys(void)
     press(B_REC);
     bad += check("cancelling REC on PATTERNS immediately restores selection", !song.rec && song.grid == 2u);
     turn(EN_SELECT, 1);
-    bad += check("PATTERNS SELECT navigates to SECTIONS, whose keys are the sections", cur_page()->graph == GR_SECTIONS && song.grid == 2u);
-    turn(EN_SELECT, 1);
-    bad += check("SECTIONS SELECT navigates to SONG and restores playing", cur_page()->graph == GR_SONG && !song.grid);
+    bad += check("PATTERNS SELECT navigates to SONG and restores playing (SECTIONS is HOME's)", cur_page()->graph == GR_SONG && !song.grid);
 
     /* PLAY retains the configured count-in; cancelling it restores selection. */
     ui_power_on(); hold(B_SEQ);
@@ -5682,7 +5683,7 @@ static int test_pattern_preset_audition(void)
     turn(EN_PRESET, 1); press(B_OCTDN);
     bad += check("OCT- dismisses preset audition and keeps PATTERNS", !pop.on && cur_page()->graph == GR_PATGRID && song.grid == 2u);
     turn(EN_PRESET, 1); turn(EN_SELECT, 1);
-    bad += check("leaving PATTERNS cancels the audition", !pop.on && cur_page()->graph == GR_SECTIONS && !song.grid);
+    bad += check("leaving PATTERNS cancels the audition", !pop.on && cur_page()->graph == GR_SONG && !song.grid);
 
     ui_power_on(); hold(B_SEQ); song.ntrk = NTRK;
     for (uint32_t t = NPART; t < NTRK; t++) {
@@ -5771,6 +5772,7 @@ static int test_seq_keys(void)
     for (i = 0; i < 41u; i++)
         led_pos[i] = (uint8_t)((i % FM1_NCOL) << 3 | (1u + i / FM1_NCOL));
     song.rec = 4u;
+    fm1_ms += (8u - (fm1_ms / 125u) % 8u) * 125u;       /* (a lit moment of the breath, BREATH[0]) */
     ui_leds();
     bad += check("  the track keys lit: track 1 bright, 2 dim, 3 (armed) breathing, 4 dark",
                  key_light(14u + key_at(1, 0)) == 2u && plane_led(1, 14u + key_at(1, 1)) &&
@@ -5963,24 +5965,30 @@ static int test_select_octave(void)
         turn(EN_SELECT, 1); ok = ui.home && ui.home_pg == HP_MIXER;
         turn(EN_SELECT, 1); ok &= ui.home_pg == HP_STAGE;
         turn(EN_SELECT, 1); ok &= ui.home_pg == HP_VIEW;
-        turn(EN_SELECT, 1); ok &= ui.home_pg == HP_TRACKS;
-        turn(EN_SELECT, -1); ok &= ui.home_pg == HP_VIEW && song.g[G_BPM] == bpm;
-        bad += check("HOME SELECT PAGES: SELECT turns TRACKS > MIXER > Stage > the chord view, both ways", ok);
+        turn(EN_SELECT, 1); ok &= !ui.home && cur_page()->graph == GR_SECTIONS;   /* (HOME's last: Hookology beta67) */
+        go_home(); ui.home_pg = HP_TRACKS;
+        turn(EN_SELECT, -1); ok &= !ui.home && cur_page()->graph == GR_SECTIONS && song.g[G_BPM] == bpm;
+        go_home(); ui.home_pg = HP_VIEW;
+        turn(EN_SELECT, -1); ok &= ui.home && ui.home_pg == HP_STAGE;
+        bad += check("HOME SELECT PAGES: SELECT turns TRACKS > MIXER > Stage > the chord view > SECTIONS, both ways", ok);
         home_stage_on = 0; ui.home_pg = HP_TRACKS;
         turn(EN_SELECT, 1); ok = ui.home_pg == HP_MIXER;
         turn(EN_SELECT, 1); ok &= ui.home_pg == HP_VIEW;
         turn(EN_SELECT, -1); ok &= ui.home_pg == HP_MIXER;
-        press(B_HOME); ok &= ui.home_pg == HP_VIEW;
+        press(B_HOME); ok &= ui.home && ui.home_pg == HP_VIEW;
         ui.home_pg = HP_STAGE; ui.force = 1; frame(); ok &= ui.home_pg == HP_TRACKS;
         bad += check("  Stage hidden (Hookology): TRACKS > MIXER > the chord view; never left on Stage", ok);
         home_view_on = 0; ui.home_pg = HP_TRACKS;
         turn(EN_SELECT, 1); ok = ui.home_pg == HP_MIXER;
-        turn(EN_SELECT, 1); ok &= ui.home_pg == HP_TRACKS;
-        turn(EN_SELECT, -1); ok &= ui.home_pg == HP_MIXER;
-        press(B_HOME); ok &= ui.home_pg == HP_TRACKS;
+        turn(EN_SELECT, 1); ok &= !ui.home && cur_page()->graph == GR_SECTIONS;
+        go_home(); ui.home_pg = HP_MIXER;
+        turn(EN_SELECT, -1); ok &= ui.home && ui.home_pg == HP_TRACKS;
+        ui.home_pg = HP_MIXER;
+        press(B_HOME); ok &= !ui.home && cur_page()->graph == GR_SECTIONS;
+        press(B_HOME); ok &= ui.home && ui.home_pg == HP_TRACKS;
         ui.home_pg = HP_VIEW; ui.force = 1; frame(); ok &= ui.home_pg == HP_TRACKS;
         home_stage_on = home_view_on = 1;
-        bad += check("  the chord view hidden too (Hookology): HOME turns TRACKS > MIXER; never left on it", ok);
+        bad += check("  the chord view hidden too (Hookology): HOME turns TRACKS > MIXER > SECTIONS; never left on it", ok);
         bad += check("  the menu lists PAGES after BPM; GLO SELECT skips it",
                      hs_step(HS_BPM, 1) == HS_PAGES && hs_step(HS_PAGES, 1) == HS_MOD && glo_hs_step(HS_BPM, 1) == HS_MOD &&
                      glo_hs_step(HS_MOD, -1) == HS_BPM && str_eq(HS_NAME[HS_PAGES], "PAGES"));
