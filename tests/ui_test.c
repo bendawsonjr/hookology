@@ -2217,11 +2217,33 @@ static int test_step_sheets(void)
     bad += check("NOTES: OCT+ on an empty step places the last note played, no sheet", t->step[4].n == 1u &&
                  t->step[4].note[0] == 62u && !pop.on && song.octave == 0);
     press(B_OCTUP);
-    bad += check("..OCT+ on the note: its sheet (Length, Velocity, Chance, Slide, Delete note)", pop.on == POP_SHEET &&
+    bad += check("..OCT+ on the note: its sheet (Length, Velocity, Level, Chance, Slide, Delete note)", pop.on == POP_SHEET &&
                  pop.rows == SHEET_NOTE && !memcmp(pop.title, "Note ", 5));
     turn(EN_K2, 1);
     bad += check("..KNOB 2 on Length snaps to 1.25 steps", notes_selected(t)<RECORD_MAX && recording[notes_selected(t)].duration*(1u<<(recording[notes_selected(t)].owner>>5))==5u*RECORD_UNIT/4u && pop.on == POP_SHEET);
-    turn(EN_K1, 1); turn(EN_K1, 1); turn(EN_K2, -10);
+    {   /* (Hookology beta70) Level, under Velocity: Ghost Soft Norm Hard, each a velocity; from between them, the next */
+        uint32_t ok = 1, c;
+        turn(EN_K1, 1); turn(EN_K1, 1);                 /* (Length, Velocity, Level) */
+        c = notes_selected(t);
+        ok &= pop.sel == 2u && str_eq(SHEET_NOTE[2].label, "Level");
+        if (c < RECORD_MAX) {
+            recording[c].vel = 96; turn(EN_K2, 1); ok &= recording[c].vel == 100;   /* (96: onto Norm) */
+            turn(EN_K2, 1); ok &= recording[c].vel == 127;
+            turn(EN_K2, 1); ok &= recording[c].vel == 127;                      /* (Hard: the top) */
+            turn(EN_K2, -1); turn(EN_K2, -1); ok &= recording[c].vel == 72;
+            turn(EN_K2, -1); ok &= recording[c].vel == 42;
+            char b[12]; nt_level_v(b); ok &= str_eq(b, "Ghost");
+            recording[c].vel = 90;
+        } else {
+            step_t *st = st_at(); st->flags &= (uint8_t)~SF_ACCENT; st->vel = 96;
+            turn(EN_K2, 1); ok &= st->vel == 100;
+            turn(EN_K2, 1); ok &= st->vel == 127;
+            turn(EN_K2, -1); turn(EN_K2, -1); turn(EN_K2, -1); ok &= st->vel == 42;
+            char b[12]; nt_level_v(b); ok &= str_eq(b, "Ghost");
+        }
+        bad += check("..Level (beta70): Norm, Hard, Soft, Ghost as velocities 100, 127, 72, 42", ok);
+    }
+    turn(EN_K1, 1); turn(EN_K2, -10);
     bad += check("..Chance: 90 %", step_chance(&t->step[4]) == 90u);
     sheet_do("Slide");
     bad += check("..Slide: on, the sheet closed", (t->step[4].flags & SF_SLIDE) && !pop.on);
@@ -2936,7 +2958,8 @@ static int test_product_ux(void)
             ok &= !page_visible(i);
     bad += check("DIGITAL retired: engine 1 asked for loads FM6; the OP ENV / OP LEVEL pages never show", ok);
     ui_power_on(); track_defaults_steps(TSEL); go_title("NOTES"); cursor_set(0); frame();
-    press(B_OCTUP); press(B_OCTUP); turn(EN_K1, 1); turn(EN_K1, 1); turn(EN_K2, -35);   /* (a note placed; its sheet: Chance) */
+    press(B_OCTUP); press(B_OCTUP); turn(EN_K1, 1); turn(EN_K1, 1); turn(EN_K1, 1); turn(EN_K2, -35);   /* (a note placed; its sheet: Chance,
+                                                                                                    * after Level: beta70) */
     bad += check("CHANCE (the note's sheet) is per step and starts at backward-compatible 100 percent", step_chance(&TSEL->step[0]) == 65 && step_chance(&TSEL->step[1]) == 100);
     turn(EN_K2, -1000); ok = step_chance(&TSEL->step[0]) == 0;
     turn(EN_K2, 1000); ok &= step_chance(&TSEL->step[0]) == 100;

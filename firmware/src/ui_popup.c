@@ -270,6 +270,25 @@ static void nt_len_v(char *b)                          /* "3 steps" */
 static void nt_len(int32_t s) { edit_param(2u, s > 0 ? 1 : -1); }
 static void nt_vel_v(char *b) { st_cap(3u, b); }
 static void nt_vel(int32_t s) { edit_param(3u, s); }
+/* (Hookology beta70) LEVEL, as SLOOP's: GHOST SOFT NORM HARD, each a velocity (the sampled kit's ghost and hard hits'
+ * too: ui_input.c HIT_GHOST, HIT_HARD); a note between them shows the nearest, a turn moves it onto the next one */
+static const uint8_t NT_LEVEL_VEL[4] = {42, 72, 100, 127};
+static const char *const NT_LEVEL[4] = {"Ghost", "Soft", "Norm", "Hard"};
+static int32_t nt_vel_now(void)                          /* the note's velocity, as NOTES' VEL shows it */
+{
+    uint32_t chosen = notes_selected(TSEL);
+    const step_t *st = st_at();
+    return chosen < RECORD_MAX ? recording[chosen].vel : st->flags & SF_ACCENT ? 127 : st->vel ? st->vel : 96;
+}
+static uint32_t nt_level_of(int32_t v) { return v <= 56 ? 0u : v <= 86 ? 1u : v <= 113 ? 2u : 3u; }
+static void nt_level_v(char *b) { str_cpy(b, NT_LEVEL[nt_level_of(nt_vel_now())], 8); }
+static void nt_level(int32_t s)
+{
+    int32_t v = nt_vel_now(), k = (int32_t)nt_level_of(v);
+    if (v == NT_LEVEL_VEL[k] || (s > 0) == (v > NT_LEVEL_VEL[k]))   /* (on a level, or past it the way it turns: the next) */
+        k = clamp(k + (s > 0 ? 1 : -1), 0, 3);
+    if (NT_LEVEL_VEL[k] != v) edit_param(3u, (int32_t)NT_LEVEL_VEL[k] - v);
+}
 static void nt_chance_v(char *b)
 {
     fmt_int(b, (int32_t)step_chance(st_at()));
@@ -297,8 +316,9 @@ static void nt_delete(void)
 }
 static void nt_copy(void) { if(st_free())note_copy_arm(); }
 static const sheet_row_t SHEET_NOTE[] = {{"Length", nt_len_v, nt_len, 0, 0}, {"Velocity", nt_vel_v, nt_vel, 0, 0},
-    {"Chance", nt_chance_v, nt_chance, 0, 0}, {"Slide", nt_slide_v, 0, nt_slide, 0}, {"Move note",0,0,note_move_arm,0}, {"Copy note",0,0,nt_copy,0}, {"Delete note", 0, 0, nt_delete, SR_RED}};
+    {"Level", nt_level_v, nt_level, 0, 0}, {"Chance", nt_chance_v, nt_chance, 0, 0}, {"Slide", nt_slide_v, 0, nt_slide, 0}, {"Move note",0,0,note_move_arm,0}, {"Copy note",0,0,nt_copy,0}, {"Delete note", 0, 0, nt_delete, SR_RED}};
 static const sheet_row_t SHEET_REC_NOTE[] = {{"Length", nt_len_v, nt_len, 0, 0}, {"Velocity", nt_vel_v, nt_vel, 0, 0},
+    {"Level", nt_level_v, nt_level, 0, 0},
     {"Move note",0,0,note_move_arm,0}, {"Copy note",0,0,nt_copy,0}, {"Delete note", 0, 0, nt_delete, SR_RED}};
 static int ht_acc_on(void) { return (step_accents(&seq_steps(TSEL)[ui.cursor]) >> ui.lane) & 1u; }
 static void ht_acc_v(char *b) { str_cpy(b, ht_acc_on() ? "On" : "Off", 8); }
