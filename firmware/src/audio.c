@@ -30,7 +30,7 @@ static uint32_t audio_irq_max_ticks,audio_timer5_max_ticks;
 static volatile uint32_t t5_nested_ticks;              /* TIMER4 ticks TIMER5 spent nested in this ISR (main.c) */
 static uint32_t audio_cpu_rem;                         /* keep the fractional IIR step: no low-load bias */
 #define SCOPE_N 512u
-static int16_t scope_buf[SCOPE_N];
+static int16_t scope_buf[SCOPE_N] __attribute__((section(".pool")));   /* (Hookology: the pool, the data SRAM is full) */
 static uint32_t scope_w;
 
 static void audio_block(int32_t *out, uint32_t n)       /* mix (mix.c), then Q15 -> 24 bit */

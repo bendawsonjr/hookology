@@ -99,19 +99,34 @@ enum { HP_STAGE, HP_VIEW, HP_TRACKS, HP_MIXER };   /* HOME's pages: Stage (ui_st
 #ifndef HOOKOLOGY_STAGE_PAGE
 #define HOOKOLOGY_STAGE_PAGE 0
 #endif
+#ifdef FM1_IRQ_TARGET                                   /* (Hookology: on the FM-1 a constant, so a hidden page's code
+                                                         * drops out of the build; the host's tests still turn it on) */
+#define home_stage_on HOOKOLOGY_STAGE_PAGE
+#else
 static uint8_t home_stage_on = HOOKOLOGY_STAGE_PAGE;
+#endif
 /* the chord view (the circle of fifths) hidden too (Hookology, 2026-11-11: not in use); HOOKOLOGY_VIEW_PAGE=1 brings it
  * back after MIXER (and Stage) */
 #ifndef HOOKOLOGY_VIEW_PAGE
 #define HOOKOLOGY_VIEW_PAGE 0
 #endif
+#ifdef FM1_IRQ_TARGET                                   /* (Hookology: on the FM-1 a constant, so a hidden page's code
+                                                         * drops out of the build; the host's tests still turn it on) */
+#define home_view_on HOOKOLOGY_VIEW_PAGE
+#else
 static uint8_t home_view_on = HOOKOLOGY_VIEW_PAGE;
+#endif
 /* MIXER hidden too (Hookology beta67: TRACKS' KNOB 3 mutes; SECTIONS takes its place on HOME); HOOKOLOGY_MIXER_PAGE=1
  * brings it back after TRACKS */
 #ifndef HOOKOLOGY_MIXER_PAGE
 #define HOOKOLOGY_MIXER_PAGE 0
 #endif
+#ifdef FM1_IRQ_TARGET                                   /* (Hookology: on the FM-1 a constant, so a hidden page's code
+                                                         * drops out of the build; the host's tests still turn it on) */
+#define home_mixer_on HOOKOLOGY_MIXER_PAGE
+#else
 static uint8_t home_mixer_on = HOOKOLOGY_MIXER_PAGE;
+#endif
 static const uint8_t HOME_ORDER[4] = {HP_TRACKS, HP_MIXER, HP_STAGE, HP_VIEW};   /* HOME's turn */
 /* (inlined: the hidden pages' code, the chord view's 4 KB, then drops out of the build) */
 static inline __attribute__((always_inline)) int home_pg_on(uint32_t pg) { return pg == HP_STAGE ? home_stage_on : pg == HP_VIEW ? home_view_on : pg == HP_MIXER ? home_mixer_on : 1; }

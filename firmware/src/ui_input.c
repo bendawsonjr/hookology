@@ -2143,11 +2143,12 @@ static void page_knob_edit(uint32_t k, int32_t s)
         tracks_knob(k, s);
         return;
     }
-    if (ui.home && ui.home_pg == HP_MIXER) {
+    if (ui.home && ui.home_pg == HP_MIXER && home_pg_on(HP_MIXER)) {
         mixer_knob(k, s);
         return;
     }
     momentary_take(k);
+    if (ui.home && !home_pg_on(HP_STAGE)) return;       /* (Hookology: Stage hidden; HOME is TRACKS) */
     if (ui.home) {                                      /* Stage: the selected track's engine's four, as its pages; they
                                                          * drop in */
         stage_knob_touch();

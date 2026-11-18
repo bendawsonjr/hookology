@@ -1341,9 +1341,9 @@ static void draw_page(void)
             view_draw();
         else if (ui.home && ui.home_pg == HP_TRACKS)    /* TRACKS (ui_tracks.c) */
             tracks_draw();
-        else if (ui.home && ui.home_pg == HP_MIXER)     /* MIXER's strips (ui_pages.c) */
+        else if (ui.home && ui.home_pg == HP_MIXER && home_pg_on(HP_MIXER))   /* MIXER's strips (ui_pages.c) */
             mixer_draw();
-        else if (ui.home)                               /* Stage: its panel and the lanes (ui_stage.c), no footer */
+        else if (ui.home && home_pg_on(HP_STAGE))       /* Stage: its panel and the lanes (ui_stage.c), no footer */
             stage_draw();
         else
             draw_graph();
