@@ -628,7 +628,7 @@ static void pop_row(int32_t y, const char *lb, const char *v, int on, int red, i
  * are (KNOB 2 .. 4), the knobs' words in the family's colour */
 static const char *const FX_KNOB_WORDS[NELEM(FX_ORDER)] = {"", "SIZE DAMP TONE", "TIME FDBK TONE", "RATE DEPTH",
     "RATE DEPTH", "RATE DEPTH", "RATE DEPTH RESO", "RATE DEPTH RESO", "RATE DEPTH RESO", "DRIVE TONE SHAPE",
-    "BITS ALIAS", "RATE FOCUS", "RATE JITTER", "RATE BITE", "DEPTH RATE PATTERN", "DEPTH RATE PATTERN", "TIME DECAY", "REL"};
+    "BITS ALIAS", "RATE FOCUS", "RATE JITTER", "RATE BITE", "LOW MID FREQ HIGH", "DEPTH RATE PATTERN", "DEPTH RATE PATTERN", "TIME DECAY", "REL"};
 #define FXL_H (240 - H_HEAD)
 static void fxl_draw(const param_desc_t *d)
 {

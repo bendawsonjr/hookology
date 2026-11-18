@@ -257,6 +257,7 @@ static inline __attribute__((always_inline)) int32_t fx_tone_input(fx_state_t *f
 #include "fx_sloop_insert.h"
 #include "fx_delay.h"
 #include "fx_slicer.h"
+#include "fx_eq.h"                          /* (Hookology beta69) EQ: a track's INSERT */
 /* ROOM: four damped combs at 13..26 ms, quarter-rate, 2 KiB. */
 static __attribute__((noinline,section(".dsp_text"))) void fx_time(fx_state_t *restrict f,int16_t *restrict mem,uint32_t n,int32_t target)
 {
@@ -430,7 +431,7 @@ static void fx_state_prepare(fx_plan_t *plan,fx_state_t *f,uint32_t res,uint32_t
     uint32_t type=(uint32_t)clamp(p[0],0,FX_COUNT-1);
     if(fx_is_midi((int32_t)type) || fx_retired((int32_t)type))type=FX_OFF; /* retired effects and note inserts never enter audio DSP */
     if(fx_retired(f->type) || fx_retired(p[0])) { resource_release(res); fx_zero(f); }
-    int32_t amount=clamp(p[1],0,127);
+    int32_t amount=type==FX_EQ?127:clamp(p[1],0,127);   /* (Hookology beta69: EQ's MIX is its LOW; always all in) */
     int32_t target=type?(amount+(amount==127))*256:0;
 #if defined(MELODEE_FX_PROFILE) && MELODEE_FX_PROFILE && defined(FM1_IRQ_TARGET)
     uint32_t slot=si%FX_SLOTS;
@@ -643,7 +644,7 @@ static int fx_insert_slot_active(const track_t *t,uint32_t slot)
 {
     uint32_t k=fx_insert_id(t,slot),base=P_FXTYPE+slot*FX_PARAMS;
     fx_state_t *f=fx_insert_state(k);
-    if((f && f->mix) || (fx_insert_type(t->p[base]) && t->p[base+1u]))return 1;
+    if((f && f->mix) || (fx_insert_type(t->p[base]) && (t->p[base+1u] || t->p[base]==FX_EQ)))return 1;   /* (EQ: its MIX is LOW) */
     if(resource[RES_FXS0+k].size || resource[RES_FXI0+k].size)fx_insert_free(k);
     return 0;
 }
@@ -696,6 +697,8 @@ static __attribute__((noinline)) int fx_insert(track_t *t,const int32_t *b,uint3
         if(!plan.active){if(!f->mix && !f->type)fx_insert_free(k);continue;}
         if(!ran){fx_insert_in(t,b,n);ran=1;}
         if(fx_slicer_type(plan.f->type))fx_slicer_run(plan.f,plan.mem,t,n,plan.target);
+        else if(plan.f->type==FX_EQ){void (*volatile run)(fx_state_t *,const int16_t *,int32_t,uint32_t,int32_t)=fx_eq_run;
+            run(plan.f,t->p+P_FXTYPE+slot*FX_PARAMS,t->p[P_FXTONE+slot],n,plan.target);}
         else fx_slot_run(&plan,n);
     }
     if(ran)fx_insert_pan(t,n);

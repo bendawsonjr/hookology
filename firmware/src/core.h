@@ -106,7 +106,8 @@ enum {
     F_ONOFF, F_OCT, F_STEPS,
     F_OFS, F_FMNOTE, F_FMFRQ,   /* FM6's pages: 0 at the middle of the range, the DX7 break point, an operator's frequency */
     F_TONE,                     /* an FX slot's TONE: DARK (a high cut) .. FULL .. THIN (a low cut), fx_tone_hz */
-    F_BITS, F_ALIAS             /* CRUSH's bits and the rate of its held samples */
+    F_BITS, F_ALIAS,            /* CRUSH's bits and the rate of its held samples */
+    F_EQDB, F_EQHZ              /* (Hookology beta69) EQ: a band's gain (+-12 dB), the MID band's frequency (fx_eq.h) */
 };
 
 typedef struct {
@@ -156,7 +157,7 @@ enum {                          /* per-track parameters */
 #define FX_SLOTS 3u
 #define FX_PARAMS 4u
 /* Append-only effect IDs; shared pickers leave MIDI-only IDs empty. */
-enum { FX_OFF, FX_PHASER, FX_WIDTH, FX_FORMANT, FX_TAPE, FX_SPIT, FX_ECHO, FX_ROOM, FX_REVERB, FX_CHORUS, FX_AUDIO_COUNT, FX_MIDIVERB = FX_AUDIO_COUNT, FX_MIDIDELAY, FX_SOFT, FX_HARD, FX_FOLD, FX_FUZZ, FX_CRUSH, FX_FLANGER, FX_PEDAL_PHASER, FX_PEDAL_CHORUS, FX_DELAY, FX_GATE, FX_STUTTER, FX_COUNT };
+enum { FX_OFF, FX_PHASER, FX_WIDTH, FX_FORMANT, FX_TAPE, FX_SPIT, FX_ECHO, FX_ROOM, FX_REVERB, FX_CHORUS, FX_AUDIO_COUNT, FX_MIDIVERB = FX_AUDIO_COUNT, FX_MIDIDELAY, FX_SOFT, FX_HARD, FX_FOLD, FX_FUZZ, FX_CRUSH, FX_FLANGER, FX_PEDAL_PHASER, FX_PEDAL_CHORUS, FX_DELAY, FX_GATE, FX_STUTTER, FX_EQ, FX_COUNT };
 /* Slot 6 stays retired. Slot 8 is the SLOOP reverb replacement. FX_DELAY (Hookology): the shared audio delay (fx.c). */
 /* one of each in the shared rack: their memory (REVERB's tank, DELAY's line) */
 static int fx_single(int32_t t){return t==FX_REVERB || t==FX_DELAY;}
@@ -172,7 +173,7 @@ static int fx_is_midi(int32_t type) { return type == FX_MIDIVERB || type == FX_M
 /* (Hookology) INSERT: a track's audio effect, in its signal before LEVEL, PAN and the sends: the character effects
  * (DRIVE, CRUSH, FORMANT, TAPE, SPIT) and the SLICER (GATE, STUTTER: fx_slicer.h); one in any of its three slots,
  * chained 1, 2, 3 */
-static int fx_insert_type(int32_t t){return (t>=FX_SOFT && t<=FX_CRUSH) || t==FX_FORMANT || t==FX_TAPE || t==FX_SPIT || t==FX_GATE || t==FX_STUTTER;}
+static int fx_insert_type(int32_t t){return (t>=FX_SOFT && t<=FX_CRUSH) || t==FX_FORMANT || t==FX_TAPE || t==FX_SPIT || t==FX_GATE || t==FX_STUTTER || t==FX_EQ;}   /* (EQ: Hookology beta69) */
 static int fx_track_type(int32_t type) { return fx_is_midi(type) || fx_insert_type(type) ? type : FX_OFF; }
 static void track_fx_normalize(int16_t *p)
 {
@@ -231,7 +232,7 @@ static void shared_fx_normalize(int16_t *g)
     uint32_t reverb=0,delay=0;
     for(uint32_t slot=0;slot<FX_SLOTS;slot++){
         int16_t *type=g+G_MFXTYPE+slot*FX_PARAMS;
-        if(fx_retired(*type) || fx_is_midi(*type) || *type<0 || *type>=FX_COUNT || *type==FX_GATE || *type==FX_STUTTER) *type=FX_OFF;   /* (the SLICER: a track's only) */
+        if(fx_retired(*type) || fx_is_midi(*type) || *type<0 || *type>=FX_COUNT || *type==FX_GATE || *type==FX_STUTTER || *type==FX_EQ) *type=FX_OFF;   /* (the SLICER, EQ: a track's only) */
         if(*type==FX_REVERB){if(reverb)*type=FX_OFF;else reverb=1;}
         if(*type==FX_DELAY){if(delay)*type=FX_OFF;else delay=1;}
     }

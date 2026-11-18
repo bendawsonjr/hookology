@@ -14,10 +14,10 @@ static const char *const N_RECQ[] = {"OFF", "1/4", "1/8", "1/16", "1/32", "8T", 
 static const char *const N_LTRIG[] = {"NOTE", "FREE"};
 static const char *const N_LPOL[] = {"BI", "UNI"};
 /* SOFT .. FUZZ are one DRIVE, their SHAPE on KNOB 4 (N_SHAPE) */
-static const char *const N_FX[] = {"OFF", "PHASER", "WIDTH", "FORMANT", "TAPE", "SPIT", "", "ROOM", "REVERB", "CHORUS", "NOTE TAIL", "NOTE ECHO", "DRIVE", "DRIVE", "DRIVE", "DRIVE", "CRUSH", "FLANGER", "PEDAL PHASER", "PEDAL CHORUS", "DELAY", "GATE", "STUTTER"};
+static const char *const N_FX[] = {"OFF", "PHASER", "WIDTH", "FORMANT", "TAPE", "SPIT", "", "ROOM", "REVERB", "CHORUS", "NOTE TAIL", "NOTE ECHO", "DRIVE", "DRIVE", "DRIVE", "DRIVE", "CRUSH", "FLANGER", "PEDAL PHASER", "PEDAL CHORUS", "DELAY", "GATE", "STUTTER", "EQ"};
 /* (Hookology) a track's slots: its INSERT (the character effects, core.h fx_insert_type) and the note effects */
-static const char *const N_NOTE_FX[FX_COUNT] = {"OFF", "", "", "FORMANT", "TAPE", "SPIT", "", "", "", "", "NOTE TAIL", "NOTE ECHO", "DRIVE", "DRIVE", "DRIVE", "DRIVE", "CRUSH", "", "", "", "", "GATE", "STUTTER"};
-static const char *const N_AUDIO_FX[] = {"OFF", "PHASER", "WIDTH", "FORMANT", "TAPE", "SPIT", "", "ROOM", "REVERB", "CHORUS", "", "", "DRIVE", "DRIVE", "DRIVE", "DRIVE", "CRUSH", "FLANGER", "PEDAL PHASER", "PEDAL CHORUS", "DELAY", "", ""};
+static const char *const N_NOTE_FX[FX_COUNT] = {"OFF", "", "", "FORMANT", "TAPE", "SPIT", "", "", "", "", "NOTE TAIL", "NOTE ECHO", "DRIVE", "DRIVE", "DRIVE", "DRIVE", "CRUSH", "", "", "", "", "GATE", "STUTTER", "EQ"};
+static const char *const N_AUDIO_FX[] = {"OFF", "PHASER", "WIDTH", "FORMANT", "TAPE", "SPIT", "", "ROOM", "REVERB", "CHORUS", "", "", "DRIVE", "DRIVE", "DRIVE", "DRIVE", "CRUSH", "FLANGER", "PEDAL PHASER", "PEDAL CHORUS", "DELAY", "", "", ""};
 /* the SLICER's RATE and PATTERN (Hookology; fx_slicer.h FX_SL_DEN, FX_SL_PAT) */
 static const char *const N_SLDIV[] = {"1/8", "1/16", "1/32", "8T", "16T", "32T"};
 static const char *const N_SLPAT[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"};
@@ -28,13 +28,14 @@ static const char *const N_SHAPE[FX_FUZZ + 1u] = {[FX_SOFT] = "SOFT", [FX_HARD] 
  * Notes (the track's racks only: the last two); DRIVE stands for SOFT .. FUZZ. The stored IDs keep their numbers */
 /* (Hookology: ROOM is off the list (a song that has it still plays it); a track's list is OFF, then Dirt, Colour and Notes) */
 static const uint8_t FX_ORDER[] = {FX_OFF, FX_REVERB, FX_DELAY, FX_WIDTH, FX_PHASER, FX_CHORUS, FX_FLANGER, FX_PEDAL_PHASER,
-                                   FX_PEDAL_CHORUS, FX_SOFT, FX_CRUSH, FX_FORMANT, FX_TAPE, FX_SPIT, FX_GATE, FX_STUTTER,
+                                   FX_PEDAL_CHORUS, FX_SOFT, FX_CRUSH, FX_FORMANT, FX_TAPE, FX_SPIT, FX_EQ, FX_GATE, FX_STUTTER,
                                    FX_MIDIDELAY, FX_MIDIVERB};
-static const uint8_t FX_FAM_FIRST[] = {0, 1, 4, 9, 11, 14, 16, 18};   /* each family's first place in FX_ORDER */
+static const uint8_t FX_FAM_FIRST[] = {0, 1, 4, 9, 11, 15, 17, 19};   /* each family's first place in FX_ORDER (EQ: Colour's
+                                                                      * last, Hookology beta69) */
 static const char *const FX_FAM_NAME[] = {"Off", "Space", "Motion", "Dirt", "Colour", "Rhythm", "Notes"};
 enum { FXF_OFF, FXF_SPACE, FXF_MOTION, FXF_DIRT, FXF_COLOUR, FXF_RHYTHM, FXF_NOTES };   /* (Rhythm: the SLICER, a track's only) */
 static int fx_names(const param_desc_t *d) { return d->names == N_FX || d->names == N_AUDIO_FX || d->names == N_NOTE_FX; }
-static uint32_t fx_order_n(const param_desc_t *d) { return d->names == N_AUDIO_FX ? FX_FAM_FIRST[FXF_RHYTHM] : NELEM(FX_ORDER); }
+static uint32_t fx_order_n(const param_desc_t *d) { return d->names == N_AUDIO_FX ? FX_FAM_FIRST[FXF_RHYTHM] - 1u : NELEM(FX_ORDER); }   /* (the shared list: Colour without EQ, a track's) */
 /* the list's first effect after OFF: a track's (N_NOTE_FX) starts at Dirt */
 static uint32_t fx_order_lo(const param_desc_t *d) { return d->names == N_NOTE_FX ? FX_FAM_FIRST[FXF_DIRT] : 1u; }
 static uint32_t fx_family_lo(const param_desc_t *d) { return d->names == N_NOTE_FX ? FXF_DIRT : FXF_SPACE; }
@@ -399,7 +400,16 @@ static const param_desc_t *track_desc(const track_t *t, uint32_t id)
         disabled = TP[id]; disabled.min = disabled.max = disabled.def = t->p[id];
         return &disabled;
     }
-    if(param_fx_tone(id)){uint32_t type=t->p[P_FXTYPE+(id-P_FXTONE)*FX_PARAMS];if(fx_sloop_swept(type))return fx_pedal_desc(type,4,&TP[id]);}
+    if(param_fx_tone(id)){uint32_t type=t->p[P_FXTYPE+(id-P_FXTONE)*FX_PARAMS];if(fx_sloop_swept(type))return fx_pedal_desc(type,4,&TP[id]);
+        if(type==FX_EQ){static param_desc_t hd;hd=TP[id];hd.label="HIGH";hd.fmt=F_EQDB;hd.def=0;return &hd;}}   /* (Hookology beta69) */
+    if (id >= P_FXMIX && id <= P_FX3CHAR && (id - P_FXTYPE) % FX_PARAMS &&       /* (Hookology beta69) EQ's LOW MID FREQ */
+        t->p[P_FXTYPE + (id - P_FXTYPE) / FX_PARAMS * FX_PARAMS] == FX_EQ) {
+        static param_desc_t ed;
+        uint32_t col = (id - P_FXTYPE) % FX_PARAMS;
+        ed = TP[id];ed.min = 0;ed.max = 127;ed.def = 64;
+        ed.label = col == 1u ? "LOW" : col == 2u ? "MID" : "FREQ";ed.fmt = col == 3u ? F_EQHZ : F_EQDB;
+        return &ed;
+    }
     if (id >= P_FXTYPE && id <= P_FX3CHAR) {
         uint32_t base = P_FXTYPE + (id - P_FXTYPE) / FX_PARAMS * FX_PARAMS, col = id - base;
         if (fx_is_midi(t->p[base]) && col) {
@@ -481,6 +491,13 @@ static const uint8_t CRUSH_HOLD[16] = {64, 48, 40, 32, 24, 20, 16, 12, 10, 8, 6,
 static uint8_t fmt_named;        /* the last param_format was a name (F_ENUM, even "4"): ui_draw.c's digits do not roll it */
 
 /* value string (<= 5 chars) and unit for a parameter value */
+/* a value's gain in dB x 10: a slot value 0 .. 127 (64 flat), or TONE's -63 .. 63 (0 flat) */
+static int32_t fx_eq_db10(int32_t v, int tone)
+{
+    return tone ? clamp(v, -63, 63) * 120 / 63 : (clamp(v, 0, 127) - 64) * 120 / 64;
+}
+/* FREQ's Hz: 200 x 25^(v / 127), 1 kHz in the middle */
+static float fx_eq_hz(int32_t v) { return 200.0f * fm_exp2f((float)clamp(v, 0, 127) * (4.6438562f / 127.0f)); }
 static void param_format(const param_desc_t *d, int32_t v, char *val, const char **unit)
 {
     *unit = "";
@@ -547,6 +564,21 @@ static void param_format(const param_desc_t *d, int32_t v, char *val, const char
             fmt_fix(val, (int32_t)((h + 50u) / 100u), 1);
             *unit = "kHz";
         }
+        break;
+    }
+    case F_EQDB: {                                    /* (Hookology beta69) EQ: a band's gain, 0.1 dB */
+        int32_t d10 = fx_eq_db10(v, d->min < 0), a = d10 < 0 ? -d10 : d10, n = 0;
+        if (d10) val[n++] = d10 > 0 ? '+' : '-';
+        fmt_int(val + n, a / 10);
+        n = (int32_t)str_len(val);
+        val[n] = '.'; val[n + 1] = (char)('0' + a % 10); val[n + 2] = 0;
+        *unit = "dB";
+        break;
+    }
+    case F_EQHZ: {                                    /* .. the MID band's frequency */
+        int32_t h = (int32_t)fx_eq_hz(v);
+        if (h < 1000) { fmt_int(val, h); *unit = "Hz"; }
+        else { fmt_fix(val, (h + 50) / 100, 1); *unit = "kHz"; }
         break;
     }
     case F_TONE:                                      /* (the cut's frequency: the FX picture's strip) */
@@ -979,7 +1011,8 @@ static const param_desc_t *page_desc(const page_t *pg, uint32_t slot, int16_t **
     }
     if ((pg->scope == SC_GLOBAL && id >= G_MFXTONE && id <= G_MFX3TONE &&    /* TONE: ROOM only */
          !fx_third_control(song.g[G_MFXTYPE + (id - G_MFXTONE) * FX_PARAMS])) ||
-        (pg->scope == SC_TRACK && param_fx_tone(id) && !fx_third_control(TSEL->p[P_FXTYPE + (id - P_FXTONE) * FX_PARAMS]))) {
+        (pg->scope == SC_TRACK && param_fx_tone(id) && !fx_third_control(TSEL->p[P_FXTYPE + (id - P_FXTONE) * FX_PARAMS]) &&
+         TSEL->p[P_FXTYPE + (id - P_FXTONE) * FX_PARAMS] != FX_EQ)) {   /* (Hookology beta69: EQ's HIGH) */
         *valp = 0;
         return 0;
     }

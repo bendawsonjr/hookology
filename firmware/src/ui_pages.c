@@ -774,6 +774,27 @@ static void pv_fx(int32_t h)
             x += step;
             n++;
         }
+    } else if (type == FX_EQ) {                         /* (Hookology beta69) the response, 20 Hz .. 20 kHz (log), 0 dB a line,
+                                                          * +-15 dB the panel's height: the three bands' biquads at each x */
+        fx_coeff_t q[3];
+        int32_t py = 0;
+        fx_eq_design(&q[0], 0u, FX_EQ_LOW_HZ, fx_eq_db10(mix, 0));
+        fx_eq_design(&q[1], 1u, fx_eq_hz(cha), fx_eq_db10(rate, 0));
+        fx_eq_design(&q[2], 2u, FX_EQ_HIGH_HZ, fx_eq_db10(tone, 1));
+        cv_rect(16, cy >> 4, 208, 1, T_LINE);
+        for (i = 0; i < 208; i++) {
+            float hz = 20.0f * fm_exp2f((float)i * (9.9657843f / 207.0f)), w = 2.0f * FM_PI * (hz < 21000.0f ? hz : 21000.0f) / (float)FS;
+            float c1 = fm_cosf(w), s1 = fm_sinf(w), c2 = fm_cosf(2.0f * w), s2 = fm_sinf(2.0f * w), g2 = 1.0f;
+            for (k = 0; k < 3u; k++) {                  /* |H|^2 of each: (b0 + b1 z^-1 + b2 z^-2) / (1 + a1 z^-1 + a2 z^-2) */
+                float nr = q[k].b0 + q[k].b1 * c1 + q[k].b2 * c2, ni = q[k].b1 * s1 + q[k].b2 * s2;
+                float dr = 1.0f + q[k].a1 * c1 + q[k].a2 * c2, di = q[k].a1 * s1 + q[k].a2 * s2;
+                g2 *= (nr * nr + ni * ni) / (dr * dr + di * di + 1e-12f);
+            }
+            float db = 3.0103f * fm_log2f(g2 > 1e-6f ? g2 : 1e-6f);
+            int32_t y = clamp(cy - (int32_t)(db * (float)amp / 15.0f), top, low);
+            cv_vspan_aa(16 + i, i ? py : y, y, th);
+            py = y;
+        }
     } else {
         int ghost = fx_sloop_type((int32_t)type);       /* (the older effects: their curve alone) */
         for (k = ghost ? 0u : 1u; k < (type == FX_PEDAL_CHORUS ? 3u : 2u); k++) {   /* the dry trace (dim), the

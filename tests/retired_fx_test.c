@@ -63,7 +63,7 @@ static void controls(void)
     assert(enum_step(&TP[P_FXTYPE],FX_OFF,FX_OFF+1)==FX_SOFT);
     assert(enum_step(&TP[P_FXTYPE],FX_MIDIDELAY,FX_MIDIDELAY+1)==FX_MIDIVERB);
     assert(enum_orig(&TP[P_FXTYPE],FX_REVERB)==FX_OFF);
-    assert(enum_rows(&TP[P_FXTYPE])==10 && enum_rows(&GP[G_MFXTYPE])==14);   /* (+ GATE, STUTTER on a track's) */   /* (+ DELAY, - ROOM: Hookology) */
+    assert(enum_rows(&TP[P_FXTYPE])==11 && enum_rows(&GP[G_MFXTYPE])==14);   /* (+ GATE, STUTTER on a track's) */   /* (+ DELAY, - ROOM: Hookology) */
     press(B_FX);assert(cur_page()->fam==FAM_FX);
     btn_down(B_FX);frames(800);assert(ui.layer==LAYER_FX);
     key_down(white(0));frame();assert(!gates() && kb_layer);key_up(white(0));frame();assert(!gates());

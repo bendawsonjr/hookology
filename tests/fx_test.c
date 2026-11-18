@@ -447,7 +447,7 @@ static void grouped_fx_test(void)
 {
     static const uint8_t order[] = {FX_OFF, FX_REVERB, FX_DELAY, FX_WIDTH, FX_PHASER, FX_CHORUS,
         FX_FLANGER, FX_PEDAL_PHASER, FX_PEDAL_CHORUS, FX_SOFT, FX_CRUSH, FX_FORMANT, FX_TAPE, FX_SPIT,
-        FX_MIDIDELAY, FX_MIDIVERB};
+        FX_MIDIDELAY, FX_MIDIVERB};   /* (the shared list: no EQ, GATE, STUTTER, a track's only) */
     ui_power_on();
     for (uint32_t shared = 1; shared < 2; shared++) {
         const param_desc_t *d = shared ? &GP[G_MFXTYPE] : &TP[P_FXTYPE];

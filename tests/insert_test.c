@@ -33,10 +33,10 @@ int main(void)
 {
     {   /* the list: OFF, the INSERTs (Dirt, Colour), the note effects */
         ui_power_on();const param_desc_t *d=&TP[P_FXTYPE];
-        static const int16_t order[]={FX_OFF,FX_SOFT,FX_CRUSH,FX_FORMANT,FX_TAPE,FX_SPIT,FX_GATE,FX_STUTTER,FX_MIDIDELAY,FX_MIDIVERB};
+        static const int16_t order[]={FX_OFF,FX_SOFT,FX_CRUSH,FX_FORMANT,FX_TAPE,FX_SPIT,FX_EQ,FX_GATE,FX_STUTTER,FX_MIDIDELAY,FX_MIDIVERB};   /* (EQ: beta69) */
         assert(enum_rows(d)==(int32_t)NELEM(order));
         for(uint32_t i=0;i<NELEM(order);i++)assert(enum_value(d,(int32_t)i)==order[i] && enum_rank(d,order[i])==(int32_t)i);
-        for(int32_t t=0;t<FX_COUNT;t++)assert(fx_track_type(t)==(fx_is_midi(t) || (t>=FX_SOFT && t<=FX_CRUSH) || t==FX_FORMANT || t==FX_TAPE || t==FX_SPIT || t==FX_GATE || t==FX_STUTTER?t:FX_OFF));
+        for(int32_t t=0;t<FX_COUNT;t++)assert(fx_track_type(t)==(fx_is_midi(t) || (t>=FX_SOFT && t<=FX_CRUSH) || t==FX_FORMANT || t==FX_TAPE || t==FX_SPIT || t==FX_GATE || t==FX_STUTTER || t==FX_EQ?t:FX_OFF));
         for(int32_t i=0;i<enum_rows(&GP[G_MFXTYPE]);i++)assert(!fx_slicer_type(enum_value(&GP[G_MFXTYPE],i)));   /* (the SLICER: a track's only) */
         song.g[G_MFX2TYPE]=FX_GATE;shared_fx_normalize(song.g);assert(song.g[G_MFX2TYPE]==FX_OFF);
         /* ROOM is off the shared list; a song that has it still names it */
