@@ -187,14 +187,27 @@ static int dlk_tick(track_t *t)
 }
 
 /* the kit, one block: each lane's drum at its level, the steps easing out, DRV, the output as the 808's */
-static __attribute__((noinline)) void dlk_render(track_t *t, int32_t *out, uint32_t n, const vmod_t *m,
+/* (Hookology beta68) a lane's pan as PAN's gains (Q12): the far side down, the near one whole */
+static void lane_pan_gains(int32_t pan, int32_t *gl, int32_t *gr)
+{
+    pan = clamp(pan, -64, 63);
+    *gl = 4096 - (pan > 0 ? pan * 64 : 0);
+    *gr = 4096 + (pan < 0 ? pan * 64 : 0);
+}
+/* left 0: the kit into out, as ever; left: (Hookology beta68, a drum track's lane pans) each lane by its pan, the right
+ * side into out and the left into left, each through the same DRV and knee */
+static __attribute__((noinline)) void dlk_render(track_t *t, int32_t *out, int32_t *left, uint32_t n, const vmod_t *m,
                                                  const int16_t *p)
 {
     dlk_part_t *K = dlk_part((uint32_t)(t - trk) % NPART);
-    int32_t y[CTL] = {0}, x[CTL], drv = p[P_E7], g = 0, mk = 0;
+    int32_t y[CTL] = {0}, yl[CTL], x[CTL], drv = p[P_E7], g = 0, mk = 0, lg[DV_NLANE], rg[DV_NLANE];
     uint32_t i, k;
     if (!K || !K->ready || K->kit != p[P_E0])
         return;
+    if (left) {
+        for (i = 0; i < n; i++) yl[i] = 0;
+        for (k = 0; k < DV_NLANE; k++) lane_pan_gains(t->lane_pan[k], &lg[k], &rg[k]);
+    }
     for (k = 0; k < DV_NLANE; k++) {
         dlk_ch_t *c = &K->ch[k];
         int32_t g0, g1, s = 0;
@@ -216,7 +229,8 @@ static __attribute__((noinline)) void dlk_render(track_t *t, int32_t *out, uint3
                 s = c->fade > (int32_t)i ? s * (c->fade - (int32_t)i) / DLK_FADE : 0;
             s += c->ease;
             c->ease -= c->ease >> DLK_EASE;
-            y[i] += s;
+            if (left) { y[i] += (s * rg[k]) >> 12; yl[i] += (s * lg[k]) >> 12; }   /* (|s| < 2^18: in 31 bits) */
+            else y[i] += s;
         }
         if (c->ease > -(1 << DLK_EASE) && c->ease < (1 << DLK_EASE))
             c->ease = 0;
@@ -234,4 +248,11 @@ static __attribute__((noinline)) void dlk_render(track_t *t, int32_t *out, uint3
             s = (softclip((s * g) >> 12) * mk) >> 15;
         out[i] += voice_amp(soft_knee(s + (s >> 2), 24000), m, i) << 1;
     }
+    if (left)
+        for (i = 0; i < n; i++) {
+            int32_t s = clamp(yl[i], -131071, 131071);
+            if (g)
+                s = (softclip((s * g) >> 12) * mk) >> 15;
+            left[i] += voice_amp(soft_knee(s + (s >> 2), 24000), m, i) << 1;
+        }
 }

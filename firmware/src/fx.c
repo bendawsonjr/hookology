@@ -660,6 +660,10 @@ static __attribute__((noinline,section(".dsp_text"))) void fx_insert_in(const tr
         for(uint32_t i=0;i<n;i++)fx_left[i]=fx_right[i]=clamp(b[i],-884000,884000);
         return;
     }
+    if(spread_lr){    /* (Hookology beta68) a panned drum: spread_buf its left side, the rest its right */
+        for(uint32_t i=0;i<n;i++){fx_left[i]=clamp(spread_buf[i],-884000,884000);fx_right[i]=clamp(b[i]-spread_buf[i],-884000,884000);}
+        return;
+    }
     int32_t s=(t->p[P_SPRD]+1)>>1,pa=clamp(-s,-64,63),pb=clamp(s,-64,63);
     int32_t gla=4096-(pa>0?pa*64:0),gra=4096+(pa<0?pa*64:0),glb=4096-(pb>0?pb*64:0),grb=4096+(pb<0?pb*64:0);
     for(uint32_t i=0;i<n;i++){   /* (>> 2 first: two 4096 gains on +-884000 stay inside 31 bits) */

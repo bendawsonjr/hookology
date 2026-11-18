@@ -1201,6 +1201,7 @@ static void track_defaults(track_t *t)
 {
     uint32_t i;
     t->mpc_octave = 0;
+    memset(t->lane_pan, 0, sizeof t->lane_pan);   /* (Hookology beta68) */
     for (i = 0; i < P_E0; i++)
         t->p[i] = TP[i].def;
     track_defaults_steps(t);

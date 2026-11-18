@@ -476,6 +476,8 @@ if sound && [ $TABLES = 1 ]; then
     t "SID filter output: exact full state across models/waves/stacks/modes and costs" sid_filter_test -O2 $FW
     t "808/909 metal preparation: exact pitches, states and steady/changing costs" drum_prepare_test -O2 -DHOOKOLOGY_D9_QUIET_END=0 $FW
     t "909 sound bit for bit: every voice, control and distortion, mono and stereo" drum909_exact_test -O2 $FW
+    t "drum lane pans: hard left / right, other lanes, SID ignored, through the queue" drum_pan_test -O2 -DBATCH=1 $FW
+    t "drum lane pans: the same on one core" drum_pan_test_1:drum_pan_test -O2 -DBATCH=0 $FW
     t "SID drum kernel: original PCM/state through digi, controls, steals and releases" drum_sid_fast_test -O2 $FW
     t "CZ native window: exact phase kernel and full renderer through live edits" cz_window_test -O2 $FW
     t "FM6 zero-level preparation: exact state and static/changing costs" fm6_prepare_test -O2 $FW

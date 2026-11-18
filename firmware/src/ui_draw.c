@@ -833,7 +833,13 @@ static void draw_columns(void)
     if(cur_page()->scope==SC_DRUM){
         char v[12];uint32_t sound=ui.drum_sound%drum_sound_count(TSEL);const int8_t *c=drum_patch_of(song.sel)->c[sound];
         draw_column(0,"DRUM",drum_sound_name(TSEL,sound),"",VAL(0u),-1,ICON_AUTO);
-        if(cur_page()->id[1]==4){fmt_int(v,127-c[3]);draw_column(1,"LEVEL",v,"",VAL(1u),-1,ICON_AUTO);draw_column(2,"","","",T_THEME,-1,ICON_NONE);draw_column(3,"","","",T_THEME,-1,ICON_NONE);return;}
+        if(cur_page()->id[1]==4){
+            int32_t lp=clamp(TSEL->lane_pan[drum_lane(drum_sound_note(TSEL,sound))&(NLANE-1u)],-64,63);const char *u="";
+            fmt_int(v,127-c[3]);draw_column(1,"LEVEL",v,"",VAL(1u),-1,ICON_AUTO);
+            if(drum_issid(TSEL))draw_column(2,"","","",T_THEME,-1,ICON_NONE);   /* (the SID kit: one chip, no pans) */
+            else{param_format(&TP[P_PAN],lp,v,&u);draw_column(2,"PAN",v,u,VAL(2u),-1,ICON_AUTO);}   /* (Hookology beta68: its lane's) */
+            draw_column(3,"","","",T_THEME,-1,ICON_NONE);return;
+        }
         fmt_int(v,c[0]);draw_column(1,"TUNE",v,"ST",VAL(1u),-1,ICON_PITCH);
         fmt_int(v,c[1]+64);draw_column(2,"DECAY",v,"",VAL(2u),-1,ICON_GATE);
         fmt_int(v,c[2]+64);draw_column(3,(drum_is909(TSEL)?drum_character(sound):drum_issid(TSEL)?"SNAP":sound==D9_SD?"SNAPPY":"TONE"),v,"",VAL(3u),-1,ICON_AUTO);return;

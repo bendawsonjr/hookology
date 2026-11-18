@@ -156,6 +156,27 @@ static __attribute__((noinline)) void mix_spread(track_t *t, int32_t *b, uint32_
     }
     t->peak=pk;
 }
+/* (Hookology beta68) a panned drum (voice.c spread_lr): spread_buf its left side, b - spread_buf its right; then LEVEL
+ * and the track's PAN as on a mono track; the meter the louder side, the stem their mean */
+static __attribute__((noinline)) void mix_lr(track_t *t, int32_t *b, uint32_t n)
+{
+    uint32_t send=fx_send_on?fx_send_gain(t):0u;
+    int32_t *d=spread_buf;
+    int32_t lvl=LEVEL_Q12[t->p[P_LEVEL] & 127],pan=t->p[P_PAN],pk=t->peak;
+    int32_t gl=4096-(pan>0?pan*64:0),gr=4096+(pan<0?pan*64:0);
+    uint32_t dk=(uint32_t)(t-trk)*8u;
+    for(uint32_t i=0;i<n;i++){
+        int32_t l=mix_level(d[i],lvl,i+dk),r=mix_level(b[i]-d[i],lvl,i+dk+4u);
+        int32_t a=l<0?-l:l,c=r<0?-r:r;
+        if(c>a)a=c;
+        if(a>pk)pk=a;
+#if MELODEE_USB_AUDIO
+        if(track_capture_on&&t<trk+NROWS)track_capture[i*NROWS+(uint32_t)(t-trk)]=(l+r)>>1;
+#endif
+        mix_add((l*gl)>>12,(r*gr)>>12,i,send);
+    }
+    t->peak=pk;
+}
 #if MELODEE_MIX_FAST
 #define MIX_MONO_GENERAL mix_mono_general
 #else
@@ -251,7 +272,7 @@ static void mix_solo(track_t *t,int32_t *b,uint32_t n)
 }
 #if MELODEE_BATCH_AUDIO && !MELODEE_LEGACY_EXTRAS
 static int32_t batch_pcm[NPART][CTL],batch_spread[NPART][CTL];
-static uint32_t batch_rendered[NPART];static uint8_t batch_spread_on[NPART],batch_ready;
+static uint32_t batch_rendered[NPART];static uint8_t batch_spread_on[NPART],batch_spread_lr[NPART],batch_ready;
 static __typeof__(mod) batch_mod[NPART];
 #if MELODEE_DUAL_CORE
 static uint8_t batch_posted[NPART];
@@ -274,8 +295,9 @@ static __attribute__((noinline)) void mix_prepare_batch(uint32_t n,uint32_t nt) 
         track_t *t=&trk[p];
         if(t->engine==ENGI_MIDI){batch_rendered[p]=0;continue;}
         mod_begin(t);batch_mod[p]=mod;memcpy(batch_params[p],t->p,sizeof t->p);
-        spread_on=t->p[P_SPRD]>0 && (trk_vmode(t)==V_POLY || trk_vmode(t)==V_UNISON);
-        batch_spread_on[p]=spread_on;spread_buf=batch_spread[p];
+        spread_lr=(uint8_t)drum_pan_on(t);              /* (Hookology beta68: a panned drum, left / right) */
+        spread_on=spread_lr || (t->p[P_SPRD]>0 && (trk_vmode(t)==V_POLY || trk_vmode(t)==V_UNISON));
+        batch_spread_on[p]=spread_on;batch_spread_lr[p]=spread_lr;spread_buf=batch_spread[p];
         batch_rendered[p]=track_render_audio(t,batch_pcm[p],n,0);
         if(mod.on)mod_end(t);
     }
@@ -299,7 +321,7 @@ static __attribute__((noinline)) void mix_part(track_t *t,uint32_t n)
         uint32_t p=(uint32_t)(t-trk);mod=batch_mod[p];
         part_buf=batch_pcm[p];
         if(mod.on)for(uint32_t k=0;k<mod.nk;k++)t->p[mod.kid[k]]=batch_params[p][mod.kid[k]];
-        spread_on=batch_spread_on[p];spread_buf=batch_spread[p];rendered=(int)batch_rendered[p];
+        spread_on=batch_spread_on[p];spread_lr=batch_spread_lr[p];spread_buf=batch_spread[p];rendered=(int)batch_rendered[p];
         if(rendered){
             if(spread_on)spread_sum(part_buf);
             const engine_t *e=ENGINES[t->engine];
@@ -313,7 +335,8 @@ static __attribute__((noinline)) void mix_part(track_t *t,uint32_t n)
 #endif
     {
         part_buf=part_storage;spread_buf=spread_storage;mod_begin(t);
-        spread_on=t->p[P_SPRD]>0 && (trk_vmode(t)==V_POLY || trk_vmode(t)==V_UNISON);
+        spread_lr=(uint8_t)drum_pan_on(t);
+        spread_on=spread_lr || (t->p[P_SPRD]>0 && (trk_vmode(t)==V_POLY || trk_vmode(t)==V_UNISON));
         rendered=(int)track_render_audio(t,part_buf,n,0);
     }
 #if defined(MELODEE_FX_PROFILE) && MELODEE_FX_PROFILE && defined(FM1_IRQ_TARGET)
@@ -321,14 +344,15 @@ static __attribute__((noinline)) void mix_part(track_t *t,uint32_t n)
 #endif
     int insert=0;
     if(rendered || fx_insert_active(t)){   /* (Hookology: the track's INSERT, its tail too once the notes have stopped) */
-        if(!rendered){memset(part_buf,0,n*sizeof *part_buf);spread_on=0;}
+        if(!rendered){memset(part_buf,0,n*sizeof *part_buf);spread_on=spread_lr=0;}
         if(fx_insert_active(t)){AP_START(fx_start);int (*volatile run)(track_t *,const int32_t *,uint32_t)=fx_insert;insert=run(t,part_buf,n);AP_END(AP_FX,fx_start);}
     }
     AP_START(mix_start);
     if(insert){void (*volatile mix)(track_t *,uint32_t)=mix_insert_samples;mix(t,n);}
     else if(rendered){
         mix_solo(t,part_buf,n);
-        if(spread_on)mix_spread(t,part_buf,n);
+        if(spread_lr)mix_lr(t,part_buf,n);              /* (Hookology beta68: a panned drum) */
+        else if(spread_on)mix_spread(t,part_buf,n);
         else{
             mix_cache_t *mc=&mix_cache[(uint32_t)(t-trk)];
             if(!mc->valid || mc->level!=t->p[P_LEVEL] || mc->pan!=t->p[P_PAN])mix_cache_update(t,mc);

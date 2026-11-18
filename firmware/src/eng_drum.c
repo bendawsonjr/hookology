@@ -423,7 +423,8 @@ static __attribute__((noinline)) void drum_color(drum_lane_t *L,int32_t value,in
     int32_t k=dr_lp1(dr_exp(4000u,value,24));
     for(uint32_t i=0;i<n;i++){L->r.color+=(int32_t)(((int64_t)(y[i]-L->r.color)*k)>>14);y[i]=value<0?L->r.color:y[i]+((y[i]-L->r.color)*value>>6);}
 }
-static void drum_render_into(track_t *t,voice_t *v,int32_t *out,uint32_t n,const vmod_t *m,dr_scratch_t *scratch,const int16_t *p)
+/* left: (Hookology beta68) a lane kit's left side, its lanes panned (dlk_render); 0 as ever */
+static void drum_render_into(track_t *t,voice_t *v,int32_t *out,uint32_t n,const vmod_t *m,dr_scratch_t *scratch,const int16_t *p,int32_t *left)
 {
     if (p[P_E0] == DK_SID) {
         if (v->s[2] == DK_SID)
@@ -432,7 +433,7 @@ static void drum_render_into(track_t *t,voice_t *v,int32_t *out,uint32_t n,const
     }
     if (p[P_E0] >= DK_CR78) {
         if (v->s[2] == p[P_E0])
-            dlk_render(t, out, n > CTL ? CTL : n, m, p);
+            dlk_render(t, out, left, n > CTL ? CTL : n, m, p);
         return;
     }
     drum_lane_t *L = drum_lane_of(t, v);
@@ -470,8 +471,9 @@ static void drum_render_into(track_t *t,voice_t *v,int32_t *out,uint32_t n,const
     }
 }
 
+static int32_t *drum_left_out;                          /* (Hookology beta68) CPU0's lane kit: its left side (voice.c) */
 static void drum_render(track_t *t,voice_t *v,int32_t *out,uint32_t n,const vmod_t *m)
-{ drum_render_into(t,v,out,n,m,&dr_scratch,t->p); }
+{ drum_render_into(t,v,out,n,m,&dr_scratch,t->p,drum_left_out); }
 
 /* the GM drum map, the first C (key 7) is the kick (C2, 36) */
 static int32_t drum_keys(const track_t *t, uint32_t k)

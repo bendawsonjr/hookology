@@ -17,7 +17,7 @@ static const struct { const char *prefix, *name; } SEC_RULE[] = {   /* a page's 
     {"CZ TOOLS", "Tools"}, {"CZ1 ", "Line 1"}, {"C1 PIT", "Pitch 1"}, {"C1 WAV", "Wave 1"}, {"C1 AMP", "Amp 1"},
     {"CZ2 ", "Line 2"}, {"C2 PIT", "Pitch 2"}, {"C2 WAV", "Wave 2"}, {"C2 AMP", "Amp 2"}, {"CZ ", "Line"},
     {"DCW", "Env"}, {"DCA", "Env"}, {"DCO", "Env"}, {"CZ LEVEL", "Env"}, {"OP", "Env"},
-    {"DRUM", "Drum"}, {"LANES", "Lanes"}, {"VOICE", "Voice"}, {"EDIT", "Sound"}};
+    {"DRUM", "Drum"}, {"LANES", "Lanes"}, {"PANS", "Lanes"}, {"VOICE", "Voice"}, {"EDIT", "Sound"}};
 static const char *const SEC_OP[6] = {"OP1", "OP2", "OP3", "OP4", "OP5", "OP6"};
 static struct {
     uint8_t n, eng, e7, ok;

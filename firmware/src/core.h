@@ -510,6 +510,8 @@ typedef struct track {
     uint8_t engine, preset;      /* engine: what the audio ISR renders */
     uint8_t eng_req;             /* engine the UI asked for (the ISR switches at a block start) */
     int8_t mpc_octave;           /* MPC bank's input octave, -3..3; independent of song.octave */
+    int8_t lane_pan[NLANE];      /* (Hookology beta68) a DRUM track's lane pans, -64..63 as PAN; outside P_COUNT (no
+                                  * stored layout changes): a FUN record's tag 'L' (project.c) */
     uint16_t user;                /* user preset slot + 1 the sound came from (UI), 0 = none */
     uint8_t user_native;         /* legacy project origin only; new presets use the shared bank */
     voice_t *v;                  /* NVOICE voices: the part's (part_voice), a MIDI-only track the silent midi_voice */

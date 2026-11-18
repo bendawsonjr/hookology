@@ -102,6 +102,10 @@ static uint8_t proj_p5_origin_value(const project_t *p,uint32_t track)
 #define PROJ_P5_ORIGIN_TAG1 0x35u
 #define PROJ_P5_ORIGIN_MAX 128u /* native Prophet user collection */
 #define PROJ_MPC_OCT_WIRE (PROJ_TONE_WIRE - 2u) /* tagged bank octaves in the unused project tail */
+#define PROJ_LPAN_BYTES (2u + NPART * NLANE)  /* (Hookology beta68) tag 'L' 1, the places' drum lane pans */
+/* (Hookology beta68) the drum lane pans of the project in flight (captured, packed, unpacked, restored: one at a time),
+ * beside project_t, not in it: project_t's size is a stored layout (proj_import's raw snapshots) */
+static int8_t proj_lpan[NPART][NLANE];
 #define TMPL_MPC_OCT_G G_RESERVED25             /* template metadata only; remains an inert runtime global */
 
 /* Four signed octaves in a tagged 16-bit word; zero is an older record (all banks at zero).
@@ -201,6 +205,7 @@ static int proj_import(project_t *q, const void *b, int n)
 {
     if (n == (int)PROJ_STORE_SIZE && (((const uint32_t *)b)[0] == PROJ_MAGIC || ((const uint32_t *)b)[0] == PROJ_CUT_MAGIC || ((const uint32_t *)b)[0] == PROJ_PRE_HP_MAGIC || ((const uint32_t *)b)[0] == 0x46554E46u || ((const uint32_t *)b)[0] == 0x46554E45u || ((const uint32_t *)b)[0] == 0x46554E44u || ((const uint32_t *)b)[0] == 0x46554E43u))
         return proj_unpack(q, b) && proj_fn_none(q);
+    memset(proj_lpan, 0, sizeof proj_lpan);             /* (Hookology beta68: a raw snapshot holds no pans) */
     if (n == (int)sizeof *q && proj_ok((const project_t *)b)) {
         memcpy(q, b, sizeof *q);
         return 1;
@@ -344,6 +349,15 @@ static int proj_pack(project_store_t *out, const project_t *q)
     pos += sizeof q->motion;
     b[pos++]='U';b[pos++]=3u;
     for(t=0;t<PROJ_TRK;t++){b[pos++]=(uint8_t)q->user[t];b[pos++]=(uint8_t)(q->user[t]>>8);}
+    {   /* (Hookology beta68) the drum lane pans: tag 'L' 1, a byte (+ 64) a lane of each place; only when one is not
+         * centred, in the unused tail (older firmware never reads past the 'U' block) */
+        uint32_t any = 0;
+        for (t = 0; t < NPART; t++) for (i = 0; i < NLANE; i++) any |= proj_lpan[t][i] != 0;   /* (proj_lpan: q's) */
+        if (any && pos + PROJ_LPAN_BYTES <= PROJ_MPC_OCT_WIRE) {
+            b[pos++] = 'L'; b[pos++] = 1u;
+            for (t = 0; t < NPART; t++) for (i = 0; i < NLANE; i++) b[pos++] = (uint8_t)(clamp(proj_lpan[t][i], -64, 63) + 64);
+        }
+    }
     b[PROJ_MPC_OCT_WIRE] = (uint8_t)octword;
     b[PROJ_MPC_OCT_WIRE+1u] = (uint8_t)(octword >> 8);
     memcpy(b + PROJ_FM6_OFF, q->fm6, sizeof q->fm6);
@@ -389,6 +403,7 @@ static int proj_unpack(project_t *q, const uint8_t *b)
         68u + PROJ_TRK * (np - (magic==0x46554E44u?PROJ_FX_FIELDS:0u) + 2u + NSTEP * ((magic==PROJ_MAGIC || magic==PROJ_CUT_MAGIC || magic==PROJ_PRE_HP_MAGIC || magic==0x46554E46u || magic==0x46554E45u)?8u:9u)) + sizeof q->chain + sizeof q->motion > end)
         return 0;
     memset(q, 0, sizeof *q); q->magic = PROJ_MAGIC; q->size = sizeof *q;
+    memset(proj_lpan, 0, sizeof proj_lpan);           /* (Hookology beta68: a new project, centred pans) */
     memcpy(q->g,b+8,2u*PROJ_GLOBALS);
     for(i=G_MFXTYPE;i<G_COUNT;i++)q->g[i]=GP[i].def;
     if(magic==PROJ_MAGIC || magic==PROJ_CUT_MAGIC || magic==PROJ_PRE_HP_MAGIC || magic==0x46554E46u){
@@ -444,8 +459,15 @@ static int proj_unpack(project_t *q, const uint8_t *b)
     memcpy(&q->chain, b + pos, sizeof q->chain); pos += sizeof q->chain;
     memcpy(&q->motion, b + pos, sizeof q->motion);
     pos += sizeof q->motion;
+    memset(proj_lpan, 0, sizeof proj_lpan);             /* (Hookology beta68: none unless tagged below) */
     if(pos+2u+2u*PROJ_TRK<=PROJ_FM6_OFF && b[pos]=='U' && b[pos+1u]==3u){
         for(t=0;t<PROJ_TRK;t++){uint32_t user=b[pos+2u+2u*t]|(uint32_t)b[pos+3u+2u*t]<<8;q->user[t]=(uint16_t)(user<=384u?user:0);}
+        uint32_t lp = pos + 2u + 2u * PROJ_TRK;         /* (Hookology beta68) the drum lane pans after it */
+        if (lp + PROJ_LPAN_BYTES <= PROJ_MPC_OCT_WIRE && b[lp] == 'L' && b[lp + 1u] == 1u)
+            for (t = 0; t < NPART; t++) for (i = 0; i < NLANE; i++) {
+                uint32_t v = b[lp + 2u + t * NLANE + i];
+                proj_lpan[t][i] = (int8_t)(v <= 127u ? (int32_t)v - 64 : 0);
+            }
     }else if(pos+2u+PROJ_TRK<=PROJ_FM6_OFF && b[pos]==PROJ_P5_ORIGIN_TAG0 && b[pos+1u]==PROJ_P5_ORIGIN_TAG1){
         for(t=0;t<PROJ_TRK;t++){uint32_t origin=b[pos+2u+t];if(origin && origin<=128u){uint32_t slot=origin-1u,bank=slot/26u,k=slot%26u,spill=bank*8u+k-18u;q->user[t]=(uint16_t)(1u+(k<18u?(16u+bank)*18u+k:spill<32u?spill/2u*18u+16u+spill%2u:378u+spill-32u));}}
     }
@@ -697,6 +719,7 @@ static void project_capture(project_t *p)
     uint8_t native[FP_SIZE + 1u];
     uint32_t f = motion_guard();
     memset(p, 0, sizeof *p);
+    memset(proj_lpan, 0, sizeof proj_lpan);           /* (Hookology beta68: a new project, centred pans) */
     p->magic = PROJ_MAGIC;
     p->size = sizeof *p;
     for (i = 0; i < G_COUNT; i++)
@@ -766,6 +789,11 @@ static void project_capture(project_t *p)
     p->motion.rsv[0] = 1;                     /* full container supplies the bank tags */
     motion_unguard(f);
     memcpy(p->name, proj_name, str_len(proj_name));
+    memset(proj_lpan, 0, sizeof proj_lpan);
+    for (i = 0; i < NPART; i++) {                     /* (Hookology beta68) each place's drum lane pans */
+        uint32_t src = cap_map(i);
+        if (src < NPART) memcpy(proj_lpan[i], trk[src].lane_pan, NLANE);
+    }
     p->sum = proj_sum(p);
 }
 
@@ -1026,6 +1054,8 @@ static int project_restore_runtime(const project_t *input)
         pat_sig[k] = ~steps_sig(t);                     /* a project's steps are the user's */
     }
     for (k = PROJ_TRK; k < NTRK; k++) pat_sig[k] = ~steps_sig(&trk[k]);
+    for (k = 0; k < NTRK; k++)                          /* (Hookology beta68) the drum lane pans; MIDI tracks none */
+        for (i = 0; i < NLANE; i++) trk[k].lane_pan[i] = k < NPART ? (int8_t)clamp(proj_lpan[k][i], -64, 63) : 0;
     scale_share(song.sel < PROJ_TRK ? TSEL : &trk[0]);   /* MIDI settings arrive with the tail; templates use part 1's key */
     undo_depth--;
     sync_reload = 1;
@@ -1358,6 +1388,7 @@ static void template_load(void)
         return;
     }
     memset(p, 0, sizeof *p);
+    memset(proj_lpan, 0, sizeof proj_lpan);           /* (Hookology beta68: a new project, centred pans) */
     p->magic = PROJ_MAGIC;
     p->size = sizeof *p;
     for (i = 0; i < PROJ_GLOBALS; i++)

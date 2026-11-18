@@ -140,13 +140,15 @@ static void drum_levels(void)
     int16_t lv=t->p[P_LEVEL], sn=t->p[P_LN0+1], kick=t->p[P_LN0];
     key_down(key); page_knob(0,-5); ui.force=1; ui_draw();
     assert(t->p[P_LN0+1]<sn && t->p[P_LEVEL]==lv && t->p[P_LN0]==kick && tracks.lane==2u && tracks.out);
-    {   /* KNOB 2..4 with it held: the drum's TUNE DECAY TONE (EDIT > DRUM SOUND), not PAN SWING STEPS */
+    {   /* KNOB 2..4 with it held: the lane's PAN (Hookology beta68, was TUNE), the drum's DECAY TONE (EDIT > DRUM SOUND),
+         * not the track's PAN MUTE STEPS */
         uint32_t sd=drum_sound_of(t,kb_map(t,key))%drum_sound_count(t); int8_t *c=drum_patch_of(song.sel)->c[sd];
         int8_t tu=c[0], de=c[1], to=c[2]; int16_t pan=t->p[P_PAN], sw=t->p[P_SSWING], len=t->p[P_SLEN];
         page_knob(1,2); page_knob(2,-3); page_knob(3,4); ui.force=1; ui_draw();
-        assert(c[0]==tu+2 && c[1]==de-3 && c[2]==to+4 && tracks.lane==2u && tracks.sound==sd);
+        assert(t->lane_pan[1]>0 && !t->lane_pan[0] && c[0]==tu && c[1]==de-3 && c[2]==to+4 && tracks.lane==2u && tracks.sound==sd);
         assert(t->p[P_PAN]==pan && t->p[P_SSWING]==sw && t->p[P_SLEN]==len && !t->slen_next);
-        page_knob(1,100); assert(c[0]==24);                                /* (TUNE: two octaves at most) */
+        page_knob(1,100); assert(t->lane_pan[1]==63);                      /* (PAN: hard right at most) */
+        page_knob(1,-200); assert(t->lane_pan[1]==-64);
     }
     key_up(key); page_knob(1,1); assert(!tracks.lane);                     /* let go: the strip's own cards */
     page_knob(0,-1); assert(t->p[P_LEVEL]==lv-1 && !tracks.lane);

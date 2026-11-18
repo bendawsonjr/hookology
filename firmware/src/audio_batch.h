@@ -20,6 +20,7 @@ typedef void (*audio_batch_fn)(const void *,int32_t *);
 _Static_assert(AUDIO_BATCH_JOBS<=32u,"Batch worker mask must cover every descriptor");
 typedef struct {
     audio_batch_fn run;int32_t *out;uint32_t n, profile_id,guard;
+    int32_t *out2,*left;int32_t gl,gr;   /* (Hookology beta68) a panned drum: out2 (the spread side) too, see merge */
 #if MELODEE_AUDIO_PROFILE
     uint32_t elapsed;
 #endif
@@ -78,7 +79,12 @@ static void audio_batch_merge(audio_batch_job_t *j)
     audio_profile_add(j->profile_id,j->elapsed);
 #endif
     AP_START(merge_start);
-    for(uint32_t i=0;i<j->n;i++)j->out[i]+=j->pcm[i];
+    if(!j->out2)for(uint32_t i=0;i<j->n;i++)j->out[i]+=j->pcm[i];
+    else if(j->left)for(uint32_t i=0;i<j->n;i++){j->out[i]+=j->pcm[i];j->out2[i]+=j->left[i];}   /* a lane kit: R, L */
+    else for(uint32_t i=0;i<j->n;i++){                  /* an 808 / 909 hit: its lane's pan (Q12 gains) */
+        int32_t x=j->pcm[i];
+        j->out[i]+=(int32_t)(((int64_t)x*j->gr)>>12);j->out2[i]+=(int32_t)(((int64_t)x*j->gl)>>12);
+    }
     AP_END(AP_BATCH_MERGE,merge_start);
 }
 static void audio_batch_parallel(void *context)
@@ -153,7 +159,7 @@ static void audio_batch_push_cost(audio_batch_fn run,const void *data,uint32_t b
     if(audio_batch_count==AUDIO_BATCH_JOBS)audio_batch_flush();
     AP_START(prepare_start);
     uint32_t k=audio_batch_count++;audio_batch_job_t *j=&audio_batch_jobs[k];
-    j->run=run;j->out=out;j->n=n;j->profile_id=profile_id;memcpy(j->data,data,bytes);
+    j->run=run;j->out=out;j->n=n;j->profile_id=profile_id;memcpy(j->data,data,bytes);j->out2=j->left=0;
     j->guard=(uint32_t)(uintptr_t)run^n^profile_id^0x913ab267u;
 #if MELODEE_DUAL_CORE
     uint32_t cost=estimated_cost;
@@ -186,4 +192,11 @@ static void audio_batch_push_cost(audio_batch_fn run,const void *data,uint32_t b
 static void audio_batch_push(audio_batch_fn run,const void *data,uint32_t bytes,int32_t *out,uint32_t n,uint32_t profile_id)
 {
     audio_batch_push_cost(run,data,bytes,out,n,profile_id,audio_batch_cost[profile_id]);
+}
+/* (Hookology beta68) the job just pushed is a panned drum: its merge adds to out2 too (left: a lane kit's own left
+ * side; else the pcm scaled by gl, out by gr) */
+static void audio_batch_stereo(int32_t *out2,int32_t *left,int32_t gl,int32_t gr)
+{
+    audio_batch_job_t *j=&audio_batch_jobs[audio_batch_count-1u];
+    j->out2=out2;j->left=left;j->gl=gl;j->gr=gr;
 }

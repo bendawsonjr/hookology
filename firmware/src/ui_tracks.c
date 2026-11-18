@@ -97,8 +97,8 @@ static void tr_columns(void)
     const track_t *t = TSEL;
     int32_t level = clamp(t->p[P_LEVEL], 0, 127), pan = clamp(t->p[P_PAN], -64, 63), mute = t->p[P_MUTE] != 0, steps = (int32_t)tr_steps(t);
     uint32_t c, midi = midi_track_only(t);
-    if (tracks.lane) {                                  /* a drum key held: that drum's LEVEL (EDIT > LANES), TUNE DECAY
-                                                         * TONE (EDIT > DRUM SOUND) */
+    if (tracks.lane) {                                  /* a drum key held: that drum's LEVEL (EDIT > LANES), its lane's PAN,
+                                                         * DECAY TONE (EDIT > DRUM SOUND) */
         const int8_t *dc = drum_patch_of(song.sel)->c[tracks.sound % drum_sound_count(t)];
         int32_t lv = clamp(t->p[P_LN0 + tracks.lane - 1u], 0, 127);
         char v[12], lb[12];
@@ -106,7 +106,10 @@ static void tr_columns(void)
         str_cpy(lb, drum_lane_name(t, tracks.lane - 1u), sizeof lb);
         param_format(&TP[P_LN0 + tracks.lane - 1u], lv, v, &unit);
         draw_column(0, lb, v, unit, T_ACCENT, lv * 1000 / 127, ICON_NONE);
-        fmt_int(v, dc[0]); draw_column(1, "TUNE", v, "ST", VAL(1u), (dc[0] + 24) * 1000 / 48, ICON_NONE);
+        int32_t lp = clamp(t->lane_pan[(tracks.lane - 1u) & (NLANE - 1u)], -64, 63);   /* (Hookology beta68: PAN, was TUNE) */
+        if (drum_issid(t)) draw_column(1, "PAN", "--", "", T_DIM, -1, ICON_NONE);   /* (the SID kit: one chip, no pans) */
+        else { param_format(&TP[P_PAN], lp, v, &unit); draw_column(1, "PAN", v, unit, VAL(1u), (lp + 64) * 1000 / 127, ICON_NONE); }
+        unit = "";
         fmt_int(v, dc[1] + 64); draw_column(2, "DECAY", v, "", VAL(2u), (dc[1] + 64) * 1000 / 127, ICON_NONE);
         fmt_int(v, dc[2] + 64);
         draw_column(3, drum_is909(t) ? drum_character(tracks.sound) : drum_issid(t) ? "SNAP" : tracks.sound == D9_SD ? "SNAPPY" : "TONE",
@@ -126,14 +129,16 @@ static void tr_columns(void)
 }
 /* under the strip: the setting of the knob turned for every track of the group, a bar each (PAN a mark from the
  * middle), its value at the right; the selected track outlined */
-/* .. a drum key held: the kit's eight drum levels in two columns, the held one outlined */
+/* .. a drum key held: the kit's eight drum levels in two columns, the held one outlined (KNOB 2 turned: their pans,
+ * Hookology beta68, a mark from the middle) */
 static void tr_lanes(void)
 {
     const track_t *t = TSEL;
     uint32_t l, sig = fnv1(2166136261u, tracks.lane + 16u * song.sel + 4096u * (uint32_t)t->p[P_E0]);
     int32_t rh = TR_CMP_H / 4;
     uint16_t tc = T_TRK(song.sel);
-    for (l = 0; l < 8u; l++) sig = fnv1(sig, (uint32_t)t->p[P_LN0 + l]);
+    for (l = 0; l < 8u; l++) sig = fnv1(sig, (uint32_t)t->p[P_LN0 + l] + 256u * (uint32_t)(t->lane_pan[l] + 64));
+    sig = fnv1(sig, tracks.knob);
     sig = fnv1(sig, ux.gen * 977u + ux.pal * 31u + 1u);
     if (!ui.force && sig == tracks.cmp) return;
     tracks.cmp = sig;
@@ -141,17 +146,22 @@ static void tr_lanes(void)
         cv_begin_band(240u, (uint32_t)TR_CMP_H, T_BG, band);
         for (l = 0; l < 8u; l++) {
             int32_t x = BOX_X + (int32_t)(l / 4u) * (BOX_W / 2), y = (int32_t)(l % 4u) * rh, w = BOX_W / 2 - 2;
-            int32_t v = clamp(t->p[P_LN0 + l], 0, 127), bx = x + 34, bw = w - 34 - 54;
+            int32_t pans = tracks.knob == 1u, v = pans ? clamp(t->lane_pan[l], -64, 63) : clamp(t->p[P_LN0 + l], 0, 127);
+            int32_t bx = x + 34, bw = w - 34 - 54;
             uint16_t bg = ux_mix(T_BG, tc, l + 1u == tracks.lane ? 24 : 11);
             char val[12];
             const char *unit = "";
-            param_format(&TP[P_LN0 + l], v, val, &unit);      /* (as the card above and EDIT > LANES: %) */
+            param_format(pans ? &TP[P_PAN] : &TP[P_LN0 + l], v, val, &unit);   /* (as the card above and EDIT > LANES) */
             if (unit[0] && str_len(val) + str_len(unit) < sizeof val) str_cpy(val + str_len(val), unit, sizeof val - str_len(val));
             if (l + 1u == tracks.lane) { cv_rrect(x, y + 1, w, rh - 2, 5, tc, T_BG); cv_rrect(x + 2, y + 3, w - 4, rh - 6, 3, bg, tc); }
             else cv_rrect(x, y + 1, w, rh - 2, 5, bg, T_BG);
             cv_text(x + 6, ty_y(y + rh / 2, TY_LB), TY_LB, drum_lane_abbr(t, l), T_TEXT);
             cv_rect(bx, y + rh / 2 - 3, bw, 6, ux_mix(bg, tc, 22));
-            cv_rect(bx, y + rh / 2 - 3, v * bw / 127, 6, tc);
+            if (pans) {                                 /* (a mark from the middle, as PAN's) */
+                int32_t mid = bx + bw / 2, px = bx + (v + 64) * bw / 127;
+                cv_rect(px < mid ? px : mid, y + rh / 2 - 3, (px < mid ? mid - px : px - mid) + 1, 6, tc);
+            } else
+                cv_rect(bx, y + rh / 2 - 3, v * bw / 127, 6, tc);
             cv_text_r(x + w - 6, ty_y(y + rh / 2, TY_LB), TY_LB, val, T_TEXT, bg);
         }
         cv_blit_band(0, TR_CMP_Y);

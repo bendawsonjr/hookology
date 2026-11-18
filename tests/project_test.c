@@ -40,6 +40,28 @@ int main(void)
                  P_RESERVED45 == P_DETUNE + 1 && P_RESERVED48 + 1 == P_M1SRC && P_M4AMT + 1 == P_FM1_ATK && P_FM4_LEVEL + 1 == P_CHRD && P_VOIC + 1 == P_MPCDEG && P_MPCDEG + 1 == P_LN0 && P_LN7 + 1 == P_LSYNC && P_SPRD + 1 == P_FXTYPE && P_FX3CHAR + 1 == P_FXSEND && P_FXSEND + 1 == P_FXSEND2 && P_FXSEND2 + 1 == P_FXSEND3 && P_FXSEND3 + 1 == P_FXTONE && P_FX3TONE + 1 == P_STRUM && P_STRUM + 1 == P_STROKE && P_STROKE + 1 == P_E0 && P_E0 == 116);
     bad += check("FUN16 fits its record", sizeof(project_store_t) == PROJ_STORE_SIZE);
 
+    {   /* (Hookology beta68) the drum lane pans: tag 'L' 1 after the 'U' block, read back; a record without: centred; the
+         * record otherwise byte for byte as without (older firmware reads the same project) */
+        static project_store_t with, without;
+        uint32_t lo = PROJ_STORE_SIZE, hi = 0, ok;
+        blank(&q);
+        memset(proj_lpan, 0, sizeof proj_lpan);
+        ok = proj_pack(&without, &q);
+        proj_lpan[0][0] = -64; proj_lpan[1][3] = 63; proj_lpan[NPART - 1u][NLANE - 1u] = -20;
+        ok &= proj_pack(&with, &q);
+        for (uint32_t i = 0; i < PROJ_STORE_SIZE; i++)
+            if (with.raw[i] != without.raw[i] && i < PROJ_STORE_SIZE - 4u) { if (i < lo) lo = i; if (i > hi) hi = i; }
+        ok &= lo < hi && with.raw[lo] == 'L' && with.raw[lo + 1u] == 1u && hi < lo + PROJ_LPAN_BYTES && hi < PROJ_MPC_OCT_WIRE &&
+              with.raw[lo - 2u - 2u * PROJ_TRK] == 'U';
+        memset(proj_lpan, 0x11, sizeof proj_lpan);
+        ok &= proj_import(&q2, &with, sizeof with) && proj_lpan[0][0] == -64 && proj_lpan[1][3] == 63 &&
+              proj_lpan[NPART - 1u][NLANE - 1u] == -20 && !proj_lpan[0][1];
+        ok &= proj_import(&q2, &without, sizeof without);
+        for (uint32_t k = 0; k < NPART; k++) for (uint32_t l = 0; l < NLANE; l++) ok &= !proj_lpan[k][l];
+        memset(proj_lpan, 0, sizeof proj_lpan);
+        bad += check("drum lane pans (beta68): tag 'L' after 'U', round trip, none: centred, the rest unchanged", ok);
+    }
+
     {   /* Reconstruct the prior raw layout independently of RAM bitfields. */
         static uint8_t old[sizeof(project_t)+RECORD_MAX];blank(&q);
         q.recording[0]=(recorded_note_t){.on=65535, .duration=49321, .note7=127, .vel=91, .owner=255, .step=255, .pitch=-24, .length=1};

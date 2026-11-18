@@ -677,13 +677,22 @@ static uint32_t tracks_held_drum(const track_t *t)
     }
     return 0;
 }
-/* a drum key held: KNOB 1 that drum's LEVEL (its lane, EDIT > LANES), KNOB 2..4 its TUNE DECAY TONE (EDIT > DRUM SOUND) */
+/* a drum key held: KNOB 1 that drum's LEVEL (its lane, EDIT > LANES), KNOB 2 its lane's PAN (Hookology beta68, was TUNE:
+ * EDIT > DRUM SOUND has it), KNOB 3, 4 its DECAY TONE (EDIT > DRUM SOUND) */
 static void tracks_drum_knob(track_t *t, uint32_t note, uint32_t k, int32_t s)
 {
     uint32_t sound = drum_sound_of(t, note) % drum_sound_count(t);
     tracks.lane = (uint8_t)(drum_lane(note) + 1u);
     tracks.sound = (uint8_t)sound;
     if (k == 0u) { tracks_value(t, P_LN0 + tracks.lane - 1u, 0, s); return; }
+    if (k == 1u) {                                      /* PAN: the lane's (track_t lane_pan, saved with the project; the SID
+                                                         * kit: one chip, none) */
+        if (drum_issid(t)) return;
+        int8_t *lp = &t->lane_pan[(tracks.lane - 1u) & (NLANE - 1u)];
+        *lp = (int8_t)clamp(*lp + accel(EN_K2, s, 127), -64, 63);
+        ui.force = 1;
+        return;
+    }
     fm1_irq_off();
     int8_t *p = &drum_patch_of(song.sel)->c[sound][k - 1u];
     *p = (int8_t)clamp(*p + s, k == 1u ? -24 : -64, k == 1u ? 24 : 63);
@@ -1027,6 +1036,11 @@ static void drum_sound_edit(uint32_t slot,int32_t delta)
     if(field==255)return;
     fm1_irq_off();
     if(field==4){int8_t *p=&drum_patch_of(song.sel)->c[ui.drum_sound][3];*p=(int8_t)clamp(*p-delta,0,127);}
+    else if(field==5){   /* (Hookology beta68) the drum's lane's PAN (the drums of a lane share it, as its level) */
+        if(drum_issid(TSEL)){fm1_irq_on();return;}
+        int8_t *lp=&TSEL->lane_pan[drum_lane(drum_sound_note(TSEL,ui.drum_sound))&(NLANE-1u)];
+        *lp=(int8_t)clamp(*lp+accel(EN_K1+slot,delta,127),-64,63);
+    }
     else {int8_t *p=&drum_patch_of(song.sel)->c[ui.drum_sound][field-1];*p=(int8_t)clamp(*p+delta,field==1?-24:-64,field==1?24:63);}
     fm1_irq_on();ui.force=1;
 }
