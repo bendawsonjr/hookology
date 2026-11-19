@@ -110,9 +110,13 @@ static uint32_t trk_nvoice(const track_t *t)
 
 /* the voices a POLY note may take: trk_nvoice, at most the track's VOICES (P_VMAX, 0: ALL; Hookology). A note past it
  * reuses one of these (voice_alloc: the oldest released, else the oldest held but the lowest) */
+/* (Hookology beta72) ECO caps a synth track at ECO_VOICES (its own VOICES lower still wins); a drum track (hits:
+ * engine_t.oneshot) keeps its own, a hit a voice */
+#define ECO_VOICES 4u
 static uint32_t trk_vlimit(const track_t *t)
 {
     uint32_t n = trk_nvoice(t), lim = (uint32_t)t->p[P_VMAX];
+    if (song.g[G_ECO] == 1 && !ENGINES[t->engine]->oneshot && (!lim || lim > ECO_VOICES)) lim = ECO_VOICES;
     return lim && lim < n ? lim : n;
 }
 

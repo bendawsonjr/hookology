@@ -26,8 +26,39 @@ static uint32_t held(const track_t *t){uint32_t n=0;for(uint32_t i=0;i<NVOICE;i+
 static void poly(uint32_t k,uint32_t engine,uint32_t preset){host_preset(&trk[k],engine,preset);trk[k].p[P_VOICE]=V_POLY;trk[k].p[P_MUTE]=0;}
 static void blocks(uint32_t n){int32_t o[2*CTL];while(n--)mix_block(o,CTL);}
 
+static uint32_t sounding(const track_t *t){uint32_t n=0;for(uint32_t i=0;i<NVOICE;i++)n+=t->v[i].active&&t->v[i].stage!=4u;return n;}
+/* (Hookology beta72) ECO caps a synth track at 4 voices; a lower VOICES wins; drums keep theirs; ECO off: the track's own */
+static void eco_voices(void)
+{
+    static const uint8_t SIX[6]={48,52,55,59,62,65};
+    uint32_t ok=1;int16_t budget=settings_budget;
+    for(uint32_t eng=0;eng<3u;eng++){
+        uint32_t e=eng==0?ENGI_CZ:eng==1?ENGI_FM6:ENGI_PROPHET;
+        fresh();settings_budget=32;poly(0,e,0);song.g[G_ECO]=1;
+        for(uint32_t i=0;i<6u;i++)trk_note_on(&trk[0],SIX[i],100);
+        ok&=held(&trk[0])==4u&&gated(&trk[0],65)&&gated(&trk[0],62)&&(e==ENGI_FM6?gated(&trk[0],55):gated(&trk[0],48));   /* (the
+                                                         * newest; the lowest kept, FM6 as Dexed: the newest four) */
+        fresh();settings_budget=32;poly(0,e,0);song.g[G_ECO]=1;trk[0].p[P_VMAX]=2;
+        for(uint32_t i=0;i<6u;i++)trk_note_on(&trk[0],SIX[i],100);
+        ok&=held(&trk[0])==2u;
+        fresh();settings_budget=32;poly(0,e,0);song.g[G_ECO]=0;
+        for(uint32_t i=0;i<6u;i++)trk_note_on(&trk[0],SIX[i],100);
+        ok&=held(&trk[0])==6u;
+    }
+    check("ECO: a synth track at most 4 voices (CZ, FM6, Prophet); VOICES 2 still 2; ECO off: all six",ok);
+    static const uint8_t HITS[6]={36,38,39,42,45,37};   /* (six lanes: KICK SNARE CLAP HATCL TOM RIM) */
+    uint32_t n[2];
+    for(uint32_t eco=0;eco<2u;eco++){
+        fresh();settings_budget=32;host_preset(&trk[3],ENGI_DRUM,0);trk[3].p[P_E0]=4;song.g[G_ECO]=(int16_t)eco;   /* (the 808: a hit a voice) */
+        for(uint32_t i=0;i<6u;i++)trk_note_on(&trk[3],HITS[i],100);
+        n[eco]=sounding(&trk[3]);
+    }
+    check("ECO: a drum track keeps its voices (six 808 hits ring together, as without)",n[1]==n[0]&&n[1]==6u);
+    song.g[G_ECO]=0;settings_budget=budget;
+}
 int main(void)
 {
+    eco_voices();
     fresh();
     poly(0,ENGI_PROPHET,0);poly(1,ENGI_FM6,0);poly(2,ENGI_CZ,0);poly(3,ENGI_DRUM,0);
     check("a Prophet voice costs most, FM6 least of the synths",voice_units(&trk[0])==9u&&voice_units(&trk[1])==4u&&voice_units(&trk[2])==6u);
