@@ -1590,19 +1590,19 @@ static int test_browser(void)
     go_page(GR_BROWSE);
     list_set(LM_ALL);
     for (i = 0; i < LM_N + 2u; i++)
-        turn(EN_K1, 1);
-    bad += check("LIST (KNOB 1): ALL FAV RECENT, the categories, stopping at OTHER", list_mode() == LM_N - 1u &&
+        turn(EN_K4, 1);
+    bad += check("LIST (KNOB 4): ALL FAV RECENT, the categories, stopping at OTHER", list_mode() == LM_N - 1u &&
                  str_eq(browser_list_name(list_mode()), "Other"));
     for (i = 0; i < LM_N; i++)
-        turn(EN_K1, -1);
-    turn(EN_K1, 1);
-    turn(EN_K1, 1);
-    turn(EN_K1, 1);
+        turn(EN_K4, -1);
+    turn(EN_K4, 1);
+    turn(EN_K4, 1);
+    turn(EN_K4, 1);
     bad += check("LIST: a category is kept with the settings in its byte, FAV stays favorites.filter",
                  list_mode() == LM_CAT && list_lcat == CAT_BASS && !favorites.filter && !list_recent);
-    turn(EN_K2, 1);
+    turn(EN_K1, 1);
     cur_entry(&src, &k);
-    bad += check("LIST BASS: KNOB 2 loads the next bass", entry_cat(src, k) == CAT_BASS);
+    bad += check("LIST BASS: KNOB 1 loads the next bass", entry_cat(src, k) == CAT_BASS);
 
     PREF_BITS &= (uint8_t)~PREF_ACCEL_OFF;
     memset(ui.enc_t, 0, sizeof ui.enc_t);
@@ -1647,14 +1647,14 @@ static int test_browser(void)
     press(B_OCTDN);
     bad += check("BROWSER: OCT- without a load goes to Stage, the sound as it was", ui.home && list_cur(&total) == first);
     go_page(GR_BROWSE);
-    turn(EN_K2, 1);
-    turn(EN_K2, 1);
+    turn(EN_K1, 1);
+    turn(EN_K1, 1);
     ok = list_cur(&total) == first + 2u;
     press(B_OCTDN);
-    bad += check("BROWSER: KNOB 2 browses; OCT- goes back to the sound from before it, to Stage",
+    bad += check("BROWSER: KNOB 1 browses; OCT- goes back to the sound from before it, to Stage",
                  ok && ui.home && list_cur(&total) == first);
     go_page(GR_BROWSE);
-    turn(EN_K2, 1);
+    turn(EN_K1, 1);
     press(B_OCTUP);
     bad += check("BROWSER: OCT+ keeps the sound, to Stage", ui.home && list_cur(&total) == first + 1u);
     PREF_BITS &= (uint8_t)~PREF_ACCEL_OFF;
@@ -1749,7 +1749,7 @@ static int test_favorites(void)
     go_page(GR_BROWSE);
     before = *TSEL;
     turn(EN_K3, 1);
-    turn(EN_K1, 1);
+    turn(EN_K4, 1);
     pos = preset_pos(&total);
     bad += check("FAV and LIST mark/filter the current sound without loading or touching its steps",
                  preset_favorite() && favorites.filter && total == 1 && pos == 0 &&
@@ -1778,7 +1778,7 @@ static int test_favorites(void)
     turn(EN_PRESET, 1);
     bad += check("empty favorites explains LIST ALL and retains the current sound and steps",
                  msg_is("NO FAVORITES") && !memcmp(TSEL, &before, sizeof before));
-    turn(EN_K1, -1);
+    turn(EN_K4, -1);
     preset_pos(&total);
     bad += check("LIST ALL restores the full browser without an implicit load", !favorites.filter && total > 1 &&
                  !memcmp(TSEL, &before, sizeof before));
@@ -2330,16 +2330,16 @@ static int test_init_scales_patterns(void)
                  msg_is("SOUND INIT"));
     go_page(GR_BROWSE); frame();
     list_set(LM_ALL);
-    turn(EN_K4, -1);
+    turn(EN_K2, -1);
     bad += check("INIT: the browser's ENGINE knob: the Prophet, its INIT", TSEL->eng_req == ENGI_PROPHET && !TSEL->preset);
-    turn(EN_K4, 1);
-    bad += check("..again: FM6, its INIT VOICE", TSEL->eng_req == ENGI_FM6 && TSEL->preset == FM6_NFAC);
     turn(EN_K2, 1);
+    bad += check("..again: FM6, its INIT VOICE", TSEL->eng_req == ENGI_FM6 && TSEL->preset == FM6_NFAC);
+    turn(EN_K1, 1);
     ok = TSEL->eng_req == ENGI_FM6 && !TSEL->preset;
-    turn(EN_K2, -1);
-    bad += check("..INIT VOICE first in FM6's sounds: KNOB 2 on, F1; back: INIT VOICE", ok && TSEL->eng_req == ENGI_FM6 &&
+    turn(EN_K1, -1);
+    bad += check("..INIT VOICE first in FM6's sounds: KNOB 1 on, F1; back: INIT VOICE", ok && TSEL->eng_req == ENGI_FM6 &&
                  TSEL->preset == FM6_NFAC);
-    turn(EN_K2, -1);
+    turn(EN_K1, -1);
     bad += check("..back again: the Prophet's last program", TSEL->eng_req == ENGI_PROPHET &&
                  TSEL->preset == ENGINES[ENGI_PROPHET]->npresets - 1u);
 

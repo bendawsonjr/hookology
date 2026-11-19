@@ -1,20 +1,18 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Kerem Kilic (Ellic Studio) */
-/* SAVE > PRESETS, the sound browser, a screen of its own in the large type (docs/design/README.md "Large type": C,
- * rows). At the top the track's numeral and the list (KNOB 1: ALL, the favourites, RECENT, the categories) in its
- * colour, the sound's place in it at the right (a message in its place while there is one; a fast turn's acceleration
- * beside it, "x4"). Under it the sounds (KNOB 2, PRESETS): the one shown a card tinted in the track's colour (its
- * name, its engine, its star: KNOB 3), two before and two after it, fading; the place as a bar at the right edge.
- * OCT- back (the sound from before the browser, when it loaded one), OCT+ keep; both go back to Stage.
- * Each part remembers what it drew and redraws when that changes. Included by ui_draw.c */
-#define BR_TOP_H H_HEAD                                 /* the top: rows 0 .. 29 */
-#define BR_CAT_Y BR_TOP_H                               /* (Hookology) the category line: rows 30 .. 61 */
-#define BR_CAT_H 32
-#define BR_BODY_Y (BR_CAT_Y + BR_CAT_H)                 /* the sounds: rows 62 .. 237 */
-#define BR_ROW 34
-#define BR_CARD 60
-#define BR_SHOW 4                                       /* (the card and three rows fit) */
-
+/* SAVE > PRESETS, the sound browser (Hookology beta73: after Skiff's PRESETS page). At the top the track's numeral and
+ * Patches (a message in their place while there is one); under it the four knobs' cards: KNOB 1 No. (the sound's place
+ * in the list, as PRESETS), KNOB 2 ENG (the next or previous engine's first sound in the list), KNOB 3 FAV (right: a
+ * favourite, left: not), KNOB 4 LIST (All, Faves, Recent, the categories); then the list, BR_SHOW compact rows, each
+ * the engine's short name (a user sound's with a dot) and the sound's name, the one shown highlighted in its engine's
+ * shade with its star; the place a bar at the right edge. The bottom line: OCT+ keep, OCT- back (the sound from before
+ * the browser, when it loaded one); both go back home. Each part remembers what it drew and redraws when that changes.
+ * Included by ui_draw.c */
+#define BR_TOP_H H_HEAD                                 /* the top: rows 0 .. 29; the cards under it (draw_column) */
+#define BR_BODY_Y Y_GRAPH                               /* the sounds: rows 84 .. 211 */
+#define BR_BODY_H (Y_FOOT - Y_GRAPH)
+#define BR_ROW 21
+#define BR_SHOW 6                                       /* (6 rows of 21: 126 of the 128) */
 static struct { uint32_t top, side, list, foot, cat; } brv;  /* what each part drew */
 
 /* LIST's names on the screen; the categories by CAT_* */
@@ -43,6 +41,7 @@ static void browser_top(uint32_t cur, uint32_t total)
     const aafont_t *tf = TY_TX, *lf = TY_LB;
     int pending = browse_pending(), badge = pending && brw.x > 1u;
     int32_t x, cy = BR_TOP_H / 2;
+    (void)r;
     uint32_t sig = song.sel * 7u + list_mode() * 131u + total * 1031u + cur * 3001u + ux.gen * 977u + ux.pal * 31u +
                    (ui.msg_t ? str_hash(3u, ui.msg) : 0u) + (badge ? brw.x : 0u) * 40503u;
     if (!ui.force && sig == brv.top)
@@ -54,110 +53,110 @@ static void browser_top(uint32_t cur, uint32_t total)
     x = cv_text_on(34, ty_y(cy, tf), tf, "Patches", T_TEXT, T_BG) + 10;
     if (ui.msg_t) {
         cv_free_text(x, ty_y(cy, lf), lf, ui.msg, T_ACCENT, T_BG, 236 - x);
-    } else if (total) {
-        fmt_int(r, (int32_t)(cur < total ? cur : 0u) + 1);
-        str_cpy(r + str_len(r), "/", 2);
-        fmt_int(r + str_len(r), (int32_t)total);
-        x = cv_text_r(236, ty_y(cy, lf), lf, r, T_MID, T_BG);
-        if (badge) {                                    /* a fast turn: its acceleration */
-            char b[4] = {'x', 0, 0, 0};
-            fmt_int(b + 1, brw.x);
-            cv_text_r(x - 8, ty_y(cy, lf), lf, b, T_THEME, T_BG);
-        }
+    } else if (badge) {                                /* a fast turn: its acceleration */
+        char b[4] = {'x', 0, 0, 0};
+        fmt_int(b + 1, brw.x);
+        cv_text_r(236, ty_y(cy, lf), lf, b, T_THEME, T_BG);
     }
     cv_blit(0, 0);
 }
 
-/* (Hookology) the category line under it: the list (KNOB 1) in the track's colour between its arrows (dim at the
- * ends); lit while KNOB 2 has gone up past the first sound (br_at_top) */
-static void browser_cat(void)
+/* the four knobs' cards (draw_column, as every page's): No., ENGINE, FAV, LIST */
+static void browser_cards(uint32_t cur, uint32_t total)
 {
-    uint32_t m = list_mode(), sig = m * 131u + (uint32_t)br_at_top * 7u + ux.gen * 977u + ux.pal * 31u + song.sel * 3u;
-    const aafont_t *tf = TY_TX;
-    int32_t cy = BR_CAT_H / 2;
-    if (!ui.force && sig == brv.cat)
-        return;
-    brv.cat = sig;
-    cv_begin(240, BR_CAT_H, T_BG);
-    uint16_t bg = br_at_top ? ux_mix(T_BG, T_THEME, 22) : T_BG;
-    if (br_at_top) cv_rrect(BOX_X, 2, BOX_W, BR_CAT_H - 4, 8, bg, T_BG);
-    cv_icon_mid(14, cy, 12, ICON_X_LEFT, m ? T_THEME : T_DIM, bg);
-    int32_t x = cv_text_on(28, ty_y(cy, tf), tf, browser_list_name(m), T_THEME, bg);
-    cv_icon_mid(x + 12, cy, 12, ICON_X_RIGHT, m + 1u < LM_N ? T_THEME : T_DIM, bg);
-    cv_blit(0, BR_CAT_Y);
+    char no[8], of[8], en[12];
+    uint32_t at = brw.on && brw.n < total ? brw.n : cur, k, src;
+    int fav = browser_shown_fav();
+    if (total && at < total) {
+        fmt_int(no, (int32_t)at + 1);
+        of[0] = '/'; fmt_int(of + 1, (int32_t)total);
+        src = preset_at(at, &k);
+        k = src_engine(src, k);
+    } else {
+        str_cpy(no, "--", sizeof no); of[0] = 0;
+        k = TSEL->eng_req;
+    }
+    k = eng_idx(k);                                     /* (the Prophet's name is wider than a card: P5) */
+    if (k == ENGI_PROPHET || k == ENGI_MIDI) str_cpy(en, k == ENGI_MIDI ? "MIDI" : "P5", sizeof en);   /* (MIDI Track too) */
+    else list_words(en, ENGINES[k]->name, sizeof en);
+    draw_column(0, "No.", no, of, VAL(0u), -1, ICON_NONE);
+    draw_column(1, "ENG", en, "", VAL(1u), -1, ICON_NONE);
+    draw_column(2, "FAV", fav ? "ON" : "OFF", "", fav ? VAL(2u) : T_DIM, -1, ICON_NONE);
+    draw_column(3, "LIST", browser_list_name(list_mode()), "", VAL(3u), -1, ICON_NONE);
 }
 
-/* the sounds from the top: the one shown in a card, the others rows (near: secondary, far: dim); the list scrolls once
- * the card reaches the second place, so the next ones stay in view (Hookology: it was always in the middle). The
- * place as a bar at the right edge. The loaded sound out of the list: the list's first, its card untinted */
+/* the sounds: BR_SHOW rows from the top, scrolling once the one shown reaches the second; each its engine's short
+ * name (a user sound's with a dot after it) and its name; the one shown highlighted, its star at the right. The place
+ * as a bar at the right edge. The loaded sound out of the list: the list's first, unhighlighted */
 static void browser_list(uint32_t cur, uint32_t total)
 {
-    uint32_t m = list_mode(), out = cur >= total, at = out ? 0u : cur, k, src, sig;
-    int pending = browse_pending(), fav = browser_shown_fav();
-    const aafont_t *tf = TY_TX, *lf = TY_LB;
-    int32_t r, top, h = 240 - BR_BODY_Y - 2;
+    uint32_t m = list_mode(), at0 = brw.on && brw.n < total ? brw.n : cur, out = at0 >= total, at = out ? 0u : at0, k, src, sig;
+    int fav = browser_shown_fav();
+    const aafont_t *lf = TY_LB;
+    int32_t h = BR_BODY_H;
     char tag[6], nm[16];
-    sig = at * 7u + total * 131u + m * 1031u + (uint32_t)pending * 3u + out * 17u + (uint32_t)fav * 5u +
-          song.sel * 11u + up_gen * 7919u + ux.gen * 977u + ux.pal * 31u + (uint32_t)br_at_top * 104729u;
+    sig = at * 7u + total * 131u + m * 1031u + (uint32_t)browse_pending() * 3u + out * 17u + (uint32_t)fav * 5u +
+          song.sel * 11u + up_gen * 7919u + ux.gen * 977u + ux.pal * 31u;
     if (!ui.force && sig == brv.list)
         return;
     brv.list = sig;
-    for (top = 0; top < h; top += 124) {                /* (in two slices: a canvas holds 124 rows) */
-        int32_t sh = h - top < 124 ? h - top : 124;
-        for (uint32_t band = 0; band < (uint32_t)((uint32_t)sh); band += CV_MAX / (240)) {
-            cv_begin_band(240,(uint32_t)sh,T_BG,band);
-            cv_oy = -top;
-            if (!total) {
-                cv_text_c(120, ty_y(h / 2, tf), tf, m == LM_FAV ? "No favourites" : m == LM_RECENT ? "Nothing loaded yet" :
-                          "No sounds", T_MID, T_BG);
-            } else {
-                int32_t first = clamp((int32_t)at - 1, 0, total > BR_SHOW ? (int32_t)total - BR_SHOW : 0), y = 0;
-                for (int32_t j = 0; j < BR_SHOW; j++, y += r ? BR_ROW : BR_CARD) {   /* (the card where it is) */
-                    int32_t n = first + j;
-                    r = n - (int32_t)at;
-                    if (n >= (int32_t)total)
-                        break;
-                    uint16_t hc;                            /* (each engine its shade of the track's colour) */
-                    src = preset_at((uint32_t)n, &k);
-                    hc = T_KNOB(eng_rank(src_engine(src, k)));
-                    entry_label(src, k, tag, nm);
-                    if (src == ENGI_PROPHET)                /* (the Prophet's own name, whole) */
-                        str_cpy(nm, eng_preset(ENGINES[ENGI_PROPHET], k)->name, sizeof nm);
-                    if (!r) {                               /* the card: the name, its engine, its star */
-                        uint16_t bg = out ? T_SURF : ux_mix(T_BG, hc, 18);
-                        uint32_t e = src_engine(src, k);
-                        cv_rrect(BOX_X, y, BOX_W, BR_CARD - 2, 8, bg, T_BG);
-                        cv_free_text(12, ty_y(y + 18, ty_fit(tf, nm[0] ? nm : tag, 196)), ty_fit(tf, nm[0] ? nm : tag, 196),
-                                     nm[0] ? nm : tag, out ? T_MID : T_TEXT, bg, 196);
-                        cv_text_on(12, ty_y(y + 42, lf), lf, ENGINES[eng_idx(e)]->name, out ? T_MID : hc, bg);
-                        cv_icon_mid(212, y + 42, 16, fav ? ICON_X_STAR : ICON_X_STAR_O, fav ? hc : T_DIM, bg);
-                        continue;
-                    }
-                    cv_free_text(12, ty_y(y + BR_ROW / 2 - 1, ty_fit(tf, nm[0] ? nm : tag, 220)), ty_fit(tf, nm[0] ? nm : tag, 220),
-                                 nm[0] ? nm : tag, ux_mix(T_BG, hc, r == -1 || r == 1 ? 78 : 55), T_BG, 220);
-                }
-                cv_rect(238, 0, 2, h, T_LINE);              /* the place */
-                {
-                    int32_t th = 24, ty = total > 1u ? (int32_t)at * (h - th) / (int32_t)(total - 1u) : 0;
-                    cv_rect(238, ty, 2, th, out ? T_MID : T_THEME);
-                }
+    for (uint32_t band = 0; band < (uint32_t)h; band += CV_MAX / 240u) {
+        cv_begin_band(240, (uint32_t)h, T_BG, band);
+        if (!total) {
+            cv_text_c(120, ty_y(h / 2, TY_TX), TY_TX, m == LM_FAV ? "No favourites" : m == LM_RECENT ? "Nothing loaded yet" :
+                      "No sounds", T_MID, T_BG);
+        } else {
+            int32_t first = clamp((int32_t)at - 1, 0, total > BR_SHOW ? (int32_t)total - BR_SHOW : 0);
+            for (int32_t j = 0; j < BR_SHOW && first + j < (int32_t)total; j++) {
+                int32_t n = first + j, y = j * BR_ROW + 1, sel = n == (int32_t)at && !out, tx = 60, cy = y + BR_ROW / 2 - 1;
+                uint32_t e;
+                src = preset_at((uint32_t)n, &k);
+                e = src_engine(src, k);
+                uint16_t hc = T_KNOB(eng_rank(e)), bg = sel ? ux_mix(T_BG, hc, 22) : T_BG;
+                entry_label(src, k, tag, nm);
+                if (src == ENGI_PROPHET)                /* (the Prophet's own name, whole) */
+                    str_cpy(nm, eng_preset(ENGINES[ENGI_PROPHET], k)->name, sizeof nm);
+                if (sel) cv_rrect(BOX_X, y, BOX_W - 4, BR_ROW - 1, 5, bg, T_BG);
+                int32_t x = cv_text_on(10, ty_y(cy, lf), lf, eng_idx(e) == ENGI_MIDI ? "MIDI" : eng_abbr(ENGINES[eng_idx(e)]->name),
+                                       sel ? hc : ux_mix(T_BG, hc, 70), bg);
+                if (src_slot(src)) cv_rect(x + 2, cy + 3, 3, 3, sel ? hc : ux_mix(T_BG, hc, 70));   /* (yours) */
+                cv_free_text(tx, ty_y(cy, lf), lf, nm[0] ? nm : tag, sel ? T_TEXT : T_SEC, bg, sel ? 150 : 172);
+                if (sel) cv_icon_mid(214, cy, 16, fav ? ICON_X_STAR : ICON_X_STAR_O, fav ? hc : T_DIM, bg);
             }
-            cv_oy = 0;
-            cv_blit_band(0, (uint32_t)(BR_BODY_Y + top));
+            cv_rect(238, 0, 2, h, T_LINE);              /* the place */
+            {
+                int32_t th = 18, ty = total > 1u ? (int32_t)at * (h - th) / (int32_t)(total - 1u) : 0;
+                cv_rect(238, ty, 2, th, out ? T_MID : T_THEME);
+            }
         }
+        cv_blit_band(0, BR_BODY_Y);
     }
+}
+
+/* the bottom line: what OCT+ and OCT- do */
+static void browser_foot(void)
+{
+    uint32_t sig = ux.gen * 977u + ux.pal * 31u + 5u;
+    if (!ui.force && sig == brv.foot)
+        return;
+    brv.foot = sig;
+    khint_t kh[2] = {{KC_OCTUP, "KEEP"}, {KC_OCTDN, "BACK"}};
+    cv_begin(240, H_FOOT, T_BG);
+    cv_key_row(8, 232, (H_FOOT - KC_PH) / 2, kh, 2, 3u, T_BG);
+    cv_blit(0, Y_FOOT);
 }
 
 static void browser_draw(void)
 {
-    static uint32_t seen;                               /* (coming back to the page: the category line unlit) */
-    if (ui.frame - seen > 4u) br_at_top = 0;
-    seen = ui.frame;
     uint32_t total, cur = preset_pos(&total);
-    if (ui.force)                                       /* (the canvases cover the rest) */
+    if (ui.force) {                                     /* (the canvases cover the rest) */
         lcd_fill(0, 238, 240, 2, T_BG);
+        lcd_fill(0, H_HEAD, 240, Y_GRAPH - H_HEAD, T_BG);   /* (the cards' band: the gaps between and around them,
+                                                         * which no card draws; the page before's would show there) */
+    }
     browser_top(cur, total);
-    browser_cat();
+    browser_cards(cur, total);
+    browser_foot();
     browser_list(cur, total);                           /* (the busiest last: the SPI sends it during the next frame) */
 }
 

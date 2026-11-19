@@ -1248,26 +1248,21 @@ static void edit_param(uint32_t slot, int32_t steps)
         scale_picker_mark(steps > 0);
         return;
     }
-    if (pg->graph == GR_BROWSE) {   /* the browser's two columns: KNOB 1 LIST (ALL FAV RECENT, the categories), 2 the
-                                     * sounds in it (as PRESETS); 3 FAV, 4 the next / previous engine */
-        if (slot == 1u) {                                 /* (Hookology) up past the first sound: the category line lit,
-                                                           * no wrap to the last; down again: the first */
+    if (pg->graph == GR_BROWSE) {   /* (Hookology beta73, after Skiff's PRESETS) KNOB 1 No.: the sounds of the list (as
+                                     * PRESETS, no wrap past the first); 2 ENGINE: the next / previous engine's first
+                                     * sound in the list; 3 FAV; 4 LIST: ALL FAV RECENT, the categories (ui_browser.c) */
+        ui.hot_col = (uint8_t)slot; ui.hot_t = 40;
+        if (slot == 0u) {
             uint32_t total, cur = preset_pos(&total);
-            if (br_at_top) {
-                if (steps > 0) { br_at_top = 0; ui.force = 1; }
-                return;
-            }
-            if (steps < 0 && total && cur == 0u) { br_at_top = 1; ui.force = 1; return; }
-            browse_turn(EN_K2, steps);
+            if (steps < 0 && total && (brw.on && brw.n < total ? brw.n : cur) == 0u) return;
+            browse_turn(EN_K1, steps);
             return;
         }
-        br_at_top = 0;
+        if (slot == 1u) { browse_engine(steps > 0 ? 1 : -1); return; }
         browse_commit();                                  /* (the others act on the sound shown: load it first) */
-        if (slot == 3u) {
-            select_engine(eng_step(TSEL->eng_req, steps));
-        } else if (slot == 2u) {
+        if (slot == 2u) {
             preset_mark(steps > 0);
-        } else if (slot == 0u) {                          /* ALL FAV RECENT, the categories (no wrap) */
+        } else if (slot == 3u) {                          /* ALL FAV RECENT, the categories (no wrap) */
             uint32_t m = (uint32_t)clamp((int32_t)list_mode() + (steps > 0 ? 1 : -1), 0, (int32_t)LM_N - 1);
             if (m != list_mode()) {
                 list_set(m);

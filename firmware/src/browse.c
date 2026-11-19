@@ -217,7 +217,6 @@ static void recent_push(uint32_t src, uint32_t k)
 enum { LM_ALL, LM_FAV, LM_RECENT, LM_CAT };
 #define LM_N (LM_CAT + NELEM(CAT_ORDER))
 static uint8_t list_recent;
-static uint8_t br_at_top;   /* (Hookology) KNOB 2 went up past the first sound: the category line is lit (ui_browser.c) */
 static uint8_t list_trk[NTRK];                             /* each track's LIST + 1, 0 none */
 static struct { uint8_t on, trk, mode, x; uint16_t n; uint32_t t; } brw;   /* the pending place: list index n; x the
                                                                              * turn's acceleration (the browser's badge) */
@@ -260,7 +259,6 @@ static void list_set(uint32_t m)                            /* the selected trac
     list_recent = m == LM_RECENT;
     list_lcat = (uint8_t)(m >= LM_CAT && m < LM_N ? CAT_ORDER[m - LM_CAT] : 0u);
     brw.on = 0;
-    br_at_top = 0;
 }
 static int list_keep(uint32_t m, uint32_t src, uint32_t k)
 {
@@ -418,4 +416,26 @@ static void browse_turn(uint32_t role, int32_t s)
     brw.on = 0;
     if (n != loaded)
         preset_go(n);
+}
+/* (Hookology beta73) the Patches page's ENGINE: from the sound shown, the next engine's first sound in the list (dir 1),
+ * or the first sound of the engine before (dir -1); none: it stays */
+static void browse_engine(int dir)
+{
+    uint32_t total, loaded = list_cur(&total), cur, k, e, n;
+    if (!total) { browse_turn(EN_K2, dir); return; }
+    cur = brw.on && brw.n < total ? brw.n : loaded < total ? loaded : 0u;
+    e = src_engine(preset_at(cur, &k), k);
+    n = cur;
+    if (dir > 0) {
+        while (n + 1u < total && src_engine(preset_at(n, &k), k) == e) n++;
+        if (src_engine(preset_at(n, &k), k) == e) return;   /* (the last engine already) */
+    } else {
+        while (n > 0u && src_engine(preset_at(n - 1u, &k), k) == e) n--;   /* this engine's first */
+        if (!n) return;
+        n--;                                            /* the engine before: its first */
+        e = src_engine(preset_at(n, &k), k);
+        while (n > 0u && src_engine(preset_at(n - 1u, &k), k) == e) n--;
+    }
+    brw.on = 0;
+    if (n != loaded) preset_go(n);
 }
